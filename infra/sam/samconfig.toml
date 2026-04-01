@@ -1,0 +1,21 @@
+version = 0.1
+
+[default]
+[default.global.parameters]
+stack_name = "reqly-insights"
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.deploy.parameters]
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = false
+region = "ap-south-1"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-dk9ts2q2dtvw"
+# DatabaseUrl and GroqApiKey are NOT stored here — pass via environment
+# variables or --parameter-overrides at deploy time.
+# Example:
+#   sam deploy --parameter-overrides \
+#     "DatabaseUrl=postgresql://..." \
+#     "GroqApiKey=gsk_..."

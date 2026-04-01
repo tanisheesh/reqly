@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  sdk:
+    name: SDK tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -e "./sdk[dev]"
+      - run: pytest sdk/tests -v
+
+  collector:
+    name: Collector tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: timescale/timescaledb:latest-pg16
+        env:
+          POSTGRES_DB: reqly
+          POSTGRES_USER: reqly
+          POSTGRES_PASSWORD: reqly
+        options: >-
+          --health-cmd "pg_isready -U reqly -d reqly"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        working-directory: collector
+        run: pip install -r requirements.txt pytest
+      - name: Run tests
+        working-directory: collector
+        run: pytest tests -v
+        env:
+          DATABASE_URL: "postgresql://reqly:reqly@localhost:5432/reqly"
+          REQLY_INGEST_KEY: "test-key"
+          REQLY_READ_KEY: "test-key"
+
+  dashboard:
+    name: Dashboard type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - name: Install dependencies
+        working-directory: dashboard
+        run: npm ci
+      - name: Type-check
+        working-directory: dashboard
+        run: npx tsc --noEmit
