@@ -1,0 +1,69 @@
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_DB: reqly
+      POSTGRES_USER: reqly
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-localdev}
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+      - ./collector/migrations:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reqly -d reqly"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  collector:
+    build:
+      context: ./collector
+    environment:
+      DATABASE_URL: postgresql://reqly:${POSTGRES_PASSWORD:-localdev}@timescaledb:5432/reqly
+      REQLY_INGEST_KEY: ${REQLY_INGEST_KEY:-demo-key}
+      REQLY_READ_KEY: ${REQLY_READ_KEY:-demo-key}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  dashboard:
+    build:
+      context: ./dashboard
+      args:
+        VITE_COLLECTOR_URL: ${VITE_COLLECTOR_URL:-http://localhost:8000}
+        VITE_READ_KEY: ${REQLY_READ_KEY:-demo-key}
+    ports:
+      - "5173:5173"
+    depends_on:
+      collector:
+        condition: service_healthy
+
+  load-generator:
+    build:
+      context: ./load_generator
+    environment:
+      REQLY_COLLECTOR_URL: http://collector:8000
+      REQLY_INGEST_KEY: ${REQLY_INGEST_KEY:-demo-key}
+      BACKFILL_WEEKS: ${BACKFILL_WEEKS:-8}
+      BACKFILL_EVENTS_PER_HOUR: ${BACKFILL_EVENTS_PER_HOUR:-30}
+      LIVE_RPS: ${LIVE_RPS:-2}
+    depends_on:
+      collector:
+        condition: service_healthy
+    restart: on-failure
+
+
+volumes:
+  timescale_data:

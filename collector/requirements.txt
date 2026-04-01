@@ -1,0 +1,13 @@
+# Mirrors pyproject.toml's [project.dependencies] + the `lambda` extra.
+# Exists only so `sam build` (which expects a requirements.txt in CodeUri
+# for its default Python build process) can resolve dependencies -- the
+# Docker Compose path uses pyproject.toml via `pip install .` instead.
+# Keep in sync with pyproject.toml when dependencies change.
+fastapi>=0.110
+uvicorn[standard]>=0.27
+asyncpg>=0.29
+pydantic>=2.6
+slowapi>=0.1.9
+apscheduler>=3.10,<4.0
+groq>=0.9
+mangum>=0.17

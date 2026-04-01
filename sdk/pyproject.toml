@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reqly"
+version = "0.1.4"
+description = "Auto-instrumentation SDK for FastAPI and Flask: zero-code latency, error rates, and status codes shipped to a Reqly collector."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "GPL-3.0-or-later"
+authors = [{ name = "reqly" }]
+keywords = [
+    "observability", "apm", "monitoring", "fastapi", "flask",
+    "telemetry", "metrics", "latency", "tracing"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Monitoring",
+    "Framework :: FastAPI",
+    "Framework :: Flask",
+]
+dependencies = [
+    "httpx>=0.27,<1.0",
+]
+
+[project.urls]
+Homepage = "https://reqly.tanisheesh.in"
+Repository = "https://github.com/tanisheesh/reqly"
+Issues = "https://github.com/tanisheesh/reqly/issues"
+Documentation = "https://github.com/tanisheesh/reqly/blob/main/CONTRIBUTING.md"
+"Live Demo" = "https://eventflow-g2h5.onrender.com"
+
+[project.optional-dependencies]
+fastapi = ["fastapi>=0.100"]
+flask = ["flask>=2.3"]
+dev = [
+    "pytest>=8.0",
+    "fastapi>=0.100",
+    "flask>=2.3",
+    "httpx>=0.27",
+]
+
+[tool.setuptools.packages.find]
+include = ["reqly*"]

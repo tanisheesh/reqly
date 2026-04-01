@@ -1,0 +1,169 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Reqly — weekly AI Insights Lambda + EventBridge Scheduler + S3 archive.
+
+  The collector (FastAPI) runs separately: docker-compose locally, or Fly.io
+  for a hosted demo. This SAM stack owns only the insights generation job,
+  which is a natural fit for Lambda because it runs once a week, takes ~30s,
+  and is completely stateless with respect to the web tier.
+
+  Cost: effectively $0/month. Lambda permanent free tier covers 1M
+  requests/month and 400K GB-seconds/month. This job runs 4-5 times/month
+  and uses ~15 GB-seconds/run. EventBridge Scheduler permanent free tier
+  covers 14M invocations/month. S3 costs ~$0.001/month for the tiny JSON
+  objects stored here.
+
+Parameters:
+  DatabaseUrl:
+    Type: String
+    NoEcho: true
+    Description: >
+      TimescaleDB connection string.
+      Format: postgresql://user:password@host:5432/reqly
+      For Timescale Cloud: get from your service dashboard.
+      For local/Fly.io: the public-facing connection string.
+
+  GroqApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: >
+      Groq API key for LLM report generation.
+      Get a free key at https://console.groq.com/keys.
+      If left empty, the insights panel falls back to a plain-text
+      statistical summary instead of an LLM-written report.
+
+  GroqModel:
+    Type: String
+    Default: llama-3.3-70b-versatile
+    Description: >
+      Groq model ID. llama-3.3-70b-versatile is used deliberately over
+      smaller/faster models because this runs once a week as a batch job —
+      Groq's famous low-latency inference does not matter here; report
+      quality does.
+
+  Environment:
+    Type: String
+    Default: demo
+    AllowedValues: [demo, production]
+    Description: >
+      demo: Lambda Function URL has no auth (convenient for walkthrough).
+      production: remove the FunctionUrl resource and add API Gateway + IAM.
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 300
+    MemorySize: 512
+    Environment:
+      Variables:
+        DATABASE_URL: !Ref DatabaseUrl
+        GROQ_API_KEY: !Ref GroqApiKey
+        GROQ_MODEL: !Ref GroqModel
+        S3_BUCKET: !Ref InsightReportsBucket
+
+Resources:
+
+  # ---------------------------------------------------------------------------
+  # S3 bucket — archives one JSON object per (service, week).
+  # Path pattern: insights/{service_name}/{YYYY-MM-DD}.json
+  # This is supplemental to the insight_reports table in TimescaleDB; the
+  # dashboard reads from the DB, not S3. S3 gives you a durable, inspectable
+  # history outside the DB and is trivially cheap at this volume.
+  # ---------------------------------------------------------------------------
+  InsightReportsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "reqly-insights-${AWS::AccountId}-${AWS::Region}"
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireOldReports
+            Status: Enabled
+            ExpirationInDays: 365
+
+  # ---------------------------------------------------------------------------
+  # Lambda function — the insights pipeline.
+  # Mirrors the APScheduler job inside the collector (scheduler.py) but runs
+  # as a proper AWS-native scheduled compute unit. Both paths share the same
+  # TimescaleDB schema and produce identical output — this is an AWS-native
+  # alternative to the embedded scheduler, not a replacement for local dev.
+  # ---------------------------------------------------------------------------
+  InsightsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: reqly-weekly-insights
+      CodeUri: insights_lambda/
+      Handler: handler.lambda_handler
+      Description: >
+        Weekly AI insights: pulls 8 weeks of route_errors_1hour data,
+        runs z-score anomaly detection (day-of-week x hour-of-day baseline),
+        hands findings to Groq (Llama 3.3-70b), stores result in TimescaleDB
+        and archives to S3.
+      Policies:
+        - S3WritePolicy:
+            BucketName: !Ref InsightReportsBucket
+      Events:
+        WeeklySchedule:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: "cron(0 23 ? * SUN *)"
+            ScheduleExpressionTimezone: UTC
+            Description: "Reqly weekly insights — Sunday 23:00 UTC"
+            RetryPolicy:
+              MaximumRetryAttempts: 2
+              MaximumEventAgeInSeconds: 3600
+
+      # Uncomment and fill in if TimescaleDB is inside a private VPC
+      # (e.g. RDS in a private subnet). Not needed for Timescale Cloud
+      # or any publicly-accessible Postgres endpoint.
+      #
+      # VpcConfig:
+      #   SecurityGroupIds:
+      #     - !Ref LambdaSecurityGroup
+      #   SubnetIds:
+      #     - !Ref PrivateSubnet1
+      #     - !Ref PrivateSubnet2
+
+  # ---------------------------------------------------------------------------
+  # Lambda Function URL — demo convenience endpoint.
+  # Equivalent to POST /v1/insights/generate on the collector: lets you
+  # trigger a fresh report during a live walkthrough without waiting for
+  # Sunday night.
+  #
+  # AuthType NONE is intentional for the demo environment. For production,
+  # remove this resource and put the Lambda behind API Gateway + IAM auth
+  # (or use the collector's /v1/insights/generate endpoint instead, which
+  # already has X-Reqly-Key auth).
+  # ---------------------------------------------------------------------------
+  InsightsFunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !GetAtt InsightsFunction.Arn
+      AuthType: NONE
+
+  InsightsFunctionUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt InsightsFunction.Arn
+      Action: lambda:InvokeFunctionUrl
+      Principal: "*"
+      FunctionUrlAuthType: NONE
+
+Outputs:
+  InsightsFunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt InsightsFunction.Arn
+
+  InsightsFunctionUrl:
+    Description: >
+      Function URL for manual trigger (demo only — no auth).
+      POST to this URL to regenerate insights for all services immediately.
+      curl -X POST <url>
+    Value: !GetAtt InsightsFunctionUrl.FunctionUrl
+
+  InsightReportsBucket:
+    Description: S3 bucket where insight reports are archived as JSON
+    Value: !Ref InsightReportsBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-InsightReportsBucket"

@@ -1,0 +1,56 @@
+# ── Python ────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+.venv/
+venv/
+env/
+.Python
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ── Node / React ───────────────────────────────────────────────
+node_modules/
+dist-ssr/
+*.local
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# TypeScript build artefacts (generated, not source)
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+
+# ── Environment / secrets ──────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── AWS ────────────────────────────────────────────────────────
+.aws-sam/
+*.zip
+*.pem
+
+# ── Docker volumes ─────────────────────────────────────────────
+timescale_data/
+
+# ── Misc ───────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.log
+secrets.txt
+
+# ── Local demo / scratch ───────────────────────────────────────
+demo/
