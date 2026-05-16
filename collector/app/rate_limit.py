@@ -5,7 +5,7 @@ from slowapi.util import get_remote_address
 
 from .config import settings
 
-# In-memory single-instance limiter — enough to demonstrate the concept
+# In-memory, single-instance limiter -- enough to demonstrate the concept
 # without needing Redis-backed distributed rate limiting. Explicitly does
 # NOT scale horizontally as-is; that's a documented tradeoff, not an
 # oversight (see ARCHITECTURE.md §3).
