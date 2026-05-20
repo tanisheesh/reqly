@@ -41,7 +41,7 @@ class Settings:
             ingest_key=ingest_key,
             read_key=read_key,
             groq_api_key=os.environ.get("GROQ_API_KEY") or None,
-            groq_model=os.environ.get("GROQ_MODEL", "llama3-70b-8192"),
+            groq_model=os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile"),
             cors_origins=cors_origins,
             db_pool_min_size=int(os.environ.get("DB_POOL_MIN_SIZE", "2")),
             db_pool_max_size=int(os.environ.get("DB_POOL_MAX_SIZE", "10")),
