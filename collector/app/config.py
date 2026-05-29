@@ -4,7 +4,7 @@ import logging
 import os
 from dataclasses import dataclass
 
-_logger = logging.getLogger("reqly.collector")
+_logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
