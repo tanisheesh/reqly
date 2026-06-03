@@ -44,7 +44,7 @@ class Settings:
             groq_model=os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile"),
             cors_origins=cors_origins,
             db_pool_min_size=int(os.environ.get("DB_POOL_MIN_SIZE", "2")),
-            db_pool_max_size=int(os.environ.get("DB_POOL_MAX_SIZE", "10")),
+            db_pool_max_size=int(os.environ.get("DB_POOL_MAX_SIZE", "8")),
             rate_limit_per_minute=int(os.environ.get("RATE_LIMIT_PER_MINUTE", "600")),
         )
 
