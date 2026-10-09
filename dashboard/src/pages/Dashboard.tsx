@@ -7,7 +7,7 @@ import { StatusDistributionChart } from "../components/StatusDistributionChart";
 import { TopRoutesTable } from "../components/TopRoutesTable";
 import { InsightsPanel } from "../components/InsightsPanel";
 import { useMetricsSummary } from "../hooks/useMetrics";
-import { TimeWindow } from "../api/client";
+import { COLLECTOR_URL, TimeWindow } from "../api/client";
 
 function ReqlyIcon({ size = 18 }: { size?: number }) {
   return (
@@ -171,7 +171,10 @@ export function Dashboard() {
                 color="amber"
               />
               <KpiTile
-                label="Error rate"
+                // The 1h window reads raw events in 5-minute buckets; longer
+                // windows read the hourly aggregate, whose newest bucket is
+                // the last completed hour -- so don't call it "now".
+                label={timeWindow === "1h" ? "Error rate (5 min)" : "Error rate (last full hour)"}
                 value={latestErrPct}
                 unit="%"
                 color={errColor}
@@ -219,7 +222,7 @@ export function Dashboard() {
               GitHub
             </a>
             <a
-              href="http://localhost:8000/docs"
+              href={`${COLLECTOR_URL}/docs`}
               target="_blank"
               rel="noopener noreferrer"
               className="transition-colors hover:text-slate-400"
