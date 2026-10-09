@@ -1,7 +1,9 @@
 # reqly
 
-**Open-source API observability SDK for FastAPI and Flask.**  
-Auto-instrument your app with 2 lines of code — get latency percentiles, error rates, status distribution, top routes, and weekly AI-generated anomaly reports.
+**Self-hosted API monitoring for FastAPI and Flask — two lines of code.**
+Latency percentiles, error rates and release tracking for every route, shipped to your own
+[Reqly](https://github.com/tanisheesh/reqly) collector — which turns them into deploy-aware
+hourly alerts and weekly AI anomaly reports.
 
 [![PyPI](https://img.shields.io/pypi/v/reqly?color=06b6d4&label=reqly)](https://pypi.org/project/reqly/)
 [![Python](https://img.shields.io/pypi/pyversions/reqly?color=06b6d4)](https://pypi.org/project/reqly/)
@@ -24,8 +26,13 @@ import reqly
 from fastapi import FastAPI
 
 app = FastAPI()
-reqly.instrument(app, service_name="checkout-api")
-# Every route is now tracked — latency · error rate · status codes
+reqly.instrument(
+    app,
+    service_name="checkout-api",
+    collector_url="https://reqly.example.com",
+    api_key="your-ingest-key",
+)
+# Every route is now tracked: latency, errors, status codes, release
 ```
 
 **Flask**
@@ -35,64 +42,101 @@ import reqly
 from flask import Flask
 
 app = Flask(__name__)
-reqly.instrument(app, service_name="checkout-api")
+reqly.instrument(app, service_name="checkout-api")  # settings from REQLY_* env vars
 ```
 
-`instrument()` auto-detects FastAPI vs Flask — no other code changes needed.
+`instrument()` detects FastAPI or Flask by itself — no decorators, no middleware to wire up.
+The release you're running is picked up automatically from your CI or host
+(`GITHUB_SHA`, `RENDER_GIT_COMMIT`, `VERCEL_GIT_COMMIT_SHA`, …), so deploys show up in
+Reqly with no extra code.
 
 ## What you get
 
-- **p50 / p95 / p99 latency** per route
-- **Error rates** and status code distribution (2xx / 3xx / 4xx / 5xx)
-- **Top routes** ranked by volume and error rate
-- **Live requests/min** tile, time windows 1h / 6h / 24h / 7d
-- **Weekly AI anomaly report** — z-score detection with Groq (Llama 3.3-70b) writing the narrative
+From the SDK, per request: method, **route template** (`/orders/{id}`, never the raw
+path), status code, duration, error type, host, **release**, environment and
+request/response **body size**.
 
-> "Your `/auth` endpoint degrades every Monday morning (08:00–10:00), with error rate at 18% vs. a 2% baseline and p95 latency at 1850ms vs. 320ms baseline."
+In the Reqly dashboard and collector:
 
-## Live Demo
+- **p50 / p95 / p99 latency** per route and per service — real percentiles from
+  mergeable sketches, not the max of per-route numbers
+- **Error rates, status codes and top routes** over 1h / 6h / 24h / 7d
+- **Deploy markers and per-release health** — each release's error rate and p95
+- **Hourly alerts** to Slack, Discord or a webhook when a route breaks from its usual
+  weekday-hour pattern, with **root-cause hints**
+- **Weekly AI report** — statistics find the anomalies, Groq (Llama 3.3-70b) writes the
+  summary; plain-text fallback without an API key
 
-Reqly is running live against [EventFlow](https://eventflow-g2h5.onrender.com), a Flask event management app.
+An alert from the demo data looks like this:
 
-- **Demo app** → [eventflow-g2h5.onrender.com](https://eventflow-g2h5.onrender.com)
-- **Metrics dashboard** → [reqly-eventflow-dashboard.onrender.com](https://reqly-eventflow-dashboard.onrender.com)
+```
+🔴 Anomaly — flask-demo /orders (Friday 15:00-16:00 UTC, z=5.37)
+• error rate 30.0% vs 2.2% usual · p95 6588ms vs 1576ms usual
+• running release v2 — vs v1: errors 2.6% → 33.1%, p95 2072ms → 4501ms
+• 100% of errors came from host pod-3, which served 23% of requests
+```
 
-> Login as **Administrator** (`admin@eventhub.com` / `Admin@123`) → click **Metrics** in the nav.
+**Not on Python?** Node, Java, Go and .NET apps can report to the same collector through
+OpenTelemetry — no Reqly SDK needed. See the
+[OpenTelemetry guide](https://github.com/tanisheesh/reqly/blob/main/docs/OTEL.md).
 
 ## Configuration
 
-Every option can be passed as a kwarg to `instrument()` or set via environment variable.  
-Resolution order: **kwarg → env var → default**.
+Every option can be passed to `instrument()` or set as an environment variable.
+Resolution order: **argument → environment variable → default**.
 
-| kwarg | env var | default |
+| argument | environment variable | default |
 |---|---|---|
 | `service_name` | `REQLY_SERVICE_NAME` | `sys.argv[0]` basename |
 | `collector_url` | `REQLY_COLLECTOR_URL` | `http://localhost:8000` |
 | `api_key` | `REQLY_API_KEY` | `None` |
+| `release` | `REQLY_RELEASE`, then CI variables (`GITHUB_SHA`, `CI_COMMIT_SHA`, `RENDER_GIT_COMMIT`, `VERCEL_GIT_COMMIT_SHA`, `RAILWAY_GIT_COMMIT_SHA`, `HEROKU_SLUG_COMMIT`, `K_REVISION`, …) | auto-detected, else `None` |
+| `environment` | `REQLY_ENVIRONMENT` | `None` |
 | `sample_rate` | `REQLY_SAMPLE_RATE` | `1.0` |
 | `flush_interval_seconds` | `REQLY_FLUSH_INTERVAL_SECONDS` | `5.0` |
 | `max_batch_size` | `REQLY_MAX_BATCH_SIZE` | `200` |
 | `max_queue_size` | `REQLY_MAX_QUEUE_SIZE` | `2000` |
 | `ignore_routes` | `REQLY_IGNORE_ROUTES` (comma-separated) | `/health,/metrics` |
 | `capture_request_body` | `REQLY_CAPTURE_REQUEST_BODY` | `False` (not implemented yet) |
-| `release` | `REQLY_RELEASE`, then CI vars (`GITHUB_SHA`, `RENDER_GIT_COMMIT`, …) | auto-detected or `None` |
-| `environment` | `REQLY_ENVIRONMENT` | `None` |
+
+With `sample_rate` below 1.0, request counts in the dashboard are the sampled volume;
+latency percentiles and error rates stay unbiased.
 
 ## Design guarantees
 
-**Fail-open** — any internal SDK error is caught and logged once; instrumentation disables itself rather than raise into your app. A slow or unreachable collector never blocks request threads — all shipping happens on a background thread with strict HTTP timeouts.
+**Fail-open** — any internal SDK error is caught and logged once; instrumentation disables
+itself rather than raise into your app. A slow or unreachable collector never blocks
+request threads — shipping happens on a background thread with strict HTTP timeouts.
 
-**Bounded cardinality** — routes are captured as the framework's matched template (`/users/{id}`), never the raw path (`/users/123`). Unmatched paths collapse into a single `__unmatched__` bucket.
+**Bounded cardinality** — routes are recorded as the framework's matched template
+(`/users/{id}`), never the raw path (`/users/123`). Unmatched paths (404s, scanners)
+collapse into a single `__unmatched__` bucket.
 
-**Bounded memory** — events are held in a fixed-size in-memory queue; under backpressure, oldest events are dropped and counted rather than growing unbounded.
+**Bounded memory** — events wait in a fixed-size in-memory queue; under backpressure the
+oldest events are dropped and counted instead of growing without limit.
 
-**Safe retries** — batches are retried with exponential backoff on `408`, `429` and any `5xx` (e.g. a collector restart behind a proxy); other `4xx` responses are dropped immediately. Every event carries a unique `event_id` the collector dedups on, so a retry never double-counts.
+**Safe retries** — batches are retried with exponential backoff on `408`, `429` and any
+`5xx` (for example a collector restart behind a proxy); other `4xx` responses are dropped
+immediately. Every event carries a unique `event_id` the collector deduplicates on, so a
+retry never double-counts.
 
-**Pre-fork servers** — under gunicorn `--preload` (or uWSGI without lazy-apps), each forked worker restarts its own flush thread and HTTP connection pool, so events from workers are shipped instead of silently queuing forever.
+**Pre-fork servers** — under gunicorn `--preload` (or uWSGI without lazy-apps) each
+forked worker restarts its own flush thread and HTTP connection pool, so workers' events
+are shipped instead of silently queuing forever.
 
-## Self-hosting
+## Compatibility
 
-Reqly is fully self-hostable. Run the full stack (collector + TimescaleDB + dashboard) with Docker Compose:
+| | Supported |
+|---|---|
+| Python | 3.9 – 3.13 |
+| FastAPI | 0.100+ |
+| Flask | 2.3+ |
+| Collector | any version; `release`, `environment` and body sizes are stored by collector 0.3.0+ and ignored by older ones |
+
+## Self-hosting the collector
+
+The SDK sends data to a Reqly collector you run. The full stack — collector,
+TimescaleDB and dashboard — starts with Docker Compose:
 
 ```bash
 git clone https://github.com/tanisheesh/reqly.git
@@ -100,7 +144,24 @@ cd reqly
 docker compose up -d
 ```
 
-See the [repository](https://github.com/tanisheesh/reqly) and [CONTRIBUTING.md](https://github.com/tanisheesh/reqly/blob/main/CONTRIBUTING.md) for full setup instructions.
+Setup, configuration and AWS deployment:
+[docs/SETUP.md](https://github.com/tanisheesh/reqly/blob/main/docs/SETUP.md) ·
+[infra/DEPLOY.md](https://github.com/tanisheesh/reqly/blob/main/infra/DEPLOY.md) ·
+[ingest API spec](https://github.com/tanisheesh/reqly/blob/main/docs/INGEST_SPEC.md)
+
+## Live demo
+
+Reqly monitors [EventFlow](https://eventflow-g2h5.onrender.com), a Flask event management
+app, in production:
+
+- **Demo app** → [eventflow-g2h5.onrender.com](https://eventflow-g2h5.onrender.com)
+- **Metrics dashboard** → [reqly-eventflow-dashboard.onrender.com](https://reqly-eventflow-dashboard.onrender.com)
+
+> Log in as **Administrator** (`admin@eventhub.com` / `Admin@123`) → click **Metrics** in the nav.
+
+## Changelog
+
+See [CHANGELOG.md](https://github.com/tanisheesh/reqly/blob/main/sdk/CHANGELOG.md).
 
 ## License
 
