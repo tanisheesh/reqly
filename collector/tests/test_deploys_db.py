@@ -85,3 +85,38 @@ def test_anomaly_on_new_release_gets_before_after_context():
     assert "before" not in on_v1["release_context"]
 
     assert empty["release_context"] is None
+
+
+def test_release_list_and_chart_markers():
+    service = f"test-releases-{uuid.uuid4().hex[:8]}"
+    now = datetime.now(timezone.utc)
+
+    async def run():
+        pool = await pool_module.create_pool()
+        try:
+            deploy, rows = _scenario(service, now)
+            await queries.insert_events(pool, rows)
+            await queries.record_deployments(pool, rows)
+            releases = await queries.list_releases(pool, service)
+            markers_7d = await queries.get_release_markers(pool, service, "7d")
+            markers_1h = await queries.get_release_markers(pool, service, "1h")
+            return deploy, releases, markers_7d, markers_1h
+        finally:
+            async with pool.acquire() as conn:
+                await conn.execute("DELETE FROM request_events WHERE service_name = $1", service)
+                await conn.execute("DELETE FROM deployments WHERE service_name = $1", service)
+            await pool_module.close_pool()
+
+    deploy, releases, markers_7d, markers_1h = asyncio.run(run())
+
+    assert [r["release"] for r in releases] == ["v2", "v1"]  # newest first
+    v2, v1 = releases
+    assert v2["first_seen_at"] == deploy
+    assert v2["environments"] == ["prod"]
+    assert v2["error_rate"] == pytest.approx(0.20, abs=0.02)
+    assert v1["error_rate"] == pytest.approx(0.02, abs=0.01)
+    assert v2["p95_ms"] == pytest.approx(400.0)
+    assert v1["request_count"] > v2["request_count"] > 0
+
+    assert [m["release"] for m in markers_7d] == ["v2"]  # v1 started 12 days ago
+    assert markers_1h == []

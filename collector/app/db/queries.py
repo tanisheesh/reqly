@@ -351,6 +351,78 @@ async def get_top_routes(pool: asyncpg.Pool, service_name: str, window: str) -> 
     return [dict(r) for r in rows]
 
 
+RELEASE_STATS_DAYS = 14  # raw-event retention: per-release stats can't look further back
+
+
+async def list_releases(pool: asyncpg.Pool, service_name: str, limit: int = 20) -> list[dict]:
+    """Most recent releases of a service, newest first, with request volume,
+    error rate and p95 over the raw-retention window. Releases older than
+    that window still appear (from the deployments table) with zero stats."""
+    deployments = await pool.fetch(
+        """
+        SELECT release,
+               min(first_seen_at) AS first_seen_at,
+               max(last_seen_at) AS last_seen_at,
+               array_remove(array_agg(DISTINCT nullif(environment, '')), NULL) AS environments
+        FROM deployments
+        WHERE service_name = $1
+        GROUP BY release
+        ORDER BY first_seen_at DESC
+        LIMIT $2
+        """,
+        service_name,
+        limit,
+    )
+    if not deployments:
+        return []
+    stats = await pool.fetch(
+        f"""
+        SELECT release,
+               count(*) AS request_count,
+               avg(is_error::int)::float AS error_rate,
+               percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_ms
+        FROM request_events
+        WHERE service_name = $1 AND release = ANY($2::text[])
+          AND time > now() - interval '{RELEASE_STATS_DAYS} days'
+        GROUP BY release
+        """,
+        service_name,
+        [d["release"] for d in deployments],
+    )
+    by_release = {s["release"]: s for s in stats}
+    releases = []
+    for d in deployments:
+        s = by_release.get(d["release"])
+        releases.append({
+            "release": d["release"],
+            "first_seen_at": d["first_seen_at"],
+            "last_seen_at": d["last_seen_at"],
+            "environments": list(d["environments"] or []),
+            "request_count": s["request_count"] if s else 0,
+            "error_rate": s["error_rate"] if s else None,
+            "p95_ms": s["p95_ms"] if s else None,
+        })
+    return releases
+
+
+async def get_release_markers(pool: asyncpg.Pool, service_name: str, window: str) -> list[dict]:
+    """Releases first seen inside the window -- drawn as deploy markers on
+    the dashboard's time-series charts."""
+    interval = _interval_for_window(window)
+    rows = await pool.fetch(
+        f"""
+        SELECT release, min(first_seen_at) AS first_seen_at
+        FROM deployments
+        WHERE service_name = $1
+        GROUP BY release
+        HAVING min(first_seen_at) > now() - interval '{interval}'
+        ORDER BY first_seen_at
+        """,
+        service_name,
+    )
+    return [dict(r) for r in rows]
+
+
 async def get_request_rate(pool: asyncpg.Pool, service_name: str) -> dict:
     """Polls the raw events table directly (not the 1-minute aggregate) for
     the last 60 seconds, so this one tile feels more 'live' in a demo without

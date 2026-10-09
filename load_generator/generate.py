@@ -32,6 +32,7 @@ BACKFILL_WEEKS         = int(os.environ.get("BACKFILL_WEEKS", "8"))
 BACKFILL_EVENTS_PER_HOUR = int(os.environ.get("BACKFILL_EVENTS_PER_HOUR", "30"))
 LIVE_RPS               = float(os.environ.get("LIVE_RPS", "2"))
 BATCH_SIZE             = 500
+_MAX_POST_ATTEMPTS     = 8
 
 SERVICES = ["fastapi-demo", "flask-demo"]
 
@@ -59,6 +60,31 @@ _DEGRADE_HOUR       = 8
 _DEGRADE_ERROR_RATE = 0.45  # strong enough to stand out at ~30 req/hour
 _DEGRADE_P95_MS     = 1800.0
 _DEGRADE_SINCE      = datetime.now(timezone.utc) - timedelta(days=7)
+
+# Bad-deploy scenario for deploy-aware insights: flask-demo moved from v1 to
+# v2 36 hours ago and v2 broke POST /orders. fastapi-demo ran one release the
+# whole time. Releases are sent on every event, so the collector's
+# deployments table and the dashboard's release markers pick them up.
+_DEPLOY_AT = (datetime.now(timezone.utc) - timedelta(hours=36)).replace(
+    minute=0, second=0, microsecond=0
+)
+_RELEASES: dict[str, list[tuple[str, datetime | None]]] = {
+    "fastapi-demo": [("2026.10.0", None)],
+    "flask-demo":   [("v1", None), ("v2", _DEPLOY_AT)],
+}
+_REGRESSION_SERVICE    = "flask-demo"
+_REGRESSION_RELEASE    = "v2"
+_REGRESSION_ENDPOINT   = ("POST", "/orders")
+_REGRESSION_ERROR_RATE = 0.35
+_REGRESSION_P95_FACTOR = 2.5
+
+
+def _release_for(service_name: str, ts: datetime) -> str:
+    current = _RELEASES[service_name][0][0]
+    for release, live_from in _RELEASES[service_name]:
+        if live_from is None or ts >= live_from:
+            current = release
+    return current
 
 
 # Namespace for deterministic backfill event ids (any fixed UUID works).
@@ -91,6 +117,15 @@ def _make_event(
         error_rate = _DEGRADE_ERROR_RATE
         p95_ms     = _DEGRADE_P95_MS
 
+    release = _release_for(service_name, ts)
+    if (
+        service_name == _REGRESSION_SERVICE
+        and release == _REGRESSION_RELEASE
+        and (method, route) == _REGRESSION_ENDPOINT
+    ):
+        error_rate = max(error_rate, _REGRESSION_ERROR_RATE)
+        p95_ms     = p95_ms * _REGRESSION_P95_FACTOR
+
     rng = rng or random  # the random module exposes the same methods as a Random
     is_error    = rng.random() < error_rate
     duration_ms = _sample_duration_ms(p50_ms, p95_ms, rng)
@@ -108,6 +143,7 @@ def _make_event(
         "error":       is_error,
         "error_type":  "InternalServerError" if is_error else None,
         "host":        f"{service_name}-host",
+        "release":     release,
     }
 
 
@@ -123,12 +159,25 @@ def _post_batch(service_name: str, events: list[dict]) -> bool:
         headers={"Content-Type": "application/json", "X-Reqly-Key": INGEST_KEY},
         method="POST",
     )
-    try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            return resp.status < 400
-    except Exception as exc:
-        logger.warning("ingest failed: %s", exc)
-        return False
+    # The backfill sends batches faster than the collector's per-IP rate
+    # limit allows, so 429 (and transient 5xx / connection errors) are
+    # retried with backoff instead of silently dropping weeks of history.
+    for attempt in range(_MAX_POST_ATTEMPTS):
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                return resp.status < 400
+        except urllib.error.HTTPError as exc:
+            if exc.code != 429 and exc.code < 500:
+                logger.warning("ingest rejected with %s, dropping batch", exc.code)
+                return False
+            retry_after = exc.headers.get("Retry-After") if exc.headers else None
+            delay = float(retry_after) if retry_after and retry_after.isdigit() else 2 ** attempt
+        except Exception as exc:
+            logger.warning("ingest failed (%s), retrying", exc)
+            delay = 2 ** attempt
+        time.sleep(min(delay, 30))
+    logger.warning("ingest failed after %d attempts, dropping batch", _MAX_POST_ATTEMPTS)
+    return False
 
 
 def wait_for_collector() -> None:

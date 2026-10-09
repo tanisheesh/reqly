@@ -52,7 +52,8 @@ reqly.instrument(app, service_name="checkout-api")
 
 - **Latency percentiles** — p50 / p95 / p99 per route, across 1h / 6h / 24h / 7d windows with per-route drill-down
 - **Error rates & status distribution** — 2xx / 3xx / 4xx / 5xx breakdown over time, top routes ranked by volume and error rate
-- **AI anomaly reports** — weekly z-score detection against a day-of-week × hour-of-day seasonal baseline, with Groq writing the narrative. Degrades to plain-text stats if no API key is set.
+- **AI anomaly reports** — weekly detection against a day-of-week × hour-of-day seasonal baseline, with Groq writing the narrative. Degrades to plain-text stats if no API key is set.
+- **Deploy-aware** — every event carries its release (auto-detected from CI variables like `GITHUB_SHA`), so each anomaly says which release was running and how the route behaved before vs after it; deploys show up as markers on the charts and in a per-release health table
 - **Zero-overhead SDK** — fail-open (never crashes your app), non-blocking background thread, bounded 2 000-event queue, bounded cardinality (route templates, never raw paths)
 - **Any language via OpenTelemetry** — Node, Java, Go, .NET and more report to Reqly through its OTLP/HTTP endpoint with only exporter env vars, no Reqly SDK ([guide](docs/OTEL.md))
 

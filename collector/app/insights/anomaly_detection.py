@@ -30,11 +30,16 @@ from datetime import datetime, timedelta, timezone
 #      cells at alpha = 0.05, i.e. about one false positive every ~20 weeks.
 #   4. A minimum effect size, so statistically "significant" but trivially
 #      small shifts on huge volumes (e.g. +0.5pp of errors) are ignored.
+#   5. A thin baseline is shrunk toward the route's overall error rate
+#      (empirical Bayes): a cell whose few baseline weeks happened to see
+#      1 error in 90 requests shouldn't make 5 in 30 look like an incident
+#      when the route normally runs at 3%.
 Z_THRESHOLD = 4.0
 MIN_BASELINE_SAMPLES = 3
 TOP_N_ANOMALIES = 5
 
 MIN_BASELINE_ERROR_RATE = 0.005  # floor for the binomial variance, so a 0% baseline isn't infinitely tight
+BASELINE_PRIOR_REQUESTS = 200  # pseudo-requests at the route-wide rate added to each cell's baseline
 MIN_ERROR_RATE_DELTA = 0.02  # observed must differ from baseline by >= 2pp
 
 MIN_REQUESTS_FOR_P95 = 100  # per hourly sample, recent and baseline alike
@@ -146,6 +151,15 @@ def detect_anomalies(rows: list[dict], now: datetime | None = None) -> list[Anom
         else:
             baseline_buckets[key].append(sample)
 
+    # Route-wide baseline error rate across all (day, hour) cells: the prior
+    # each cell's own baseline is shrunk toward.
+    route_baselines: dict[str, list[dict]] = defaultdict(list)
+    for (route, _dow, _hour), samples in baseline_buckets.items():
+        route_baselines[route].extend(samples)
+    route_error_rate = {
+        route: _pooled_error_rate(samples)[0] for route, samples in route_baselines.items()
+    }
+
     anomalies: list[Anomaly] = []
     for key, recent_values in recent_buckets.items():
         baseline_values = baseline_buckets.get(key)
@@ -155,7 +169,12 @@ def detect_anomalies(rows: list[dict], now: datetime | None = None) -> list[Anom
         if not baseline_values or len(baseline_values) < MIN_BASELINE_SAMPLES:
             continue
 
-        baseline_error_rate, _ = _pooled_error_rate(baseline_values)
+        baseline_error_rate, baseline_requests = _pooled_error_rate(baseline_values)
+        if baseline_requests > 0:
+            prior = route_error_rate[key[0]]
+            baseline_error_rate = (
+                baseline_error_rate * baseline_requests + prior * BASELINE_PRIOR_REQUESTS
+            ) / (baseline_requests + BASELINE_PRIOR_REQUESTS)
         observed_error_rate, observed_requests = _pooled_error_rate(recent_values)
         baseline_mean_p95 = statistics.mean(v["p95_ms"] for v in baseline_values)
         observed_p95 = statistics.mean(v["p95_ms"] for v in recent_values)

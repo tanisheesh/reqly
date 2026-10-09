@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useGenerateInsight, useLatestInsight } from "../hooks/useInsights";
 import { Card } from "./Card";
 import { formatMs, formatPercent } from "../format";
-import { HttpError } from "../api/client";
+import { HttpError, ReleaseContext } from "../api/client";
 
 function describeError(error: unknown): string {
   if (error instanceof HttpError && error.status === 401) {
@@ -12,6 +12,31 @@ function describeError(error: unknown): string {
     return "Rate limited — report generation is capped at 5 per minute. Try again shortly.";
   }
   return error instanceof Error ? error.message : "Unexpected error.";
+}
+
+function ReleaseCell({ context }: { context?: ReleaseContext | null }) {
+  if (!context) return <span className="text-slate-600">—</span>;
+  if (!context.is_new_release) {
+    return <span className="font-mono text-slate-500">{context.release}</span>;
+  }
+  const before = context.before;
+  const after = context.after;
+  return (
+    <span className="flex flex-col gap-0.5">
+      <span className="flex items-center gap-1.5">
+        <span className="font-mono text-violet-300">{context.release}</span>
+        <span className="rounded bg-violet-500/15 px-1 py-px text-[10px] font-semibold text-violet-300 ring-1 ring-violet-500/30">
+          new
+        </span>
+      </span>
+      {before && after && (
+        <span className="text-[11px] text-slate-500">
+          vs {context.previous_release}: err {formatPercent(before.error_rate)} → {formatPercent(after.error_rate)}, p95{" "}
+          {formatMs(before.p95_ms)} → {formatMs(after.p95_ms)}
+        </span>
+      )}
+    </span>
+  );
 }
 
 export function InsightsPanel({ serviceName }: { serviceName: string }) {
@@ -92,7 +117,7 @@ export function InsightsPanel({ serviceName }: { serviceName: string }) {
 
               {showData && (
                 <div className="mt-3 overflow-x-auto">
-                  <table className="w-full min-w-[600px] text-xs">
+                  <table className="w-full min-w-[760px] text-xs">
                     <thead>
                       <tr className="border-b border-slate-800 text-left text-slate-500">
                         <th className="pb-2 pr-4 font-semibold">Route</th>
@@ -101,7 +126,8 @@ export function InsightsPanel({ serviceName }: { serviceName: string }) {
                         <th className="pb-2 pr-4 text-right font-semibold">Err (base)</th>
                         <th className="pb-2 pr-4 text-right font-semibold">p95 (obs)</th>
                         <th className="pb-2 pr-4 text-right font-semibold">p95 (base)</th>
-                        <th className="pb-2 text-right font-semibold">z-score</th>
+                        <th className="pb-2 pr-4 text-right font-semibold">z-score</th>
+                        <th className="pb-2 font-semibold">Release</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60">
@@ -123,8 +149,11 @@ export function InsightsPanel({ serviceName }: { serviceName: string }) {
                           <td className="py-2 pr-4 text-right tabular-nums">
                             {formatMs(a.baseline_p95_ms)}
                           </td>
-                          <td className="py-2 text-right tabular-nums font-medium text-amber-400">
+                          <td className="py-2 pr-4 text-right tabular-nums font-medium text-amber-400">
                             {a.z_score.toFixed(2)}
+                          </td>
+                          <td className="py-2">
+                            <ReleaseCell context={a.release_context} />
                           </td>
                         </tr>
                       ))}

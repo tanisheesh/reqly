@@ -69,7 +69,8 @@ Single-page React app built with Vite. State is TanStack Query — metrics are p
 1. APScheduler triggers weekly (or on-demand via API endpoint).
 2. Pulls 8 weeks of hourly aggregates from `route_errors_1hour`.
 3. `anomaly_detection.py` computes a day-of-week × hour-of-day seasonal baseline from the older 7 weeks, compares the most recent 7 days, and flags (route, dow, hour) cells whose error count or p95 rose significantly. Error rates use an exact Poisson tail test on the request/error counts; p95 is only tested on hours with ≥ 100 requests. A cell is flagged at z > 4.0 (≈ Bonferroni for ~1,700 cells per run) and only if the shift is material (≥ 2pp of errors or ≥ 50% p95). Requires ≥ 3 baseline samples.
-4. Top 5 anomalies by z-score are serialized to JSON.
+4. Top 5 anomalies by z-score are serialized to JSON, each with the hour it happened (`window_start`).
+4b. `deploys.py` adds a `release_context` to each anomaly from raw events + the `deployments` table: which release served that route in that hour, whether it was first seen within the week before (so the baseline ran on something else), and for a new release the previous release plus before/after error rate and p95 on that route.
 5. If `GROQ_API_KEY` is set, the structured anomaly JSON is sent to Llama 3.3-70b-versatile (temperature 0.3, max 600 tokens) with a system prompt that explicitly forbids inventing root causes. Otherwise the raw statistical findings are formatted as plain text.
 6. The result is upserted into `insight_reports`.
 
@@ -173,6 +174,7 @@ Groq call has a 30 s timeout. On any exception (timeout, rate limit, provider ou
 | `GET` | `/v1/services` | Read key | List all service names with recorded traffic |
 | `GET` | `/v1/services/{service_name}/routes` | Read key | List all route templates for a service |
 | `GET` | `/v1/metrics/summary` | Read key | Latency series, error rate series, status distribution, top routes, requests/min for a service+window |
+| `GET` | `/v1/services/{service_name}/releases` | Read key | Recent releases with first/last seen, request volume, error rate and p95 (14-day raw window) |
 | `GET` | `/v1/insights/latest` | Read key | Latest weekly AI report for a service |
 | `POST` | `/v1/insights/generate` | Read key | Trigger insights generation on demand (rate-limited 5/min) |
 
