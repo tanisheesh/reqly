@@ -2,7 +2,10 @@
 
 All notable changes to the `reqly` Python SDK.
 
-## Unreleased
+## 0.2.0 — 2026-10-09
+
+First release since 0.1.4: also contains the fixes prepared as 0.1.5, which was never
+published to PyPI.
 
 ### Added
 - `release` and `environment` options (`REQLY_RELEASE` / `REQLY_ENVIRONMENT`). `release` is
@@ -11,8 +14,6 @@ All notable changes to the `reqly` Python SDK.
   older collectors ignore it.
 - `request_bytes` / `response_bytes` on every event. FastAPI counts the actual ASGI body
   messages (works for streaming); Flask reports `Content-Length` (`None` when streamed).
-
-## 0.1.5 — 2026-10-09
 
 ### Fixed
 - Batches are now retried on `408`, `429` and any `5xx` response instead of being
