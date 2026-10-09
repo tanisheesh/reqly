@@ -588,13 +588,14 @@
         <div>
           <div class="hero-badge">
             <span class="hero-badge-dot"></span>
-            v0.1.5 · Open source · GPL-3.0
+            v0.2.0 · Open source · GPL-3.0
           </div>
           <h1>API monitoring<br/>that doesn't<br/><em>get in your way</em></h1>
           <p class="hero-sub">
-            Add one call to your FastAPI or Flask app. Get latency percentiles,
-            per-route error rates, status distribution, and weekly AI-generated
-            anomaly reports — self-hosted, no agents, no SaaS bill.
+            Add one call to your FastAPI or Flask app — or point any OpenTelemetry
+            exporter at it. Get accurate latency percentiles, per-route error rates,
+            deploy markers, hourly alerts and weekly AI anomaly reports that say
+            what changed — self-hosted, no agents, no SaaS bill.
           </p>
           <div class="hero-ctас">
             <a href="https://eventflow-g2h5.onrender.com" target="_blank" rel="noopener" class="btn-primary">
@@ -683,12 +684,12 @@
           <div class="stat-desc">Error rates vs a day-of-week × hour seasonal baseline</div>
         </div>
         <div class="stat-item">
-          <div class="stat-val">2xx – 5xx</div>
-          <div class="stat-desc">Status distribution per service per hour</div>
+          <div class="stat-val">Any stack</div>
+          <div class="stat-desc">Python SDK, or OpenTelemetry for Node, Java, Go, .NET</div>
         </div>
         <div class="stat-item">
-          <div class="stat-val">Weekly AI</div>
-          <div class="stat-desc">Anomaly reports via Groq (Llama 3.3-70b)</div>
+          <div class="stat-val">Hourly + weekly</div>
+          <div class="stat-desc">Slack / Discord alerts and AI reports via Groq</div>
         </div>
       </div>
     </div>
@@ -699,7 +700,7 @@
     <div class="container">
       <p class="section-label">Features</p>
       <h2 class="section-title">Everything you need. Nothing you don't.</h2>
-      <p class="section-sub" style="margin-bottom:2.5rem">Built specifically for FastAPI and Flask — not a generic agent that ships 50 MB of overhead and a $400/month bill.</p>
+      <p class="section-sub" style="margin-bottom:2.5rem">A native SDK for FastAPI and Flask, OpenTelemetry for everything else — not a generic agent that ships 50 MB of overhead and a $400/month bill.</p>
 
       <div class="bento">
 
@@ -823,10 +824,49 @@ app = <span class="fn">FastAPI</span>()
           <div class="card-icon" style="color:#f472b6;border-color:rgba(244,114,182,.25)">
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
           </div>
-          <div class="card-title">Status distribution</div>
-          <div class="card-desc">2xx / 3xx / 4xx / 5xx breakdown per service, per hour.</div>
+          <div class="card-title">Any language via OpenTelemetry</div>
+          <div class="card-desc">Point an OTel exporter at <code class="code-inline">/otlp/v1/traces</code> — Node, Java, Go, .NET. No Reqly SDK needed.</div>
         </div>
 
+      </div>
+    </div>
+  </section>
+
+  <!-- WHAT CHANGED -->
+  <section class="section-sm" style="border-top:1px solid var(--border)">
+    <div class="container">
+      <p class="section-label">Root cause, not just charts</p>
+      <h2 class="section-title">Knows what changed</h2>
+      <p class="section-sub" style="margin-bottom:2rem">Every anomaly comes with the release that was running and where the errors are concentrated — computed from your data, not guessed by a model.</p>
+      <div class="pipe-grid">
+        <div class="pipe-card">
+          <div class="pipe-card-title">Deploy-aware</div>
+          <div class="pipe-card-body">Every event carries its release (auto-detected from CI variables like <code class="code-inline" style="font-size:.6875rem">GITHUB_SHA</code>). Regressions show the release they started on, with before → after numbers, and deploys appear as markers on the charts.</div>
+        </div>
+        <div class="pipe-card">
+          <div class="pipe-card-title">Hourly alerts</div>
+          <div class="pipe-card-body">Each hour is compared with the same weekday-hour in earlier weeks. Slack, Discord or webhook — one alert per route, reminders while it fires, a resolve message when it's over.</div>
+        </div>
+        <div class="pipe-card">
+          <div class="pipe-card-title">Root-cause hints</div>
+          <div class="pipe-card-body">Errors concentrated on one pod relative to its traffic share, or a new error type that wasn't there last week — surfaced as leads in alerts and in the weekly report.</div>
+        </div>
+        <div class="pipe-card">
+          <div class="pipe-card-title">Accurate percentiles</div>
+          <div class="pipe-card-body">Mergeable latency sketches (TimescaleDB Toolkit) make service-level and 7-day p95/p99 real percentiles, within ~0.2% of exact — not the max of per-route numbers.</div>
+        </div>
+      </div>
+      <div class="arch-terminal" style="margin-top:1.25rem">
+        <div class="arch-bar">
+          <span class="arch-dot" style="background:#f06a6a"></span>
+          <span class="arch-dot" style="background:#f0b540"></span>
+          <span class="arch-dot" style="background:#10d9a0"></span>
+          <span class="arch-bar-label">#alerts — example from the demo data</span>
+        </div>
+        <div class="arch-body"><pre style="margin:0;font-family:inherit;font-size:inherit;line-height:inherit;white-space:pre-wrap"><span class="af-app">🔴 Anomaly — flask-demo /orders (Friday 15:00-16:00 UTC, z=5.37)</span>
+<span class="af-dim">• error rate 30.0% vs 2.2% usual · p95 6588ms vs 1576ms usual</span>
+<span class="af-lmb">• running release v2 — vs v1: errors 2.6% → 33.1%, p95 2072ms → 4501ms</span>
+<span class="af-db">• 100% of errors came from host pod-3, which served 23% of requests</span></pre></div>
       </div>
     </div>
   </section>
@@ -847,13 +887,14 @@ app = <span class="fn">FastAPI</span>()
         </div>
         <div class="arch-body"><pre style="margin:0;font-family:inherit;font-size:inherit;line-height:inherit"><span class="af-app">[Your FastAPI / Flask app]</span>
   <span class="af-dim">+</span> Reqly SDK  <span class="af-arrow">──►</span>  POST /v1/ingest  <span class="af-dim">(batched, background thread)</span>
+<span class="af-app">[Any app + OpenTelemetry]</span>  <span class="af-arrow">──►</span>  POST /otlp/v1/traces  <span class="af-dim">(protobuf / JSON)</span>
                              <span class="af-dim">│  X-Reqly-Key auth · rate-limited</span>
                      <span class="af-coll">[Collector — FastAPI + asyncpg]</span>
                              <span class="af-dim">│  bulk insert</span>
                      <span class="af-db">[TimescaleDB]</span>
                       <span class="af-dim">├── request_events      (hypertable · 14-day retention)</span>
                       <span class="af-dim">└── continuous aggregates (no cron — auto-refresh):</span>
-                           <span class="af-dim">├── route_latency_1min      (p50 / p95 / p99 per minute)</span>
+                           <span class="af-dim">├── api_latency_1min        (mergeable p50 / p95 / p99 sketches)</span>
                            <span class="af-dim">├── route_errors_1hour      (error rate per hour)</span>
                            <span class="af-dim">└── route_status_dist_1hour (status codes per hour)</span>
                              <span class="af-dim">│</span>
@@ -865,7 +906,9 @@ app = <span class="fn">FastAPI</span>()
                                 <span class="af-dim">2. Build dow × hour baseline</span>
                                 <span class="af-dim">3. Count-based tests → top 5</span>
                                 <span class="af-dim">4. POST anomaly JSON → Groq</span>
-                                <span class="af-dim">5. Store report → dashboard</span></pre></div>
+                                <span class="af-dim">5. Store report → dashboard</span>
+                                <span class="af-dim">Hourly at :15: same checks →</span>
+                                <span class="af-dim">Slack / Discord / webhook alerts</span></pre></div>
       </div>
     </div>
   </section>
@@ -883,8 +926,8 @@ app = <span class="fn">FastAPI</span>()
         </thead>
         <tbody>
           <tr><td>SDK</td><td>Python — threading, httpx, pure ASGI middleware (no Starlette BaseHTTPMiddleware overhead)</td></tr>
-          <tr><td>Collector</td><td>FastAPI + asyncpg + APScheduler + slowapi — async throughout, no ORM overhead</td></tr>
-          <tr><td>Database</td><td>TimescaleDB — hypertables + continuous aggregates auto-refresh; sub-ms dashboard queries</td></tr>
+          <tr><td>Collector</td><td>FastAPI + asyncpg + APScheduler + slowapi — async throughout, no ORM overhead; native ingest plus an OTLP/HTTP receiver</td></tr>
+          <tr><td>Database</td><td>TimescaleDB (<code class="code-inline">-ha</code> image) — hypertables, continuous aggregates, Toolkit percentile sketches</td></tr>
           <tr><td>Dashboard</td><td>React 19, Vite 8, Tailwind CSS 4, recharts 3, TanStack Query 5</td></tr>
           <tr><td>AI</td><td>Groq API · Llama 3.3-70b-versatile — statistics first, LLM writes narrative only</td></tr>
           <tr><td>AWS (optional)</td><td>Lambda + EventBridge + S3, deployed via SAM — same job as APScheduler, cloud-native cron (set <code class="code-inline">INSIGHTS_SCHEDULER_ENABLED=false</code> so it runs once)</td></tr>
@@ -970,6 +1013,7 @@ app = <span class="fn">FastAPI</span>()
         <a href="#dev-pipeline">6. How the pipeline works</a>
         <a href="#dev-structure">7. Project structure</a>
         <a href="#dev-tests">8. Running tests</a>
+        <a href="#dev-otel">9. Other languages (OpenTelemetry)</a>
       </div>
     </div>
 
@@ -1105,6 +1149,8 @@ app = <span class="fn">Flask</span>(__name__)
           <tr><td>max_queue_size</td><td>REQLY_MAX_QUEUE_SIZE</td><td>2000</td></tr>
           <tr><td>ignore_routes</td><td>REQLY_IGNORE_ROUTES</td><td>/health,/metrics</td></tr>
           <tr><td>capture_request_body</td><td>REQLY_CAPTURE_REQUEST_BODY</td><td>False (not implemented yet)</td></tr>
+          <tr><td>release</td><td>REQLY_RELEASE</td><td>auto: GITHUB_SHA, RENDER_GIT_COMMIT, …</td></tr>
+          <tr><td>environment</td><td>REQLY_ENVIRONMENT</td><td>None</td></tr>
         </tbody>
       </table>
     </div>
@@ -1187,7 +1233,7 @@ docker-compose.yml
     <div class="dev-section" id="dev-tests">
       <h2 class="dev-h2"><span class="dev-num">8</span> Running tests</h2>
       <div class="code-block">
-        <div class="code-header">SDK — 26 tests</div>
+        <div class="code-header">SDK — 31 tests</div>
         <div class="code-body">cd sdk
 pip install -e ".[dev]"
 pytest tests -v</div>
@@ -1206,6 +1252,21 @@ npm install
 npx tsc --noEmit</div>
       </div>
       <p class="dev-text">CI runs all three on every push — <code class="code-inline">.github/workflows/ci.yml</code></p>
+    </div>
+
+    <!-- 9. OpenTelemetry -->
+    <div class="dev-section" id="dev-otel">
+      <h2 class="dev-h2"><span class="dev-num">9</span> Other languages (OpenTelemetry)</h2>
+      <p class="dev-text">Any app with OpenTelemetry instrumentation can report to Reqly without a Reqly SDK. Every official OTel SDK reads these variables:</p>
+      <div class="code-block">
+        <div class="code-header">environment</div>
+        <div class="code-body"><span class="hl">OTEL_EXPORTER_OTLP_ENDPOINT</span>=<span class="str">http://localhost:8000/otlp</span>
+<span class="hl">OTEL_EXPORTER_OTLP_PROTOCOL</span>=<span class="str">http/protobuf</span>
+<span class="hl">OTEL_EXPORTER_OTLP_HEADERS</span>=<span class="str">x-reqly-key=your_ingest_key</span>
+<span class="hl">OTEL_SERVICE_NAME</span>=<span class="str">checkout-api</span>
+<span class="hl">OTEL_RESOURCE_ATTRIBUTES</span>=<span class="str">service.version=&lt;git sha&gt;,deployment.environment.name=prod</span></div>
+      </div>
+      <p class="dev-text">Reqly keeps HTTP server spans only and needs <code class="code-inline">http.route</code> to group requests by route. A runnable Express example lives in <code class="code-inline">examples/otel/express</code>; details in <code class="code-inline">docs/OTEL.md</code>.</p>
     </div>
 
     <div class="dev-links">
