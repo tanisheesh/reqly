@@ -117,7 +117,7 @@ export function InsightsPanel({ serviceName }: { serviceName: string }) {
 
               {showData && (
                 <div className="mt-3 overflow-x-auto">
-                  <table className="w-full min-w-[760px] text-xs">
+                  <table className="w-full min-w-[980px] text-xs">
                     <thead>
                       <tr className="border-b border-slate-800 text-left text-slate-500">
                         <th className="pb-2 pr-4 font-semibold">Route</th>
@@ -127,7 +127,8 @@ export function InsightsPanel({ serviceName }: { serviceName: string }) {
                         <th className="pb-2 pr-4 text-right font-semibold">p95 (obs)</th>
                         <th className="pb-2 pr-4 text-right font-semibold">p95 (base)</th>
                         <th className="pb-2 pr-4 text-right font-semibold">z-score</th>
-                        <th className="pb-2 font-semibold">Release</th>
+                        <th className="pb-2 pr-4 font-semibold">Release</th>
+                        <th className="pb-2 font-semibold">Leads</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60">
@@ -152,8 +153,15 @@ export function InsightsPanel({ serviceName }: { serviceName: string }) {
                           <td className="py-2 pr-4 text-right tabular-nums font-medium text-amber-400">
                             {a.z_score.toFixed(2)}
                           </td>
-                          <td className="py-2">
+                          <td className="py-2 pr-4">
                             <ReleaseCell context={a.release_context} />
+                          </td>
+                          <td className="py-2 text-[11px] text-amber-300/90">
+                            {(a.hints ?? []).length === 0 ? (
+                              <span className="text-slate-600">—</span>
+                            ) : (
+                              (a.hints ?? []).map((h) => <div key={`${h.dimension}:${h.value}`}>{h.text}</div>)
+                            )}
                           </td>
                         </tr>
                       ))}

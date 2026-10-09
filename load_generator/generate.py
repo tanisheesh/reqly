@@ -78,6 +78,21 @@ _REGRESSION_ENDPOINT   = ("POST", "/orders")
 _REGRESSION_ERROR_RATE = 0.35
 _REGRESSION_P95_FACTOR = 2.5
 
+# Every service runs on three pods. Bad-pod scenario for root-cause hints:
+# for two hours, ~29h ago, fastapi-demo's pod-3 times out on /products/{id}
+# while the other pods stay healthy -- the weekly report's hints should say
+# the errors came from pod-3 and are a new TimeoutError.
+_PODS = 3
+_BAD_POD_SERVICE = "fastapi-demo"
+_BAD_POD_HOST    = "fastapi-demo-pod-3"
+_BAD_POD_ROUTE   = "/products/{id}"
+_BAD_POD_FROM    = (datetime.now(timezone.utc) - timedelta(hours=30)).replace(
+    minute=0, second=0, microsecond=0
+)
+_BAD_POD_UNTIL   = _BAD_POD_FROM + timedelta(hours=2)
+_BAD_POD_ERROR_RATE = 0.6
+_BAD_POD_P95_FACTOR = 4.0
+
 
 def _release_for(service_name: str, ts: datetime) -> str:
     current = _RELEASES[service_name][0][0]
@@ -127,6 +142,17 @@ def _make_event(
         p95_ms     = p95_ms * _REGRESSION_P95_FACTOR
 
     rng = rng or random  # the random module exposes the same methods as a Random
+    host = f"{service_name}-pod-{rng.randint(1, _PODS)}"
+    error_type = "InternalServerError"
+    if (
+        host == _BAD_POD_HOST
+        and route == _BAD_POD_ROUTE
+        and _BAD_POD_FROM <= ts < _BAD_POD_UNTIL
+    ):
+        error_rate = max(error_rate, _BAD_POD_ERROR_RATE)
+        p95_ms     = p95_ms * _BAD_POD_P95_FACTOR
+        error_type = "TimeoutError"
+
     is_error    = rng.random() < error_rate
     duration_ms = _sample_duration_ms(p50_ms, p95_ms, rng)
     status_code = (
@@ -141,8 +167,8 @@ def _make_event(
         "status_code": status_code,
         "duration_ms": round(duration_ms, 2),
         "error":       is_error,
-        "error_type":  "InternalServerError" if is_error else None,
-        "host":        f"{service_name}-host",
+        "error_type":  error_type if is_error else None,
+        "host":        host,
         "release":     release,
     }
 
