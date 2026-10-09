@@ -42,6 +42,31 @@ def _env_bool(name: str, default: bool) -> bool:
     return raw.strip().lower() in ("1", "true", "yes", "on")
 
 
+# Commit SHA variables set by common CI/CD and hosting platforms, checked in
+# order when neither release= nor REQLY_RELEASE is given.
+_RELEASE_ENV_VARS = (
+    "GIT_COMMIT",  # Jenkins and many custom pipelines
+    "GITHUB_SHA",  # GitHub Actions
+    "CI_COMMIT_SHA",  # GitLab CI
+    "RENDER_GIT_COMMIT",  # Render
+    "VERCEL_GIT_COMMIT_SHA",  # Vercel
+    "RAILWAY_GIT_COMMIT_SHA",  # Railway
+    "HEROKU_SLUG_COMMIT",  # Heroku (dyno metadata)
+    "SOURCE_VERSION",  # Heroku buildpacks
+    "K_REVISION",  # Cloud Run / Knative revision name
+)
+_MAX_RELEASE_LEN = 128
+_MAX_ENVIRONMENT_LEN = 32
+
+
+def _detect_release() -> str | None:
+    for name in ("REQLY_RELEASE",) + _RELEASE_ENV_VARS:
+        value = (os.environ.get(name) or "").strip()
+        if value:
+            return value[:_MAX_RELEASE_LEN]
+    return None
+
+
 @dataclass
 class Config:
     """Resolved configuration for an instrumented app.
@@ -59,6 +84,8 @@ class Config:
     max_queue_size: int = 2000
     ignore_routes: list[str] = field(default_factory=lambda: ["/health", "/metrics"])
     capture_request_body: bool = False
+    release: str | None = None
+    environment: str | None = None
     sdk_version: str = field(default_factory=_get_sdk_version)
 
     @classmethod
@@ -73,6 +100,8 @@ class Config:
         max_queue_size: int | None,
         ignore_routes: list[str] | None,
         capture_request_body: bool | None,
+        release: str | None = None,
+        environment: str | None = None,
     ) -> "Config":
         import sys as _sys
 
@@ -124,5 +153,12 @@ class Config:
                 capture_request_body
                 if capture_request_body is not None
                 else _env_bool("REQLY_CAPTURE_REQUEST_BODY", False)
+            ),
+            release=(release[:_MAX_RELEASE_LEN] if release else _detect_release()),
+            environment=(
+                (environment or os.environ.get("REQLY_ENVIRONMENT") or "").strip()[
+                    :_MAX_ENVIRONMENT_LEN
+                ]
+                or None
             ),
         )

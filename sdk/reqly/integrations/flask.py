@@ -49,9 +49,14 @@ def instrument_flask(app, client: ReqlyClient) -> None:
             duration_ms=duration_ms,
             error=error,
             error_type=error_type,
+            # Content-Length based: Flask can't count a streamed body without
+            # consuming it, so chunked requests/streamed responses report None.
+            request_bytes=request.content_length,
+            response_bytes=getattr(g, "_REQLY_response_bytes", None),
         )
 
     @app.after_request
     def _REQLY_after_request(response):
         g._REQLY_response_status = response.status_code
+        g._REQLY_response_bytes = None if response.is_streamed else response.content_length
         return response
