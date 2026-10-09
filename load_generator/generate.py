@@ -275,7 +275,38 @@ def live_loop() -> None:
         time.sleep(sleep_s)
 
 
+# Demo SLOs, created (or updated in place) on every start. flask-demo's
+# /orders one is burning: release v2 broke it (see _REGRESSION_*).
+DEMO_SLOS = [
+    {"service_name": "flask-demo", "name": "orders availability", "route": "/orders",
+     "objective": "availability", "target": 0.99, "window_days": 28},
+    {"service_name": "fastapi-demo", "name": "API availability", "route": None,
+     "objective": "availability", "target": 0.98, "window_days": 28},
+    {"service_name": "fastapi-demo", "name": "API latency", "route": None,
+     "objective": "latency", "target": 0.95, "latency_threshold_ms": 1500, "window_days": 28},
+]
+
+
+def seed_slos() -> None:
+    for slo in DEMO_SLOS:
+        req = urllib.request.Request(
+            f"{COLLECTOR_URL}/v1/slos",
+            data=json.dumps(slo).encode(),
+            headers={"Content-Type": "application/json", "X-Reqly-Key": INGEST_KEY},
+            method="PUT",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10):
+                pass
+        except urllib.error.HTTPError as exc:
+            # Older collectors (< 0.5) have no SLO API; the demo works without it.
+            logger.warning("could not create demo SLO %r: HTTP %s", slo["name"], exc.code)
+            return
+    logger.info("demo SLOs ready (%d)", len(DEMO_SLOS))
+
+
 if __name__ == "__main__":
     wait_for_collector()
+    seed_slos()
     backfill()
     live_loop()

@@ -68,6 +68,10 @@ Single-page React app built with Vite. State is TanStack Query — metrics are p
 
 At :15 past every hour the collector refreshes the last completed hour in `route_errors_1hour` and compares it with the same weekday-hour in the previous 8 weeks using the same detector as the weekly report (`recent_window=1h`). Anomalies get the same release context and hints, then `app/alerts/hourly.py` keeps at most one open alert per (service, route) in the `alerts` table: a new detection opens one and notifies, repeats update it (reminder every `ALERT_RENOTIFY_HOURS`), and two clean hours resolve it with a final notification. Messages go to Slack, Discord and/or a generic JSON webhook, built from the statistics only (no LLM in the alert path). Run the scheduler on a single collector instance.
 
+### SLOs and error budgets
+
+An SLO is one objective for a service or route over a window (default 28 days): `availability` (share of requests without an error) or `latency` (share at or under a threshold). The window's SLI and error budget come from `api_latency_1min` (latency via `approx_percentile_rank` on the merged sketch; without the Toolkit, from raw events covering at most 14 days). Burn rates for 5m / 30m / 1h / 6h come from raw events, which are current to the second. Every 5 minutes `app/alerts/slo_alerts.py` applies the multi-window burn-rate rules from the Google SRE workbook — fast burn when the 1h **and** 5m burn rates are ≥ 14.4, slow burn when the 6h **and** 30m rates are ≥ 6, with at least 20 requests in the longer window — and keeps one open alert per SLO (`kind = 'slo'` in `alerts`), notified through the same channels as anomaly alerts and resolved after 30 minutes out of burn.
+
 ### AI Insights Pipeline
 
 1. APScheduler triggers weekly (or on-demand via API endpoint).
@@ -183,7 +187,10 @@ Groq call has a 30 s timeout. On any exception (timeout, rate limit, provider ou
 | `GET` | `/v1/metrics/summary` | Read key | Latency series, error rate series, status distribution, top routes, requests/min for a service+window |
 | `GET` | `/v1/services/{service_name}/releases` | Read key | Recent releases with first/last seen, request volume, error rate and p95 (14-day raw window) |
 | `GET` | `/v1/insights/latest` | Read key | Latest weekly AI report for a service |
-| `GET` | `/v1/alerts` | Read key | Open (or recent, `status=all`) hourly alerts, optionally per service |
+| `GET` | `/v1/alerts` | Read key | Open (or recent, `status=all`) alerts — hourly anomalies and SLO burn — optionally per service |
+| `GET` | `/v1/slos` | Read key | SLOs with live status: SLI, error budget left, burn rates (5m / 30m / 1h / 6h), state |
+| `PUT` | `/v1/slos` | Ingest key | Create or update an SLO (by service + name) |
+| `DELETE` | `/v1/slos/{id}` | Ingest key | Delete an SLO |
 | `POST` | `/v1/insights/generate` | Read key | Trigger insights generation on demand (rate-limited 5/min) |
 
 ---
