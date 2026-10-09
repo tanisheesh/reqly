@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reqly"
-version = "0.1.4"
+version = "0.1.5"
 description = "Auto-instrumentation SDK for FastAPI and Flask: zero-code latency, error rates, and status codes shipped to a Reqly collector."
 readme = "README.md"
 requires-python = ">=3.9"
