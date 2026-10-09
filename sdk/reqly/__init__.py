@@ -11,26 +11,30 @@ __all__ = ["instrument"]
 
 logger = logging.getLogger("reqly")
 
-# Keep a reference on each instrumented app so repeated calls / shutdown
-# hooks can find the client without the caller having to hold onto it.
-_CLIENTS: dict[int, ReqlyClient] = {}
-_APP_CLIENT_ATTR = "_reqly_client"
+# id(app) -> (app, client) for every instrumented app. Holding the app
+# itself keeps its id from being reused by a new object, so a repeat
+# instrument() call on the same app is recognized reliably -- without
+# setting attributes on the app (Litestar apps use __slots__ and refuse).
+_CLIENTS: dict[int, tuple[object, ReqlyClient]] = {}
 
 
 def _detect_framework(app) -> str:
-    module = type(app).__module__ or ""
-    if "flask" in module:
-        return "flask"
-    if "fastapi" in module or "starlette" in module:
-        return "fastapi"
-    # Fallback to duck typing if the module name isn't conclusive.
-    if hasattr(app, "add_middleware"):
-        return "fastapi"
+    # Walk the class hierarchy so subclasses of an app class (a project's
+    # own `class App(FastAPI)`) are recognized too. FastAPI subclasses
+    # Starlette, so it must be checked first.
+    modules = [cls.__module__ or "" for cls in type(app).__mro__]
+    for framework in ("fastapi", "litestar", "starlette", "flask"):
+        if any(m == framework or m.startswith(framework + ".") for m in modules):
+            return framework
+    # Fallback to duck typing if the module names aren't conclusive.
+    if hasattr(app, "add_middleware") and hasattr(app, "router"):
+        return "starlette"
     if hasattr(app, "before_request") and hasattr(app, "wsgi_app"):
         return "flask"
     raise TypeError(
         "reqly.instrument(): could not detect framework for app of type "
-        f"{type(app)!r}. Supported: FastAPI, Flask."
+        f"{type(app)!r}. Supported: FastAPI, Starlette, Litestar, Flask "
+        "(Django: add reqly.integrations.django.ReqlyMiddleware to MIDDLEWARE)."
     )
 
 
@@ -49,7 +53,8 @@ def instrument(
     release: str | None = None,
     environment: str | None = None,
 ) -> ReqlyClient | None:
-    """Instrument a FastAPI or Flask app with one line.
+    """Instrument a FastAPI, Starlette, Litestar or Flask app with one line.
+    (Django: add ``reqly.integrations.django.ReqlyMiddleware`` to MIDDLEWARE.)
 
     Config resolution order for any omitted argument: explicit kwarg >
     environment variable (REQLY_*) > default. See core.config.Config
@@ -60,9 +65,8 @@ def instrument(
     rather than raising, so adding Reqly can never be the reason an
     app fails to start.
     """
-    # Marked on the app object itself: keying on id(app) alone would match a
-    # new app that happens to reuse a garbage-collected app's id.
-    existing = getattr(app, _APP_CLIENT_ATTR, None)
+    entry = _CLIENTS.get(id(app))
+    existing = entry[1] if entry is not None and entry[0] is app else None
     if existing is not None:
         # A second call would add a second middleware and a second flush
         # thread, double-counting every request.
@@ -96,13 +100,20 @@ def instrument(
             from .integrations.fastapi import instrument_fastapi
 
             instrument_fastapi(app, client)
+        elif framework == "starlette":
+            from .integrations.starlette import instrument_starlette
+
+            instrument_starlette(app, client)
+        elif framework == "litestar":
+            from .integrations.litestar import instrument_litestar
+
+            instrument_litestar(app, client)
         else:
             from .integrations.flask import instrument_flask
 
             instrument_flask(app, client)
 
-        _CLIENTS[id(app)] = client
-        setattr(app, _APP_CLIENT_ATTR, client)
+        _CLIENTS[id(app)] = (app, client)
         return client
     except Exception:
         logger.warning(
