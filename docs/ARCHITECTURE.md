@@ -122,6 +122,8 @@ Single-page React app built with Vite. State is TanStack Query — metrics are p
 
 ## 4. Database Schema
 
+**Latency percentiles (migration 003).** With the TimescaleDB Toolkit installed (`timescaledb-ha` image, Timescale Cloud), `api_latency_1min` stores a `uddsketch(1000, 0.005)` per minute, service, environment, route and method. Sketches merge, so service-level and multi-hour p50/p95/p99 are real percentiles of all requests (within ~0.2%) instead of the max of per-route percentiles, long windows are re-bucketed (6h → 5 min, 24h → 15 min, 7d → 1 h), and error rates come from the same 1-minute aggregate instead of the hourly one that lags by up to two hours. Without the Toolkit the migration is a no-op and the collector keeps using the `percentile_cont` views.
+
 The ingest contract (fields, limits, retry semantics) is specified in [INGEST_SPEC.md](INGEST_SPEC.md). Schema v2 (migration `002_event_v2.sql`) adds optional `release`, `environment`, `consumer_id`, byte counts and LLM token columns to `request_events`, plus a `deployments` table (first/last seen per service, environment and release) that ingest maintains for deploy-aware insights.
 
 - `request_events` — hypertable; `event_id UUID`, `time TIMESTAMPTZ`, `service_name TEXT`, `method TEXT`, `route TEXT`, `status_code SMALLINT`, `duration_ms DOUBLE PRECISION`, `is_error BOOLEAN`, `error_type TEXT`, `host TEXT`. Partitioned daily. 14-day retention.

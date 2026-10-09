@@ -35,10 +35,13 @@ REFRESH_SLICE = timedelta(days=7)
 
 # (view, end_offset of its refresh policy). Buckets newer than the end
 # offset are left to the policy, matching how the views are defined.
+# api_latency_1min only exists when the TimescaleDB Toolkit is installed
+# (migration 003); views that don't exist are skipped.
 AGGREGATES: tuple[tuple[str, timedelta], ...] = (
     ("route_latency_1min", timedelta(minutes=1)),
     ("route_errors_1hour", timedelta(hours=1)),
     ("route_status_distribution_1hour", timedelta(hours=1)),
+    ("api_latency_1min", timedelta(minutes=1)),
 )
 
 
@@ -49,13 +52,15 @@ def _floor_to_hour(ts: datetime) -> datetime:
 
 
 def refresh_windows(
-    oldest: datetime, now: datetime
+    oldest: datetime,
+    now: datetime,
+    aggregates: tuple[tuple[str, timedelta], ...] = AGGREGATES,
 ) -> list[tuple[str, datetime, datetime]]:
     """(view, start, end) refresh calls covering [oldest, now - end_offset],
     in REFRESH_SLICE-sized pieces. Pure function so it can be unit tested."""
     start = _floor_to_hour(oldest)
     windows = []
-    for view, end_offset in AGGREGATES:
+    for view, end_offset in aggregates:
         view_end = now - end_offset
         slice_start = start
         while slice_start < view_end:
@@ -94,10 +99,11 @@ class LateDataTracker:
         self._oldest = None
         now = now or datetime.now(timezone.utc)
 
-        windows = refresh_windows(oldest, now)
         started = asyncio.get_running_loop().time()
+        windows: list = []
         try:
             async with pool.acquire() as conn:
+                windows = refresh_windows(oldest, now, await existing_aggregates(conn))
                 for view, start, end in windows:
                     # CALL refresh_continuous_aggregate can't run inside a
                     # transaction block; a bare execute() is autocommit.
@@ -122,6 +128,34 @@ class LateDataTracker:
 
 
 tracker = LateDataTracker()
+
+
+async def existing_aggregates(conn: asyncpg.Connection) -> tuple[tuple[str, timedelta], ...]:
+    present = []
+    for view, end_offset in AGGREGATES:
+        if await conn.fetchval("SELECT to_regclass($1) IS NOT NULL", view):
+            present.append((view, end_offset))
+    return tuple(present)
+
+
+async def seed_empty_aggregates(pool: asyncpg.Pool, late: LateDataTracker = tracker) -> bool:
+    """When a migration has just added an aggregate, it starts out empty
+    (WITH NO DATA) and its refresh policy only looks back an hour. Queue a
+    refresh from the oldest raw event so the new view covers the whole raw
+    retention window. Returns True if a refresh was queued."""
+    async with pool.acquire() as conn:
+        for view, _ in await existing_aggregates(conn):
+            if await conn.fetchval(f"SELECT EXISTS (SELECT 1 FROM {view})"):
+                continue
+            oldest = await conn.fetchval("SELECT min(time) FROM request_events")
+            if oldest is None:
+                return False
+            late.note(oldest)
+            logger.info(
+                "Reqly collector: %s is empty; queued a refresh from %s", view, oldest.isoformat()
+            )
+            return True
+    return False
 
 
 async def run_refresh_loop(pool: asyncpg.Pool, interval_seconds: float) -> None:
