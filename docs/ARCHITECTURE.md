@@ -29,7 +29,7 @@ enough to build it, debug it, or extend it.
 reqly/
   sdk/                Python package (pip install reqly) — ASGI/WSGI middleware, buffer, shipper
   collector/          FastAPI service — ingest, metrics queries, insights scheduler
-  collector/migrations/  001_init.sql — schema applied on TimescaleDB container boot
+  collector/migrations/  001_init.sql — schema applied by the collector on startup
   dashboard/          React SPA — charts, KPI tiles, insights panel
   load_generator/     Synthetic traffic generator for demo/backfill
   demo/               Flask EventFlow app — the live demo target instrumented by the SDK
@@ -68,7 +68,7 @@ Single-page React app built with Vite. State is TanStack Query — metrics are p
 
 1. APScheduler triggers weekly (or on-demand via API endpoint).
 2. Pulls 8 weeks of hourly aggregates from `route_errors_1hour`.
-3. `anomaly_detection.py` computes a day-of-week × hour-of-day seasonal baseline from the older 7 weeks, compares the most recent 7 days, flags any (route, dow, hour) cell with z-score > 2.0 (requires ≥ 3 baseline samples to avoid false positives from thin data).
+3. `anomaly_detection.py` computes a day-of-week × hour-of-day seasonal baseline from the older 7 weeks, compares the most recent 7 days, and flags (route, dow, hour) cells whose error count or p95 rose significantly. Error rates use an exact Poisson tail test on the request/error counts; p95 is only tested on hours with ≥ 100 requests. A cell is flagged at z > 4.0 (≈ Bonferroni for ~1,700 cells per run) and only if the shift is material (≥ 2pp of errors or ≥ 50% p95). Requires ≥ 3 baseline samples.
 4. Top 5 anomalies by z-score are serialized to JSON.
 5. If `GROQ_API_KEY` is set, the structured anomaly JSON is sent to Llama 3.3-70b-versatile (temperature 0.3, max 600 tokens) with a system prompt that explicitly forbids inventing root causes. Otherwise the raw statistical findings are formatted as plain text.
 6. The result is upserted into `insight_reports`.
@@ -177,9 +177,9 @@ Groq call has a 30 s timeout. On any exception (timeout, rate limit, provider ou
 
 ## 7. Security
 
-- **API keys:** `REQLY_INGEST_KEY` (write) and `REQLY_READ_KEY` (read) are separate secrets — sharing read access with a dashboard doesn't expose ingest credentials. Both are passed via `X-Reqly-Key` header. Defaults to `demo-key` with a startup warning if not set.
-- **Ingest validation:** Every event in a batch is validated with Pydantic before writing. `duration_ms` is clamped (0–300 000 ms). Batch size is hard-capped at 1 000 events per call.
-- **Rate limiting:** slowapi enforces 600 req/min on ingest; insights generation is separately limited at 5/min.
+- **API keys:** `REQLY_INGEST_KEY` (write) and `REQLY_READ_KEY` (read) are separate keys, passed via the `X-Reqly-Key` header and compared in constant time. The read key is compiled into the dashboard bundle, so it is effectively public to dashboard viewers; it never falls back to the ingest key, and the collector warns at startup if the two are equal. Defaults: `demo-key` / `demo-read-key`, with a startup warning.
+- **Ingest validation:** Every event in a batch is validated with Pydantic before writing. `duration_ms` is clamped (0–300 000 ms). Batch size is hard-capped at 1 000 events per call, and string fields are length-capped (`service_name` 128, `route` 512, `method` 16).
+- **Rate limiting:** slowapi enforces 600 req/min per client IP on ingest; insights generation is separately limited at 5/min. Behind a proxy, set `FORWARDED_ALLOW_IPS` so the real client IP is used.
 - **Collector secrets:** `GROQ_API_KEY`, `DATABASE_URL` are env vars only — never committed. `.env.example` ships with empty values.
 - **CORS:** Configured via `CORS_ORIGINS` env var — defaults to `*` for local dev, should be restricted in production.
 - **No PII:** The SDK captures only method, route template, status code, duration, and error type — no request bodies, no query params, no user identifiers by default.
@@ -193,7 +193,7 @@ Groq call has a 30 s timeout. On any exception (timeout, rate limit, provider ou
 | SDK internal error | Caught in `record_request()`, logged once at WARNING, SDK self-disables for that session — never propagates to host app |
 | Collector unreachable | httpx timeout (connect 1s, read/write 2s); retried 3 times with exponential backoff + jitter; batch dropped and counter incremented after 3 failures |
 | SDK queue full | Oldest event dropped, `dropped_events` counter incremented — request thread never blocks |
-| Rate-limited (429) | SDK retries up to 3 times with backoff |
+| Rate-limited (429), 408, or collector 5xx | SDK retries up to 3 times with backoff (safe: the collector dedups on `event_id`); other 4xx are dropped immediately |
 | Groq API failure | Falls back to plain-text stats report; insight pipeline does not fail |
 | DB write fails | asyncpg raises; collector returns 500 — SDK will retry the batch on next flush cycle |
 | Malformed event in batch | Validated independently; one bad event increments `rejected` counter and is skipped; rest of batch is accepted |
@@ -204,14 +204,14 @@ Groq call has a 30 s timeout. On any exception (timeout, rate limit, provider ou
 
 **Local (Docker Compose):**
 1. `docker compose up -d` starts all 4 services (timescaledb → collector → dashboard → load-generator).
-2. Schema applied automatically from `collector/migrations/001_init.sql` via `docker-entrypoint-initdb.d`.
+2. The collector applies `collector/migrations/*.sql` on startup, tracking applied files in `schema_migrations`.
 3. Load generator backfills synthetic history on first run, then generates live traffic at ~2 RPS.
 
 **Production (AWS):**
-1. EC2 t3.small runs TimescaleDB in Docker; user-data script applies schema on boot.
+1. EC2 t3.small runs TimescaleDB in Docker (user-data script); the collector applies the schema on first start.
 2. Collector deployed as Docker container on EC2 (or Render/Fly.io) with env vars set.
 3. Dashboard built (`npm run build`) and deployed to any static host (Vercel, S3+CloudFront, Render).
-4. AWS SAM stack deploys `reqly-weekly-insights` Lambda + EventBridge (Sunday 23:00 UTC) + S3 archive for report JSON. Estimated cost: ~$17/month (EC2 t3.small + EBS 20 GB; Lambda/S3 on free tier).
+4. AWS SAM stack deploys `reqly-weekly-insights` Lambda (set `INSIGHTS_SCHEDULER_ENABLED=false` on the collector so the job doesn't run twice) + EventBridge (Sunday 23:00 UTC) + S3 archive for report JSON. Estimated cost: ~$17/month (EC2 t3.small + EBS 20 GB; Lambda/S3 on free tier).
 
 ---
 
