@@ -86,3 +86,51 @@ def test_insufficient_baseline_data_is_not_flagged():
         },
     ]
     assert detect_anomalies(rows, now=now + timedelta(hours=1)) == []
+
+
+def _weekly_rows(route, value_for_week, now):
+    """8 weeks of hourly rows for one route; value_for_week(week_offset)
+    returns (error_rate, p95_ms). week_offset 0 is the most recent week."""
+    rows = []
+    for week_offset in range(8):
+        error_rate, p95_ms = value_for_week(week_offset)
+        for hour in range(24):
+            rows.append(
+                {
+                    "bucket": now - timedelta(weeks=week_offset, hours=-hour),
+                    "route": route,
+                    "request_count": 100,
+                    "error_count": int(error_rate * 100),
+                    "error_rate": error_rate,
+                    "p95_ms": p95_ms,
+                }
+            )
+    return rows
+
+
+def test_single_error_on_zero_error_baseline_is_not_flagged():
+    # Baseline has exactly 0 errors every week (stddev 0). Without a stddev
+    # floor, one stray error would produce an astronomically large z-score.
+    now = datetime(2027, 2, 1, tzinfo=timezone.utc)
+    rows = _weekly_rows(
+        "/health", lambda w: (0.01, 20.0) if w == 0 else (0.0, 20.0), now
+    )
+    assert detect_anomalies(rows, now=now + timedelta(hours=1)) == []
+
+
+def test_small_latency_shift_on_flat_baseline_is_not_flagged():
+    # +10% p95 is below the minimum effect size even though the baseline
+    # is perfectly flat.
+    now = datetime(2027, 2, 1, tzinfo=timezone.utc)
+    rows = _weekly_rows(
+        "/users", lambda w: (0.02, 330.0) if w == 0 else (0.02, 300.0), now
+    )
+    assert detect_anomalies(rows, now=now + timedelta(hours=1)) == []
+
+
+def test_pattern_that_recurs_every_week_is_baseline_not_anomaly():
+    # Degradation present in every week -- including the baseline weeks --
+    # is the seasonal norm for that slot, so it must not be flagged.
+    now = datetime(2027, 2, 1, tzinfo=timezone.utc)
+    rows = _weekly_rows("/auth", lambda w: (0.18, 1850.0), now)
+    assert detect_anomalies(rows, now=now + timedelta(hours=1)) == []
