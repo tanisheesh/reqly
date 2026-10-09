@@ -9,6 +9,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from ..db import queries
 from ..db.pool import get_pool
 from .anomaly_detection import detect_anomalies
+from .deploys import add_release_context
 from .groq_client import generate_report
 
 logger = logging.getLogger("reqly.collector")
@@ -21,14 +22,21 @@ def _current_week_start(now: datetime | None = None) -> date:
 
 async def run_insights_for_service(service_name: str) -> dict:
     """The full pipeline for one service: pull seasonal data, run pure
-    statistical anomaly detection (zero LLM involvement), then hand only
-    the structured findings to Groq to write up. Used by both the weekly
-    scheduled job and the manual /v1/insights/generate demo endpoint.
+    statistical anomaly detection (zero LLM involvement), attach which
+    release was running for each anomaly, then hand only the structured
+    findings to Groq to write up. Used by both the weekly scheduled job and
+    the manual /v1/insights/generate demo endpoint.
     """
     pool = get_pool()
     rows = await queries.get_hourly_seasonal_data(pool, service_name)
     anomalies = detect_anomalies(rows)
     anomalies_dicts = [a.to_dict() for a in anomalies]
+    try:
+        await add_release_context(pool, service_name, anomalies_dicts)
+    except Exception:
+        # Release context is an enrichment; the report is still worth
+        # producing without it.
+        logger.exception("release context failed for service=%s", service_name)
     week_start = _current_week_start()
 
     report_text = await generate_report(service_name, week_start.isoformat(), anomalies_dicts)

@@ -1,6 +1,6 @@
 [project]
 name = "reqly-collector"
-version = "0.2.0"
+version = "0.3.0"
 description = "Reqly collector: ingests SDK telemetry into TimescaleDB and serves dashboard/insights queries."
 requires-python = ">=3.11"
 dependencies = [
@@ -11,6 +11,7 @@ dependencies = [
     "slowapi>=0.1.9",
     "apscheduler>=3.10,<4.0",
     "groq>=0.9",
+    "opentelemetry-proto>=1.27",
 ]
 
 [project.optional-dependencies]

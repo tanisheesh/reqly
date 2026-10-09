@@ -39,6 +39,21 @@ export interface TopRoute {
   error_rate: number | null;
 }
 
+export interface ReleaseMarker {
+  release: string;
+  first_seen_at: string;
+}
+
+export interface Release {
+  release: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  environments: string[];
+  request_count: number;
+  error_rate: number | null;
+  p95_ms: number | null;
+}
+
 export interface MetricsSummary {
   service_name: string;
   route: string | null;
@@ -48,6 +63,7 @@ export interface MetricsSummary {
   status_distribution: StatusDistributionPoint[];
   top_routes: TopRoute[];
   request_rate: { requests_per_minute: number };
+  releases?: ReleaseMarker[]; // collector >= 0.3
 }
 
 export interface Anomaly {
@@ -59,6 +75,23 @@ export interface Anomaly {
   observed_p95_ms: number;
   baseline_p95_ms: number;
   z_score: number;
+  window_start?: string;
+  release_context?: ReleaseContext | null;
+}
+
+export interface ReleaseStats {
+  requests: number;
+  error_rate: number | null;
+  p95_ms: number | null;
+}
+
+export interface ReleaseContext {
+  release: string;
+  release_first_seen_at: string | null;
+  is_new_release: boolean;
+  previous_release?: string;
+  before?: ReleaseStats;
+  after?: ReleaseStats;
 }
 
 export interface InsightReport {
@@ -112,6 +145,11 @@ export const api = {
     if (route) params.set("route", route);
     return getJSON<MetricsSummary>(`/v1/metrics/summary?${params.toString()}`);
   },
+
+  listReleases: (serviceName: string) =>
+    getJSON<{ releases: Release[] }>(
+      `/v1/services/${encodeURIComponent(serviceName)}/releases`
+    ),
 
   getLatestInsight: (serviceName: string) =>
     getJSON<InsightReport>(

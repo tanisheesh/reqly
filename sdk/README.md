@@ -74,7 +74,9 @@ Resolution order: **kwarg → env var → default**.
 | `max_batch_size` | `REQLY_MAX_BATCH_SIZE` | `200` |
 | `max_queue_size` | `REQLY_MAX_QUEUE_SIZE` | `2000` |
 | `ignore_routes` | `REQLY_IGNORE_ROUTES` (comma-separated) | `/health,/metrics` |
-| `capture_request_body` | `REQLY_CAPTURE_REQUEST_BODY` | `False` |
+| `capture_request_body` | `REQLY_CAPTURE_REQUEST_BODY` | `False` (not implemented yet) |
+| `release` | `REQLY_RELEASE`, then CI vars (`GITHUB_SHA`, `RENDER_GIT_COMMIT`, …) | auto-detected or `None` |
+| `environment` | `REQLY_ENVIRONMENT` | `None` |
 
 ## Design guarantees
 
