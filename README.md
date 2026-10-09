@@ -54,6 +54,7 @@ reqly.instrument(app, service_name="checkout-api")
 - **Error rates & status distribution** — 2xx / 3xx / 4xx / 5xx breakdown over time, top routes ranked by volume and error rate
 - **AI anomaly reports** — weekly z-score detection against a day-of-week × hour-of-day seasonal baseline, with Groq writing the narrative. Degrades to plain-text stats if no API key is set.
 - **Zero-overhead SDK** — fail-open (never crashes your app), non-blocking background thread, bounded 2 000-event queue, bounded cardinality (route templates, never raw paths)
+- **Any language via OpenTelemetry** — Node, Java, Go, .NET and more report to Reqly through its OTLP/HTTP endpoint with only exporter env vars, no Reqly SDK ([guide](docs/OTEL.md))
 
 ---
 
@@ -93,6 +94,8 @@ Raw paths like `/users/1` and `/users/99999` become distinct metric labels — c
 | [PRD](docs/PRD.md) | Product requirements — goals, user stories, non-goals |
 | [Architecture](docs/ARCHITECTURE.md) | System design, data flow, component breakdown |
 | [Decisions](docs/DECISIONS.md) | Every major technical decision and why |
+| [OpenTelemetry](docs/OTEL.md) | Send traces from any language via OTLP |
+| [Ingest spec](docs/INGEST_SPEC.md) | The `/v1/ingest` contract for SDK authors |
 | [Setup](docs/SETUP.md) | Local dev setup, env vars, deployment |
 
 ---

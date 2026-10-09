@@ -10,4 +10,5 @@ pydantic>=2.6
 slowapi>=0.1.9
 apscheduler>=3.10,<4.0
 groq>=0.9
+opentelemetry-proto>=1.27
 mangum>=0.17

@@ -3,8 +3,8 @@
 The contract every Reqly SDK implements. Write SDKs for other languages against
 this document, not against the Python SDK's code.
 
-Non-Python apps can also skip writing an SDK entirely and send OpenTelemetry traces
-instead (planned: `POST /otlp/v1/traces`).
+Apps in other languages can also skip writing an SDK entirely and send OpenTelemetry
+traces to `POST /otlp/v1/traces` instead — see [OTEL.md](OTEL.md).
 
 ---
 
