@@ -14,18 +14,24 @@ router = APIRouter()
 
 _MAX_BATCH_SIZE = 1000
 _MAX_DURATION_MS = 300_000  # 5 minutes -- anything longer is clearly corrupt
+# Length caps keep a buggy or hostile client from writing unbounded strings
+# into indexed TEXT columns (route and service_name are in every aggregate).
+_MAX_SERVICE_NAME_LEN = 128
+_MAX_ROUTE_LEN = 512
+_MAX_METHOD_LEN = 16
+_MAX_SHORT_TEXT_LEN = 255
 
 
 class EventIn(BaseModel):
     event_id: uuid.UUID
     timestamp: AwareDatetime
-    method: str
-    route: str
+    method: str = Field(min_length=1, max_length=_MAX_METHOD_LEN)
+    route: str = Field(min_length=1, max_length=_MAX_ROUTE_LEN)
     status_code: int = Field(ge=100, le=599)
     duration_ms: float
     error: bool
-    error_type: str | None = None
-    host: str | None = None
+    error_type: str | None = Field(default=None, max_length=_MAX_SHORT_TEXT_LEN)
+    host: str | None = Field(default=None, max_length=_MAX_SHORT_TEXT_LEN)
 
     @field_validator("duration_ms")
     @classmethod
@@ -36,7 +42,7 @@ class EventIn(BaseModel):
 
 
 class IngestRequest(BaseModel):
-    service_name: str
+    service_name: str = Field(max_length=_MAX_SERVICE_NAME_LEN)
     sdk_version: str | None = None
     events: list[dict] = Field(min_length=1, max_length=_MAX_BATCH_SIZE)
 
