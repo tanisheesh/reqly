@@ -7,6 +7,13 @@ from dataclasses import dataclass
 _logger = logging.getLogger("reqly.collector")
 
 
+def _env_flag(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None or raw.strip() == "":
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
 @dataclass(frozen=True)
 class Settings:
     database_url: str
@@ -20,6 +27,12 @@ class Settings:
     rate_limit_per_minute: int
     insights_scheduler_enabled: bool
     late_data_refresh_seconds: float
+    alerts_enabled: bool
+    alert_slack_webhook_url: str | None
+    alert_discord_webhook_url: str | None
+    alert_webhook_url: str | None
+    alert_renotify_hours: float
+    dashboard_url: str | None
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -59,10 +72,16 @@ class Settings:
             rate_limit_per_minute=int(os.environ.get("RATE_LIMIT_PER_MINUTE", "600")),
             # Set to false when the SAM Lambda owns the weekly run, otherwise
             # both fire every Sunday and the report is generated twice.
-            insights_scheduler_enabled=os.environ.get(
-                "INSIGHTS_SCHEDULER_ENABLED", "true"
-            ).strip().lower() in ("1", "true", "yes", "on"),
+            insights_scheduler_enabled=_env_flag("INSIGHTS_SCHEDULER_ENABLED", True),
             late_data_refresh_seconds=float(os.environ.get("LATE_DATA_REFRESH_SECONDS", "60")),
+            # Hourly anomaly alerts. The check always runs (open alerts show on
+            # the dashboard); notifications only go to channels that are set.
+            alerts_enabled=_env_flag("ALERTS_ENABLED", True),
+            alert_slack_webhook_url=os.environ.get("ALERT_SLACK_WEBHOOK_URL") or None,
+            alert_discord_webhook_url=os.environ.get("ALERT_DISCORD_WEBHOOK_URL") or None,
+            alert_webhook_url=os.environ.get("ALERT_WEBHOOK_URL") or None,
+            alert_renotify_hours=float(os.environ.get("ALERT_RENOTIFY_HOURS", "6")),
+            dashboard_url=os.environ.get("DASHBOARD_URL") or None,
         )
 
 

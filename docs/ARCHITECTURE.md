@@ -64,12 +64,17 @@ A separate plain `insight_reports` table stores one row per service per week (no
 
 Single-page React app built with Vite. State is TanStack Query — metrics are polled every 30 s by default. Components: `ServiceSelector`, `TimeRangePicker`, `LatencyChart` (Recharts LineChart with p50/p95/p99 series), `ErrorRateChart`, `StatusDistributionChart` (pie), `TopRoutesTable`, `InsightsPanel`. KPI tiles show live requests/min, p95, and error rate. The dashboard is a static SPA — the Vite build is deployed to any static host; it calls the collector directly from the browser.
 
+### Hourly alerts
+
+At :15 past every hour the collector refreshes the last completed hour in `route_errors_1hour` and compares it with the same weekday-hour in the previous 8 weeks using the same detector as the weekly report (`recent_window=1h`). Anomalies get the same release context and hints, then `app/alerts/hourly.py` keeps at most one open alert per (service, route) in the `alerts` table: a new detection opens one and notifies, repeats update it (reminder every `ALERT_RENOTIFY_HOURS`), and two clean hours resolve it with a final notification. Messages go to Slack, Discord and/or a generic JSON webhook, built from the statistics only (no LLM in the alert path). Run the scheduler on a single collector instance.
+
 ### AI Insights Pipeline
 
 1. APScheduler triggers weekly (or on-demand via API endpoint).
 2. Pulls 8 weeks of hourly aggregates from `route_errors_1hour`.
 3. `anomaly_detection.py` computes a day-of-week × hour-of-day seasonal baseline from the older 7 weeks, compares the most recent 7 days, and flags (route, dow, hour) cells whose error count or p95 rose significantly. Error rates use an exact Poisson tail test on the request/error counts; p95 is only tested on hours with ≥ 100 requests. A cell is flagged at z > 4.0 (≈ Bonferroni for ~1,700 cells per run) and only if the shift is material (≥ 2pp of errors or ≥ 50% p95). Requires ≥ 3 baseline samples.
 4. Top 5 anomalies by z-score are serialized to JSON, each with the hour it happened (`window_start`).
+4c. `hints.py` adds deterministic root-cause `hints`: errors or slow requests concentrated on one host/environment relative to its traffic share, or an error type / status code that dominates the errors and was rare in the previous week.
 4b. `deploys.py` adds a `release_context` to each anomaly from raw events + the `deployments` table: which release served that route in that hour, whether it was first seen within the week before (so the baseline ran on something else), and for a new release the previous release plus before/after error rate and p95 on that route.
 5. If `GROQ_API_KEY` is set, the structured anomaly JSON is sent to Llama 3.3-70b-versatile (temperature 0.3, max 600 tokens) with a system prompt that explicitly forbids inventing root causes. Otherwise the raw statistical findings are formatted as plain text.
 6. The result is upserted into `insight_reports`.
@@ -178,6 +183,7 @@ Groq call has a 30 s timeout. On any exception (timeout, rate limit, provider ou
 | `GET` | `/v1/metrics/summary` | Read key | Latency series, error rate series, status distribution, top routes, requests/min for a service+window |
 | `GET` | `/v1/services/{service_name}/releases` | Read key | Recent releases with first/last seen, request volume, error rate and p95 (14-day raw window) |
 | `GET` | `/v1/insights/latest` | Read key | Latest weekly AI report for a service |
+| `GET` | `/v1/alerts` | Read key | Open (or recent, `status=all`) hourly alerts, optionally per service |
 | `POST` | `/v1/insights/generate` | Read key | Trigger insights generation on demand (rate-limited 5/min) |
 
 ---

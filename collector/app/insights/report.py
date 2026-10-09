@@ -22,6 +22,8 @@ investigating, not a confirmed diagnosis.
 - If an anomaly has a "release_context" whose "is_new_release" is true, the regression \
 started while a release first seen shortly before it was running. Mention that release and \
 its before/after numbers as a likely lead, still phrased as a hypothesis.
+- If an anomaly has "hints", they are measured concentrations (for example most errors \
+coming from one host, or a new error type). Use them as leads, still phrased as hypotheses.
 - If the anomalies list is empty, state plainly that no significant anomalies were found \
 this week. Do not invent a problem to seem useful.
 """
@@ -51,5 +53,7 @@ def fallback_report(service_name: str, week_start: str, anomalies: list[dict]) -
             )
             if context.get("previous_release"):
                 line += f" (previous: `{context['previous_release']}`)"
+        for hint in a.get("hints") or []:
+            line += f"; {hint['text']}"
         lines.append(line)
     return "\n".join(lines)

@@ -48,6 +48,10 @@ cp .env.example .env
 | `GROQ_MODEL` | `llama-3.3-70b-versatile` | See Groq docs for available models |
 | `CORS_ORIGINS` | `*` | Comma-separated list of allowed origins; restrict in production |
 | `INSIGHTS_SCHEDULER_ENABLED` | `true` | Set `false` when the SAM Lambda runs the weekly job, so it doesn't run twice |
+| `ALERTS_ENABLED` | `true` | Hourly anomaly check (open alerts appear on the dashboard) |
+| `ALERT_SLACK_WEBHOOK_URL` / `ALERT_DISCORD_WEBHOOK_URL` / `ALERT_WEBHOOK_URL` | *(empty)* | Where alert notifications go; unset channels are skipped |
+| `ALERT_RENOTIFY_HOURS` | `6` | Reminder interval while an alert keeps firing |
+| `DASHBOARD_URL` | `http://localhost:5173` | Linked from Slack alerts |
 | `LATE_DATA_REFRESH_SECONDS` | `60` | How often late-arriving events (older than 1h) are materialized into the aggregates |
 | `FORWARDED_ALLOW_IPS` | `127.0.0.1` | Behind a proxy, the proxy's IP — lets rate limiting see the real client IP |
 | `VITE_COLLECTOR_URL` | `http://localhost:8000` | Collector URL as seen from the **browser** (not the Docker network) |
