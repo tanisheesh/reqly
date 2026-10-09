@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import atexit
 import logging
+import os
 import threading
 import time
 from collections import deque
@@ -40,11 +41,31 @@ class EventBuffer:
         self._dropped_events = 0
 
         self._stop_event = threading.Event()
+        self._start_thread()
+        atexit.register(self.shutdown)
+        # Pre-fork servers (gunicorn --preload, uWSGI without lazy-apps)
+        # import the app -- and start this thread -- in the master, then
+        # fork workers. Threads don't survive fork, so without this hook every
+        # worker would queue events forever and never ship them.
+        if hasattr(os, "register_at_fork"):
+            os.register_at_fork(after_in_child=self._reinit_after_fork)
+
+    def _start_thread(self) -> None:
         self._thread = threading.Thread(
             target=self._run, name="reqly-flush", daemon=True
         )
         self._thread.start()
-        atexit.register(self.shutdown)
+
+    def _reinit_after_fork(self) -> None:
+        if self._stop_event.is_set():
+            return
+        # The parent may have held the lock mid-fork; a fresh one is safe
+        # because the child is single-threaded at this point. Events queued
+        # before the fork belong to the parent, which ships them itself.
+        self._lock = threading.Lock()
+        self._queue.clear()
+        self._shipper.reset_after_fork()
+        self._start_thread()
 
     def add(self, event: RequestEvent) -> None:
         with self._lock:

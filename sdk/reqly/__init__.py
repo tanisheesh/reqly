@@ -1,16 +1,11 @@
 from __future__ import annotations
 
 import logging
-from importlib.metadata import PackageNotFoundError
-from importlib.metadata import version as _pkg_version
 
 from .core.client import ReqlyClient
-from .core.config import Config
+from .core.config import Config, _get_sdk_version
 
-try:
-    __version__ = _pkg_version("reqly")
-except PackageNotFoundError:
-    __version__ = "0.1.3"
+__version__ = _get_sdk_version()
 
 __all__ = ["instrument"]
 
@@ -19,6 +14,7 @@ logger = logging.getLogger("reqly")
 # Keep a reference on each instrumented app so repeated calls / shutdown
 # hooks can find the client without the caller having to hold onto it.
 _CLIENTS: dict[int, ReqlyClient] = {}
+_APP_CLIENT_ATTR = "_reqly_client"
 
 
 def _detect_framework(app) -> str:
@@ -62,6 +58,15 @@ def instrument(
     rather than raising, so adding Reqly can never be the reason an
     app fails to start.
     """
+    # Marked on the app object itself: keying on id(app) alone would match a
+    # new app that happens to reuse a garbage-collected app's id.
+    existing = getattr(app, _APP_CLIENT_ATTR, None)
+    if existing is not None:
+        # A second call would add a second middleware and a second flush
+        # thread, double-counting every request.
+        logger.warning("reqly: app is already instrumented, ignoring repeat instrument() call")
+        return existing
+
     try:
         framework = _detect_framework(app)
         config = Config.resolve(
@@ -93,6 +98,7 @@ def instrument(
             instrument_flask(app, client)
 
         _CLIENTS[id(app)] = client
+        setattr(app, _APP_CLIENT_ATTR, client)
         return client
     except Exception:
         logger.warning(
