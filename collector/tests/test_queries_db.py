@@ -74,3 +74,43 @@ def test_top_routes_error_rate_is_not_weighted_by_active_minutes():
     assert top[0]["route"] == "/r"
     assert top[0]["request_count"] == 120
     assert top[0]["error_rate"] == pytest.approx(0.5)
+
+
+def test_late_events_reach_the_hourly_aggregate_after_refresh():
+    """Events 10 days old are outside every refresh policy's look-back, so
+    they only reach route_errors_1hour through the late-data refresher."""
+    from app.db.late_data import LateDataTracker
+
+    service = f"test-late-{uuid.uuid4().hex[:8]}"
+
+    async def run():
+        pool = await pool_module.create_pool()
+        try:
+            hour = datetime.now(timezone.utc).replace(
+                minute=0, second=0, microsecond=0
+            ) - timedelta(days=10)
+            rows = [_row(service, "/late", hour + timedelta(minutes=m), m % 4 == 0) for m in range(40)]
+            await queries.insert_events(pool, rows)
+
+            count_sql = (
+                "SELECT coalesce(sum(request_count), 0) FROM route_errors_1hour "
+                "WHERE service_name = $1"
+            )
+            before = await pool.fetchval(count_sql, service)
+
+            tracker = LateDataTracker()
+            tracker.note(min(r[1] for r in rows))
+            calls = await tracker.refresh(pool)
+
+            after = await pool.fetchval(count_sql, service)
+            return before, calls, after, tracker.pending_since
+        finally:
+            async with pool.acquire() as conn:
+                await conn.execute("DELETE FROM request_events WHERE service_name = $1", service)
+            await pool_module.close_pool()
+
+    before, calls, after, pending = asyncio.run(run())
+    assert before == 0
+    assert calls > 0
+    assert after == 40
+    assert pending is None

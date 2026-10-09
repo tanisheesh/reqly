@@ -1,0 +1,135 @@
+"""Materializes late-arriving events into the continuous aggregates.
+
+The aggregate refresh policies only look back a short window (1h for the
+1-minute view, 3h for the hourly views). Events older than that -- the load
+generator's history backfill, an SDK retrying after a long collector outage,
+OTLP exporters flushing late -- land in request_events but would never reach
+the aggregates the dashboard and the insights pipeline read from.
+
+Ingest reports the oldest timestamp of every batch here; a background task
+then refreshes the affected range of each aggregate explicitly.
+
+Caveat: refreshing a range whose raw chunks were already dropped by the
+retention policy deletes that range from the aggregate. Late events are
+refreshed within one tick (default 60s) of arriving, well before the daily
+retention job could drop the chunks they were just written into.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from datetime import datetime, timedelta, timezone
+
+import asyncpg
+
+logger = logging.getLogger("reqly.collector")
+
+# Anything older than this is outside the shortest policy look-back
+# (route_latency_1min: start_offset 1h), so the policies won't pick it up.
+LATE_THRESHOLD = timedelta(hours=1)
+
+# Large backfills are refreshed in slices so a single CALL can't hold the
+# aggregate's locks for minutes.
+REFRESH_SLICE = timedelta(days=7)
+
+# (view, end_offset of its refresh policy). Buckets newer than the end
+# offset are left to the policy, matching how the views are defined.
+AGGREGATES: tuple[tuple[str, timedelta], ...] = (
+    ("route_latency_1min", timedelta(minutes=1)),
+    ("route_errors_1hour", timedelta(hours=1)),
+    ("route_status_distribution_1hour", timedelta(hours=1)),
+)
+
+
+def _floor_to_hour(ts: datetime) -> datetime:
+    # A refresh window only materializes buckets that lie fully inside it,
+    # so the start is aligned down to the widest bucket (1 hour).
+    return ts.replace(minute=0, second=0, microsecond=0)
+
+
+def refresh_windows(
+    oldest: datetime, now: datetime
+) -> list[tuple[str, datetime, datetime]]:
+    """(view, start, end) refresh calls covering [oldest, now - end_offset],
+    in REFRESH_SLICE-sized pieces. Pure function so it can be unit tested."""
+    start = _floor_to_hour(oldest)
+    windows = []
+    for view, end_offset in AGGREGATES:
+        view_end = now - end_offset
+        slice_start = start
+        while slice_start < view_end:
+            slice_end = min(slice_start + REFRESH_SLICE, view_end)
+            windows.append((view, slice_start, slice_end))
+            slice_start = slice_end
+    return windows
+
+
+class LateDataTracker:
+    """Tracks the oldest late event seen since the last refresh. All access
+    happens on the event loop thread, so no lock is needed: note() has no
+    await, and refresh() swaps the watermark out before its first await."""
+
+    def __init__(self) -> None:
+        self._oldest: datetime | None = None
+
+    @property
+    def pending_since(self) -> datetime | None:
+        return self._oldest
+
+    def note(self, oldest_event_time: datetime, now: datetime | None = None) -> None:
+        now = now or datetime.now(timezone.utc)
+        if oldest_event_time >= now - LATE_THRESHOLD:
+            return
+        if self._oldest is None or oldest_event_time < self._oldest:
+            self._oldest = oldest_event_time
+
+    async def refresh(self, pool: asyncpg.Pool, now: datetime | None = None) -> int:
+        """Refreshes every aggregate over the pending range. Returns the
+        number of refresh calls made. On failure the range is put back so
+        the next tick retries it."""
+        oldest = self._oldest
+        if oldest is None:
+            return 0
+        self._oldest = None
+        now = now or datetime.now(timezone.utc)
+
+        windows = refresh_windows(oldest, now)
+        started = asyncio.get_running_loop().time()
+        try:
+            async with pool.acquire() as conn:
+                for view, start, end in windows:
+                    # CALL refresh_continuous_aggregate can't run inside a
+                    # transaction block; a bare execute() is autocommit.
+                    await conn.execute(
+                        "CALL refresh_continuous_aggregate($1::regclass, $2::timestamptz, $3::timestamptz)",
+                        view,
+                        start,
+                        end,
+                    )
+        except Exception:
+            self.note(oldest, now=now)
+            raise
+
+        logger.info(
+            "Reqly collector: refreshed aggregates for late data since %s "
+            "(%d calls, %.1fs)",
+            oldest.isoformat(),
+            len(windows),
+            asyncio.get_running_loop().time() - started,
+        )
+        return len(windows)
+
+
+tracker = LateDataTracker()
+
+
+async def run_refresh_loop(pool: asyncpg.Pool, interval_seconds: float) -> None:
+    while True:
+        await asyncio.sleep(interval_seconds)
+        try:
+            await tracker.refresh(pool)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("late-data aggregate refresh failed; will retry")

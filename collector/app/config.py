@@ -19,6 +19,7 @@ class Settings:
     db_pool_max_size: int
     rate_limit_per_minute: int
     insights_scheduler_enabled: bool
+    late_data_refresh_seconds: float
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -61,6 +62,7 @@ class Settings:
             insights_scheduler_enabled=os.environ.get(
                 "INSIGHTS_SCHEDULER_ENABLED", "true"
             ).strip().lower() in ("1", "true", "yes", "on"),
+            late_data_refresh_seconds=float(os.environ.get("LATE_DATA_REFRESH_SECONDS", "60")),
         )
 
 

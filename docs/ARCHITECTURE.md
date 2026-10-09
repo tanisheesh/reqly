@@ -48,7 +48,7 @@ FastAPI service with three routers:
 - **Metrics** (`GET /v1/metrics/summary`, `/v1/services`, `/v1/services/{name}/routes`) — reads from continuous aggregates using concurrent `asyncio.gather` for the five sub-queries. All reads require `X-Reqly-Key` (read key, separate from ingest key in production).
 - **Insights** (`GET /v1/insights/latest`, `POST /v1/insights/generate`) — serves the latest weekly report, or triggers one on demand for demos.
 
-On startup the collector creates an asyncpg connection pool and starts an APScheduler job that runs the insights pipeline weekly (overrideable on demand). On shutdown it drains the scheduler and closes the pool.
+On startup the collector creates an asyncpg connection pool, starts a late-data refresher (events older than the aggregates' 1h policy look-back — backfills, SDK retries — are materialized explicitly via `refresh_continuous_aggregate`, in 7-day slices), and starts an APScheduler job that runs the insights pipeline weekly (overrideable on demand). On shutdown it drains the scheduler and closes the pool.
 
 ### TimescaleDB
 
