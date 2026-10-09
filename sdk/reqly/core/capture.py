@@ -4,14 +4,8 @@ import socket
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from importlib.metadata import PackageNotFoundError, version as _pkg_version
 
-
-def _get_sdk_version() -> str:
-    try:
-        return _pkg_version("reqly")
-    except PackageNotFoundError:
-        return "0.1.0"
+from .config import _get_sdk_version
 
 _HOSTNAME = socket.gethostname()
 

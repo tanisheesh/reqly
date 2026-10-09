@@ -7,10 +7,13 @@ import threading
 class Sampler:
     """Decides whether a given request should be kept.
 
-    Unsampled requests still increment ``observed_count`` so that volume and
-    rate metrics can be corrected downstream by ``1 / sample_rate``. Default
-    sample_rate is 1.0 (no sampling) -- this exists as a documented config
-    knob, not because this project's traffic needs it.
+    Unsampled requests still increment ``observed_count`` (visible via
+    ``client.stats()``). The collector does NOT receive the sample rate and
+    does not scale counts back up, so with sample_rate < 1.0 the dashboard's
+    request counts and requests/min are the *sampled* volume -- multiply by
+    ``1 / sample_rate`` to estimate true traffic. Latency percentiles and
+    error rates are unbiased under uniform sampling. Default sample_rate is
+    1.0 (no sampling).
     """
 
     def __init__(self, sample_rate: float = 1.0) -> None:
