@@ -28,11 +28,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import os
 import statistics
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta, timezone
+from statistics import NormalDist
 
 import asyncpg
 import boto3
@@ -52,9 +54,40 @@ S3_BUCKET: str | None = os.environ.get("S3_BUCKET") or None
 # Mirrors collector/app/insights/anomaly_detection.py exactly.
 # ---------------------------------------------------------------------------
 
-Z_THRESHOLD = 2.0
+# Deliberately simple and explainable: a z-score threshold against a
+# day-of-week x hour-of-day seasonal baseline. This is NOT STL decomposition,
+# Prophet, or an ML anomaly detector -- those need more historical data than
+# a few weeks of demo traffic will have, and a transparent, auditable
+# threshold is more defensible in an interview than a model that "just knows".
+#
+# A weekly run makes one comparison per (route, day-of-week, hour) cell --
+# ~1,700 for a 10-route service. At z > 2 (~5% false positives per cell)
+# that is dozens of pure-noise "anomalies" every week, so:
+#   1. Error rates are tested on the actual request/error COUNTS: the chance
+#      of seeing at least this many errors if the baseline rate still held
+#      (exact Poisson tail -- the normal approximation badly understates how
+#      often 3 errors in 30 requests happen by chance), reported as the
+#      equivalent z-score. Only increases count -- the report is about what
+#      degraded.
+#   2. p95 has no count-based standard error, and the p95 of a few dozen
+#      requests is essentially their 2nd-largest value -- pure noise. So p95
+#      is only tested when every hour involved saw >= 100 requests, its
+#      spread is floored at 20% of the baseline, and a shift must be >= 50%.
+#   3. The z threshold is 4.0 -- roughly a Bonferroni correction for ~1,700
+#      cells at alpha = 0.05, i.e. about one false positive every ~20 weeks.
+#   4. A minimum effect size, so statistically "significant" but trivially
+#      small shifts on huge volumes (e.g. +0.5pp of errors) are ignored.
+Z_THRESHOLD = 4.0
 MIN_BASELINE_SAMPLES = 3
 TOP_N_ANOMALIES = 5
+
+MIN_BASELINE_ERROR_RATE = 0.005  # floor for the binomial variance, so a 0% baseline isn't infinitely tight
+MIN_ERROR_RATE_DELTA = 0.02  # observed must differ from baseline by >= 2pp
+
+MIN_REQUESTS_FOR_P95 = 100  # per hourly sample, recent and baseline alike
+MIN_P95_STDDEV_FRACTION = 0.20  # p95 spread floor, as a fraction of the baseline mean
+MIN_P95_RELATIVE_DELTA = 0.50  # p95 must differ by >= 50%
+
 _DOW_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 
@@ -73,57 +106,107 @@ class Anomaly:
         return asdict(self)
 
 
+def _pooled_error_rate(samples: list[dict]) -> tuple[float, int]:
+    """(error_rate, request_count) summed over hourly samples. Pooling counts
+    weights each hour by its traffic instead of averaging per-hour rates."""
+    requests = sum(s["request_count"] for s in samples)
+    if requests > 0:
+        return sum(s["error_count"] for s in samples) / requests, requests
+    return statistics.mean(s["error_rate"] for s in samples), 0
+
+
+def _poisson_upper_tail(k: int, lam: float) -> float:
+    """P(X >= k) for X ~ Poisson(lam), summed directly from k upward so tiny
+    probabilities keep their precision (1 - CDF would round to 0)."""
+    log_term = -lam + k * math.log(lam) - math.lgamma(k + 1)
+    total = 0.0
+    i = k
+    while log_term > -745 and i < k + 100_000:  # exp(-745) underflows to 0
+        term = math.exp(log_term)
+        total += term
+        if term < total * 1e-15:
+            break
+        i += 1
+        log_term += math.log(lam) - math.log(i)
+    return min(total, 1.0)
+
+
+def _error_rate_z(observed: float, n_observed: int, baseline: float) -> float:
+    if n_observed <= 0 or observed - baseline < MIN_ERROR_RATE_DELTA:
+        return 0.0
+    expected = n_observed * max(baseline, MIN_BASELINE_ERROR_RATE)
+    observed_errors = round(observed * n_observed)
+    p_value = max(_poisson_upper_tail(observed_errors, expected), 1e-300)
+    return -NormalDist().inv_cdf(p_value)
+
+
+def _p95_z(recent_samples: list[dict], baseline_samples: list[dict]) -> float:
+    if any(
+        s["request_count"] < MIN_REQUESTS_FOR_P95 for s in recent_samples + baseline_samples
+    ):
+        return 0.0
+    observed = statistics.mean(s["p95_ms"] for s in recent_samples)
+    baseline_values = [s["p95_ms"] for s in baseline_samples]
+    baseline_mean = statistics.mean(baseline_values)
+    if baseline_mean <= 0:
+        return 0.0
+    delta = observed - baseline_mean  # increases only, like error rate
+    if delta / baseline_mean < MIN_P95_RELATIVE_DELTA:
+        return 0.0
+    spread = max(statistics.pstdev(baseline_values), baseline_mean * MIN_P95_STDDEV_FRACTION)
+    return delta / spread
+
+
 def detect_anomalies(rows: list[dict], now: datetime | None = None) -> list[Anomaly]:
-    """
-    Splits 8 weeks of hourly data into:
-      - baseline: everything older than 7 days (7 historical weeks)
-      - recent:   the most recent 7 days
+    """rows: hourly (bucket, route, request_count, error_count, error_rate,
+    p95_ms) records spanning ~8 trailing weeks, as returned by
+    db.queries.get_hourly_seasonal_data.
 
-    Groups both by (route, day_of_week, hour_of_day). For each (dow, hour)
-    bucket that appears in recent data, computes a z-score against the
-    baseline mean + stddev. Flags buckets exceeding Z_THRESHOLD.
-
-    Day-of-week × hour-of-day segmentation is exactly what makes a recurring
-    pattern like "every Monday 08:00-10:00" visible — a flat rolling average
-    would never surface it.
+    Splits rows into "baseline" (everything older than 7 days) and "recent"
+    (the most recent 7 days), grouped by (route, day_of_week, hour_of_day) --
+    this segmentation is exactly what makes a recurring pattern like "every
+    Monday morning" visible; a flat rolling average would never surface it.
     """
     now = now or datetime.now(timezone.utc)
     cutoff = now - timedelta(days=7)
 
-    baseline_buckets: dict[tuple, list[tuple[float, float]]] = defaultdict(list)
-    recent_buckets: dict[tuple, list[tuple[float, float]]] = defaultdict(list)
+    baseline_buckets: dict[tuple, list[dict]] = defaultdict(list)
+    recent_buckets: dict[tuple, list[dict]] = defaultdict(list)
 
     for row in rows:
         bucket = row["bucket"]
         if bucket.tzinfo is None:
             bucket = bucket.replace(tzinfo=timezone.utc)
         key = (row["route"], bucket.weekday(), bucket.hour)
-        error_rate = row["error_rate"] or 0.0
-        p95_ms = row["p95_ms"] or 0.0
+        sample = {
+            "request_count": row.get("request_count") or 0,
+            "error_count": row.get("error_count") or 0,
+            "error_rate": row["error_rate"] or 0.0,
+            "p95_ms": row["p95_ms"] or 0.0,
+        }
         if bucket >= cutoff:
-            recent_buckets[key].append((error_rate, p95_ms))
+            recent_buckets[key].append(sample)
         else:
-            baseline_buckets[key].append((error_rate, p95_ms))
+            baseline_buckets[key].append(sample)
 
     anomalies: list[Anomaly] = []
     for key, recent_values in recent_buckets.items():
         baseline_values = baseline_buckets.get(key)
+        # Require a minimum sample count before flagging -- otherwise mark
+        # "insufficient data" implicitly by skipping, rather than risk a
+        # false anomaly from a thin baseline.
         if not baseline_values or len(baseline_values) < MIN_BASELINE_SAMPLES:
             continue
 
-        baseline_error_rates = [v[0] for v in baseline_values]
-        baseline_p95s = [v[1] for v in baseline_values]
-        baseline_mean_err = statistics.mean(baseline_error_rates)
-        baseline_stddev_err = statistics.pstdev(baseline_error_rates) or 1e-9
-        baseline_mean_p95 = statistics.mean(baseline_p95s)
-        baseline_stddev_p95 = statistics.pstdev(baseline_p95s) or 1e-9
+        baseline_error_rate, _ = _pooled_error_rate(baseline_values)
+        observed_error_rate, observed_requests = _pooled_error_rate(recent_values)
+        baseline_mean_p95 = statistics.mean(v["p95_ms"] for v in baseline_values)
+        observed_p95 = statistics.mean(v["p95_ms"] for v in recent_values)
 
-        observed_error_rate = statistics.mean(v[0] for v in recent_values)
-        observed_p95 = statistics.mean(v[1] for v in recent_values)
-
-        z_err = abs(observed_error_rate - baseline_mean_err) / baseline_stddev_err
-        z_p95 = abs(observed_p95 - baseline_mean_p95) / baseline_stddev_p95
-        z_score = max(z_err, z_p95)
+        z_score = max(
+            _error_rate_z(observed_error_rate, observed_requests, baseline_error_rate),
+            _p95_z(recent_values, baseline_values),
+        )
 
         if z_score > Z_THRESHOLD:
             route, dow, hour = key
@@ -131,9 +214,9 @@ def detect_anomalies(rows: list[dict], now: datetime | None = None) -> list[Anom
                 Anomaly(
                     route=route,
                     day_of_week=_DOW_NAMES[dow],
-                    hour_range=f"{hour:02d}:00-{(hour + 1) % 24:02d}:00",
+                    hour_range=f"{hour:02d}:00-{'00:00 (+1d)' if hour == 23 else f'{hour + 1:02d}:00'}",
                     observed_error_rate=round(observed_error_rate, 4),
-                    baseline_error_rate=round(baseline_mean_err, 4),
+                    baseline_error_rate=round(baseline_error_rate, 4),
                     observed_p95_ms=round(observed_p95, 1),
                     baseline_p95_ms=round(baseline_mean_p95, 1),
                     z_score=round(z_score, 2),
@@ -149,17 +232,18 @@ def detect_anomalies(rows: list[dict], now: datetime | None = None) -> list[Anom
 # Mirrors collector/app/insights/groq_client.py exactly.
 # ---------------------------------------------------------------------------
 
-_SYSTEM_PROMPT = (
-    "You are a site-reliability analyst. You will be given pre-computed "
-    "statistical anomalies for an API service's past week. Write a concise "
-    "report (3-6 bullet points) explaining what was observed.\n\n"
-    "Rules:\n"
-    "- Only reference the numbers given. Do not invent root causes you cannot verify.\n"
-    "- Phrase causal explanations as hypotheses (\"likely due to\", \"consistent with\"), "
-    "never as asserted fact.\n"
-    "- If the anomalies list is empty, state plainly that no significant anomalies "
-    "were found this week. Do not invent a problem to seem useful."
-)
+_SYSTEM_PROMPT = """You are a site-reliability analyst. You will be given pre-computed \
+statistical anomalies for an API service's past week. Write a concise report \
+(3-6 bullet points) explaining what was observed.
+
+Rules:
+- Only reference the numbers given. Do not invent root causes you cannot verify from the data.
+- Phrase causal explanations as hypotheses ("likely due to", "consistent with"), never as \
+asserted fact, and note explicitly that any causal explanation is a hypothesis worth \
+investigating, not a confirmed diagnosis.
+- If the anomalies list is empty, state plainly that no significant anomalies were found \
+this week. Do not invent a problem to seem useful.
+"""
 
 
 def generate_report(service_name: str, week_start: str, anomalies: list[dict]) -> str:
@@ -175,7 +259,7 @@ def generate_report(service_name: str, week_start: str, anomalies: list[dict]) -
     try:
         from groq import Groq
 
-        client = Groq(api_key=GROQ_API_KEY)
+        client = Groq(api_key=GROQ_API_KEY, timeout=30.0)
         payload = {
             "service_name": service_name,
             "week_of": week_start,
@@ -218,7 +302,9 @@ def _fallback_report(service_name: str, week_start: str, anomalies: list[dict]) 
 
 async def list_services(pool: asyncpg.Pool) -> list[str]:
     rows = await pool.fetch(
-        "SELECT DISTINCT service_name FROM request_events ORDER BY service_name"
+        # Same source as the collector: the 90-day aggregate, not the 14-day
+        # raw table, so services quiet for >2 weeks still get a report.
+        "SELECT DISTINCT service_name FROM route_latency_1min ORDER BY service_name"
     )
     return [r["service_name"] for r in rows]
 
@@ -329,7 +415,7 @@ async def async_main() -> dict:
     try:
         services = await list_services(pool)
         if not services:
-            logger.warning("no services in request_events — nothing to process")
+            logger.warning("no services in route_latency_1min — nothing to process")
             return {"processed": 0, "services": []}
 
         results = []
