@@ -26,6 +26,19 @@ fi
 echo "=== Reqly TimescaleDB Setup ==="
 date
 
+# Small instances (t3.micro / t4g.micro have 1 GB RAM): add 1 GB of swap so a
+# memory spike (aggregate refresh, big backfill) slows Postgres down instead
+# of getting it OOM-killed.
+MEM_KB=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+if [ "$MEM_KB" -lt 2000000 ] && [ ! -f /swapfile ]; then
+  dd if=/dev/zero of=/swapfile bs=1M count=1024
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  echo "Added 1 GB swap"
+fi
+
 # Install Docker
 amazon-linux-extras install docker -y 2>/dev/null || dnf install -y docker
 systemctl start docker
