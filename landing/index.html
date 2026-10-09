@@ -588,7 +588,7 @@
         <div>
           <div class="hero-badge">
             <span class="hero-badge-dot"></span>
-            v0.1.0 · Open source · GPL-3.0
+            v0.1.5 · Open source · GPL-3.0
           </div>
           <h1>API monitoring<br/>that doesn't<br/><em>get in your way</em></h1>
           <p class="hero-sub">
@@ -680,7 +680,7 @@
         </div>
         <div class="stat-item">
           <div class="stat-val">Per-route</div>
-          <div class="stat-desc">Error rates with z-score anomaly baseline</div>
+          <div class="stat-desc">Error rates vs a day-of-week × hour seasonal baseline</div>
         </div>
         <div class="stat-item">
           <div class="stat-val">2xx – 5xx</div>
@@ -738,6 +738,12 @@ app = <span class="fn">FastAPI</span>()
               <span style="color:var(--green)">✓</span> Queue capped at 2 000 events
             </div>
             <div style="font-size:.75rem;color:var(--text-2);display:flex;gap:6px;align-items:center">
+              <span style="color:var(--green)">✓</span> Retries 429 / 5xx with backoff — deduped server-side
+            </div>
+            <div style="font-size:.75rem;color:var(--text-2);display:flex;gap:6px;align-items:center">
+              <span style="color:var(--green)">✓</span> Safe under gunicorn <code class="code-inline">--preload</code>
+            </div>
+            <div style="font-size:.75rem;color:var(--text-2);display:flex;gap:6px;align-items:center">
               <span style="color:var(--green)">✓</span> Route templates, never raw paths
             </div>
           </div>
@@ -788,15 +794,17 @@ app = <span class="fn">FastAPI</span>()
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
           </div>
           <div class="card-title">Weekly AI anomaly reports</div>
-          <div class="card-desc" style="margin-bottom:.875rem">Z-score anomaly detection first — Groq writes the narrative last. The LLM never sees raw events; only the structured anomaly JSON.</div>
-          <div class="ai-json"><span class="aj-key">"route"</span>: <span class="aj-str">"/auth"</span>,
+          <div class="card-desc" style="margin-bottom:.875rem">Statistics first, Groq writes the narrative last. Each route is compared against the same day-of-week and hour in the previous 7 weeks, using the real request and error counts — tuned to about one false alarm every ~20 weeks. The LLM never sees raw events, only the structured anomaly JSON.</div>
+          <div class="ai-json"><span class="aj-key">"route"</span>: <span class="aj-str">"/auth/login"</span>,
 <span class="aj-key">"day_of_week"</span>: <span class="aj-str">"Monday"</span>,
-<span class="aj-key">"hour_range"</span>: <span class="aj-str">"08:00–10:00"</span>,
-<span class="aj-key">"observed_error_rate"</span>: <span class="aj-num">0.18</span>,
-<span class="aj-key">"baseline_error_rate"</span>: <span class="aj-num">0.02</span>,
-<span class="aj-key">"z_score"</span>: <span class="aj-num">3.4</span></div>
+<span class="aj-key">"hour_range"</span>: <span class="aj-str">"08:00-09:00"</span>,
+<span class="aj-key">"observed_error_rate"</span>: <span class="aj-num">0.1833</span>,
+<span class="aj-key">"baseline_error_rate"</span>: <span class="aj-num">0.0274</span>,
+<span class="aj-key">"observed_p95_ms"</span>: <span class="aj-num">1840.0</span>,
+<span class="aj-key">"baseline_p95_ms"</span>: <span class="aj-num">320.8</span>,
+<span class="aj-key">"z_score"</span>: <span class="aj-num">23.68</span></div>
           <div style="margin-top:1rem;padding:1rem;background:rgba(139,92,246,.07);border:1px solid rgba(139,92,246,.15);border-radius:6px;font-size:.8125rem;color:var(--text-2);line-height:1.65;font-style:italic">
-            "Your <span style="color:var(--text);font-style:normal">/auth</span> endpoint degrades every Monday morning — error rate 18% vs. 2% baseline, p95 at 1850ms vs. 320ms."
+            "This Monday 08:00–09:00, <span style="color:var(--text);font-style:normal">/auth/login</span> ran at an 18.3% error rate vs. a 2.7% baseline for that hour, with p95 at 1840ms vs. 321ms — likely worth checking what changed before Monday morning."
           </div>
           <div style="margin-top:1rem;font-size:.75rem;color:var(--text-3)">No Groq key? Plain-text statistical summary generated instead.</div>
         </div>
@@ -855,7 +863,7 @@ app = <span class="fn">FastAPI</span>()
    <span class="af-dim">React 19 reads               Sunday 23:00 UTC:</span>
    <span class="af-dim">GET /v1/metrics/*             1. Pull 8w route_errors_1hour</span>
                                 <span class="af-dim">2. Build dow × hour baseline</span>
-                                <span class="af-dim">3. Z-score flag top anomalies</span>
+                                <span class="af-dim">3. Count-based tests → top 5</span>
                                 <span class="af-dim">4. POST anomaly JSON → Groq</span>
                                 <span class="af-dim">5. Store report → dashboard</span></pre></div>
       </div>
@@ -879,7 +887,7 @@ app = <span class="fn">FastAPI</span>()
           <tr><td>Database</td><td>TimescaleDB — hypertables + continuous aggregates auto-refresh; sub-ms dashboard queries</td></tr>
           <tr><td>Dashboard</td><td>React 19, Vite 8, Tailwind CSS 4, recharts 3, TanStack Query 5</td></tr>
           <tr><td>AI</td><td>Groq API · Llama 3.3-70b-versatile — statistics first, LLM writes narrative only</td></tr>
-          <tr><td>AWS (optional)</td><td>Lambda + EventBridge + S3, deployed via SAM — same job as APScheduler, cloud-native cron</td></tr>
+          <tr><td>AWS (optional)</td><td>Lambda + EventBridge + S3, deployed via SAM — same job as APScheduler, cloud-native cron (set <code class="code-inline">INSIGHTS_SCHEDULER_ENABLED=false</code> so it runs once)</td></tr>
         </tbody>
       </table>
     </div>
@@ -1000,7 +1008,8 @@ cp .env.example .env</div>
         <div class="code-body"><span class="cm"># Database</span>
 <span class="hl">POSTGRES_PASSWORD</span>=<span class="str">your_secure_password</span>
 
-<span class="cm"># API keys (any string — auth for SDK → collector, dashboard → collector)</span>
+<span class="cm"># API keys — the ingest key is used by the SDK (write), the read key by the dashboard.</span>
+<span class="cm"># The read key ends up in the dashboard's JavaScript, so it must differ from the ingest key.</span>
 <span class="hl">REQLY_INGEST_KEY</span>=<span class="str">your_ingest_key</span>
 <span class="hl">REQLY_READ_KEY</span>=<span class="str">your_read_key</span>
 
@@ -1016,16 +1025,17 @@ cp .env.example .env</div>
         <div class="code-header">terminal</div>
         <div class="code-body">docker compose up -d</div>
       </div>
-      <p class="dev-text">Starts 3 containers. First build takes ~2 minutes; subsequent starts are fast.</p>
+      <p class="dev-text">Starts 4 containers. First build takes ~2 minutes; subsequent starts are fast. The collector applies the database schema itself on startup.</p>
       <table class="url-table">
         <thead><tr><th>Container</th><th>URL</th><th>Role</th></tr></thead>
         <tbody>
           <tr><td>timescaledb</td><td>:5432</td><td>Time-series database</td></tr>
           <tr><td>collector</td><td>:8000 · /docs</td><td>FastAPI ingest + query + AI insights</td></tr>
           <tr><td>dashboard</td><td>http://localhost:5173</td><td>React dashboard — open this</td></tr>
+          <tr><td>load-generator</td><td>—</td><td>Synthetic history + live demo traffic</td></tr>
         </tbody>
       </table>
-      <div class="tip"><strong>Tip:</strong> Point your app at <code class="code-inline">http://localhost:8000</code>, then open the dashboard. The AI Insights panel appears at the bottom — click "Regenerate now" to trigger on-demand.</div>
+      <div class="tip"><strong>Tip:</strong> Point your app at <code class="code-inline">http://localhost:8000</code>, then open the dashboard. The AI Insights panel appears at the bottom — click "Regenerate" to trigger on-demand.</div>
       <div class="code-block" style="margin-top:1rem">
         <div class="code-header">stop</div>
         <div class="code-body"><span class="cm"># stop, keep data</span>
@@ -1075,7 +1085,7 @@ app = <span class="fn">Flask</span>(__name__)
       <div class="code-block">
         <div class="code-header">trigger AI insights on-demand</div>
         <div class="code-body">curl -X POST "http://localhost:8000/v1/insights/generate?service_name=my-api" \
-  -H "X-Reqly-Key: your_ingest_key"</div>
+  -H "X-Reqly-Key: your_read_key"</div>
       </div>
     </div>
 
@@ -1094,7 +1104,7 @@ app = <span class="fn">Flask</span>(__name__)
           <tr><td>max_batch_size</td><td>REQLY_MAX_BATCH_SIZE</td><td>200</td></tr>
           <tr><td>max_queue_size</td><td>REQLY_MAX_QUEUE_SIZE</td><td>2000</td></tr>
           <tr><td>ignore_routes</td><td>REQLY_IGNORE_ROUTES</td><td>/health,/metrics</td></tr>
-          <tr><td>capture_request_body</td><td>REQLY_CAPTURE_REQUEST_BODY</td><td>False</td></tr>
+          <tr><td>capture_request_body</td><td>REQLY_CAPTURE_REQUEST_BODY</td><td>False (not implemented yet)</td></tr>
         </tbody>
       </table>
     </div>
@@ -1120,7 +1130,7 @@ app = <span class="fn">Flask</span>(__name__)
                                <span class="af-dim">│</span>
                <span class="af-dim">┌──────────────┴──────────────────────┐</span>
         <span class="af-dash">[Dashboard]</span>                   <span class="af-lmb">[Weekly job]</span>
-     <span class="af-dim">GET /v1/metrics/*             z-score → Groq → report</span></pre></div>
+     <span class="af-dim">GET /v1/metrics/*             stats → Groq → report</span></pre></div>
       </div>
       <div class="pipe-grid">
         <div class="pipe-card">
@@ -1136,7 +1146,7 @@ app = <span class="fn">Flask</span>(__name__)
           <div class="pipe-card-body">TimescaleDB refreshes them automatically. Dashboard queries hit pre-rolled materializations — sub-millisecond, no manual cron jobs.</div>
         </div>
         <div class="pipe-card">
-          <div class="pipe-card-title">Why z-score before LLM?</div>
+          <div class="pipe-card-title">Why statistics before the LLM?</div>
           <div class="pipe-card-body">Statistics are deterministic and cheap. The LLM only writes narrative — it never hallucinates numbers because it never sees raw data.</div>
         </div>
       </div>
@@ -1177,14 +1187,14 @@ docker-compose.yml
     <div class="dev-section" id="dev-tests">
       <h2 class="dev-h2"><span class="dev-num">8</span> Running tests</h2>
       <div class="code-block">
-        <div class="code-header">SDK — 13 tests</div>
+        <div class="code-header">SDK — 26 tests</div>
         <div class="code-body">cd sdk
 pip install -e ".[dev]"
 pytest tests -v</div>
       </div>
       <div class="code-block">
-        <div class="code-header">Collector (needs TimescaleDB running)</div>
-        <div class="code-body">docker compose up timescaledb -d
+        <div class="code-header">Collector — DB-backed tests skip unless TimescaleDB is reachable</div>
+        <div class="code-body">docker compose up timescaledb -d   <span class="cm"># optional, for the DB tests</span>
 cd collector
 pip install -e ".[dev]"
 pytest tests -v</div>
