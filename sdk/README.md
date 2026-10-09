@@ -1,6 +1,6 @@
 # reqly
 
-**Self-hosted API monitoring for FastAPI and Flask — two lines of code.**
+**Self-hosted API monitoring for FastAPI, Flask, Django, Starlette and Litestar — two lines of code.**
 Latency percentiles, error rates and release tracking for every route, shipped to your own
 [Reqly](https://github.com/tanisheesh/reqly) collector — which turns them into deploy-aware
 hourly alerts and weekly AI anomaly reports.
@@ -45,7 +45,27 @@ app = Flask(__name__)
 reqly.instrument(app, service_name="checkout-api")  # settings from REQLY_* env vars
 ```
 
-`instrument()` detects FastAPI or Flask by itself — no decorators, no middleware to wire up.
+**Starlette / Litestar** — same call:
+
+```python
+reqly.instrument(app, service_name="checkout-api")
+```
+
+**Django** (also Django REST Framework and Django Ninja) — Django has no app object, so add
+the middleware first in `MIDDLEWARE`:
+
+```python
+# settings.py
+MIDDLEWARE = [
+    "reqly.integrations.django.ReqlyMiddleware",
+    # ...
+]
+REQLY = {"service_name": "checkout-api", "api_key": "your-ingest-key"}  # optional
+```
+
+`instrument()` detects the framework by itself — no decorators, no middleware to wire up.
+Routes are recorded as templates in one style across frameworks: Django's
+`users/<int:pk>/` and DRF's `^users/(?P<pk>[^/.]+)/$` both become `/users/{pk}/`.
 The release you're running is picked up automatically from your CI or host
 (`GITHUB_SHA`, `RENDER_GIT_COMMIT`, `VERCEL_GIT_COMMIT_SHA`, …), so deploys show up in
 Reqly with no extra code.
@@ -129,8 +149,11 @@ are shipped instead of silently queuing forever.
 | | Supported |
 |---|---|
 | Python | 3.9 – 3.13 |
-| FastAPI | 0.100+ |
+| FastAPI | 0.100+ (including routes in `app.mount()`ed sub-apps) |
+| Starlette | 0.27+ (including `Mount`) |
+| Litestar | 2.0+ |
 | Flask | 2.3+ |
+| Django | 4.2+, sync and async views; DRF and Django Ninja |
 | Collector | any version; `release`, `environment` and body sizes are stored by collector 0.3.0+ and ignored by older ones |
 
 ## Self-hosting the collector
