@@ -160,6 +160,31 @@ SAM will ask for `DatabaseUrl`, `GroqApiKey` and `Environment` (use `production`
 
 ---
 
+## Releasing the SDK
+
+The Python SDK is published to PyPI by `.github/workflows/release-sdk.yml` using
+[PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/) — GitHub proves its
+identity to PyPI with a short-lived OIDC token, so no PyPI API token is stored anywhere.
+
+1. Bump `version` in `sdk/pyproject.toml` (e.g. `0.2.1`).
+2. Add a `## 0.2.1 — YYYY-MM-DD` section at the top of `sdk/CHANGELOG.md`.
+3. Merge to `main`, then tag that commit and push the tag:
+   ```bash
+   git tag sdk-v0.2.1
+   git push origin sdk-v0.2.1
+   ```
+
+The workflow refuses to publish if the tag doesn't match `pyproject.toml`, the changelog
+has no entry for the version, or the version is already on PyPI. It runs the SDK tests,
+builds and checks the package, publishes it, then creates a GitHub release with the
+changelog section as notes. To dry-run everything except publishing, start the workflow
+manually from the Actions tab (**Run workflow**).
+
+**One-time setup** (already done for this repo): a `pypi` environment in the GitHub repo
+settings, restricted to `sdk-v*` tags, and a trusted publisher on
+[pypi.org → reqly → Publishing](https://pypi.org/manage/project/reqly/settings/publishing/)
+with owner `tanisheesh`, repository `reqly`, workflow `release-sdk.yml`, environment `pypi`.
+
 ## Contributing
 
 1. Fork → branch from `main`

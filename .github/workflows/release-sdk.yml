@@ -1,0 +1,128 @@
+name: Release SDK
+
+# Publishes the Python SDK (sdk/) to PyPI when a tag like `sdk-v0.2.1` is
+# pushed. Uses PyPI Trusted Publishing (OIDC): no API token is stored
+# anywhere. PyPI must list this repo + workflow + the `pypi` environment as a
+# trusted publisher for the `reqly` project -- see CONTRIBUTING.md.
+#
+# Manual runs (workflow_dispatch) do every check and build the package but
+# never publish -- use them to dry-run a release.
+
+on:
+  push:
+    tags: ["sdk-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Check, test and build
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Read package version
+        id: version
+        run: |
+          VERSION=$(python -c "import tomllib; print(tomllib.load(open('sdk/pyproject.toml', 'rb'))['project']['version'])")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "sdk/pyproject.toml version: $VERSION"
+
+      - name: Tag must match the package version
+        if: github.event_name == 'push'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [ "${GITHUB_REF_NAME#sdk-v}" != "$VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match sdk/pyproject.toml version $VERSION"
+            exit 1
+          fi
+
+      - name: Changelog must have an entry for this version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if ! grep -q "^## $VERSION " sdk/CHANGELOG.md; then
+            echo "::error::sdk/CHANGELOG.md has no '## $VERSION ...' section"
+            exit 1
+          fi
+
+      - name: Version must not already be on PyPI
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/reqly/$VERSION/json")
+          if [ "$STATUS" = "200" ]; then
+            echo "::error::reqly $VERSION is already on PyPI; bump sdk/pyproject.toml"
+            exit 1
+          fi
+
+      - name: Test
+        run: |
+          pip install -e "./sdk[dev]"
+          pytest sdk/tests -q
+
+      - name: Build
+        run: |
+          pip install build twine
+          python -m build sdk
+          twine check --strict sdk/dist/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdk-dist
+          path: sdk/dist/
+          if-no-files-found: error
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/reqly/${{ needs.build.outputs.version }}/
+    permissions:
+      id-token: write # OIDC token for PyPI Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdk-dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    name: GitHub release
+    needs: [build, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdk-dist
+          path: dist/
+
+      - name: Create release with the changelog section as notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          awk -v v="$VERSION" '
+            /^## / { if (found) exit; if (index($0, "## " v " ") == 1) { found = 1; next } }
+            found { print }
+          ' sdk/CHANGELOG.md > notes.md
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "reqly SDK $VERSION" \
+            --notes-file notes.md
