@@ -1,0 +1,12 @@
+{
+  "name": "reqly-otel-express-example",
+  "private": true,
+  "scripts": {
+    "start": "node --require @opentelemetry/auto-instrumentations-node/register app.js"
+  },
+  "dependencies": {
+    "express": "4.21.2",
+    "@opentelemetry/sdk-node": "0.57.2",
+    "@opentelemetry/auto-instrumentations-node": "0.56.1"
+  }
+}

@@ -8,19 +8,27 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ErrorRatePoint } from "../api/client";
+import { ErrorRatePoint, ReleaseMarker } from "../api/client";
+import { placeReleaseMarkers, RELEASE_MARKER_COLOR } from "../releaseMarkers";
 import { Card } from "./Card";
 import { formatBucketLabel, spansMultipleDays, formatPercent } from "../format";
 
 const ERROR_THRESHOLD = 5; // 5%
 
-export function ErrorRateChart({ data }: { data: ErrorRatePoint[] }) {
+export function ErrorRateChart({
+  data,
+  releases = [],
+}: {
+  data: ErrorRatePoint[];
+  releases?: ReleaseMarker[];
+}) {
   const withDate = spansMultipleDays(data.map((d) => d.bucket));
   const chartData = data.map((d) => ({
     ...d,
     label: formatBucketLabel(d.bucket, withDate),
     error_rate_pct: d.error_rate * 100,
   }));
+  const markers = placeReleaseMarkers(chartData, releases);
 
   const latest = chartData.at(-1)?.error_rate ?? null;
 
@@ -75,6 +83,15 @@ export function ErrorRateChart({ data }: { data: ErrorRatePoint[] }) {
             strokeOpacity={0.5}
             label={{ value: "5% threshold", fill: "#f87171", fontSize: 10, dx: -4 }}
           />
+          {markers.map((m) => (
+            <ReferenceLine
+              key={m.release}
+              x={m.x}
+              stroke={RELEASE_MARKER_COLOR}
+              strokeDasharray="2 3"
+              label={{ value: m.release, position: "insideTopLeft", fill: RELEASE_MARKER_COLOR, fontSize: 10 }}
+            />
+          ))}
           <Area
             type="monotone"
             dataKey="error_rate_pct"

@@ -2,6 +2,16 @@
 
 All notable changes to the `reqly` Python SDK.
 
+## Unreleased
+
+### Added
+- `release` and `environment` options (`REQLY_RELEASE` / `REQLY_ENVIRONMENT`). `release` is
+  auto-detected from common CI/hosting variables (`GITHUB_SHA`, `RENDER_GIT_COMMIT`,
+  `VERCEL_GIT_COMMIT_SHA`, …) and sent once per batch. Needs collector 0.3.0 to be stored;
+  older collectors ignore it.
+- `request_bytes` / `response_bytes` on every event. FastAPI counts the actual ASGI body
+  messages (works for streaming); Flask reports `Content-Length` (`None` when streamed).
+
 ## 0.1.5 — 2026-10-09
 
 ### Fixed

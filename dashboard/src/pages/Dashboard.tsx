@@ -5,6 +5,7 @@ import { LatencyChart } from "../components/LatencyChart";
 import { ErrorRateChart } from "../components/ErrorRateChart";
 import { StatusDistributionChart } from "../components/StatusDistributionChart";
 import { TopRoutesTable } from "../components/TopRoutesTable";
+import { ReleasesTable } from "../components/ReleasesTable";
 import { InsightsPanel } from "../components/InsightsPanel";
 import { useMetricsSummary } from "../hooks/useMetrics";
 import { COLLECTOR_URL, TimeWindow } from "../api/client";
@@ -182,12 +183,12 @@ export function Dashboard() {
             </div>
 
             {/* Latency — full width */}
-            <LatencyChart data={summary.latency} />
+            <LatencyChart data={summary.latency} releases={summary.releases} />
 
             {/* Error rate + Status side by side */}
             <div className="grid gap-4 lg:grid-cols-3">
               <div className="lg:col-span-2">
-                <ErrorRateChart data={summary.error_rate} />
+                <ErrorRateChart data={summary.error_rate} releases={summary.releases} />
               </div>
               <div className="lg:col-span-1">
                 <StatusDistributionChart data={summary.status_distribution} />
@@ -196,6 +197,9 @@ export function Dashboard() {
 
             {/* Top routes table */}
             <TopRoutesTable data={summary.top_routes} />
+
+            {/* Releases (deploy history + per-release health) */}
+            <ReleasesTable serviceName={serviceName} />
 
             {/* AI Insights */}
             <InsightsPanel serviceName={serviceName} />

@@ -80,7 +80,9 @@ Same call for both — `instrument()` auto-detects the framework.
 | `max_batch_size` | `REQLY_MAX_BATCH_SIZE` | `200` | Events per batch |
 | `max_queue_size` | `REQLY_MAX_QUEUE_SIZE` | `2000` | In-memory queue cap |
 | `ignore_routes` | `REQLY_IGNORE_ROUTES` | `/health,/metrics` | Routes to skip |
-| `capture_request_body` | `REQLY_CAPTURE_REQUEST_BODY` | `False` | Include request body |
+| `capture_request_body` | `REQLY_CAPTURE_REQUEST_BODY` | `False` | Include request body (not implemented yet) |
+| `release` | `REQLY_RELEASE` | auto-detected from CI vars | Git SHA / version — enables deploy-aware insights |
+| `environment` | `REQLY_ENVIRONMENT` | `None` | e.g. `prod`, `staging` |
 
 ---
 

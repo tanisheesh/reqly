@@ -36,9 +36,16 @@ class Shipper:
         api_key: str | None,
         service_name: str,
         sdk_version: str,
+        release: str | None = None,
+        environment: str | None = None,
     ) -> None:
         self._service_name = service_name
         self._sdk_version = sdk_version
+        # Sent once per batch (ingest spec v2); collectors older than 0.3
+        # ignore unknown top-level fields.
+        self._batch_fields = {
+            k: v for k, v in (("release", release), ("environment", environment)) if v
+        }
         self.dropped_batches = 0
         self.shipped_events = 0
 
@@ -70,6 +77,7 @@ class Shipper:
         payload = {
             "service_name": self._service_name,
             "sdk_version": self._sdk_version,
+            **self._batch_fields,
             "events": [e.to_dict() for e in events],
         }
 

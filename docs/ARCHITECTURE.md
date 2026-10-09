@@ -48,7 +48,7 @@ FastAPI service with three routers:
 - **Metrics** (`GET /v1/metrics/summary`, `/v1/services`, `/v1/services/{name}/routes`) — reads from continuous aggregates using concurrent `asyncio.gather` for the five sub-queries. All reads require `X-Reqly-Key` (read key, separate from ingest key in production).
 - **Insights** (`GET /v1/insights/latest`, `POST /v1/insights/generate`) — serves the latest weekly report, or triggers one on demand for demos.
 
-On startup the collector creates an asyncpg connection pool and starts an APScheduler job that runs the insights pipeline weekly (overrideable on demand). On shutdown it drains the scheduler and closes the pool.
+On startup the collector creates an asyncpg connection pool, starts a late-data refresher (events older than the aggregates' 1h policy look-back — backfills, SDK retries — are materialized explicitly via `refresh_continuous_aggregate`, in 7-day slices), and starts an APScheduler job that runs the insights pipeline weekly (overrideable on demand). On shutdown it drains the scheduler and closes the pool.
 
 ### TimescaleDB
 
@@ -69,7 +69,8 @@ Single-page React app built with Vite. State is TanStack Query — metrics are p
 1. APScheduler triggers weekly (or on-demand via API endpoint).
 2. Pulls 8 weeks of hourly aggregates from `route_errors_1hour`.
 3. `anomaly_detection.py` computes a day-of-week × hour-of-day seasonal baseline from the older 7 weeks, compares the most recent 7 days, and flags (route, dow, hour) cells whose error count or p95 rose significantly. Error rates use an exact Poisson tail test on the request/error counts; p95 is only tested on hours with ≥ 100 requests. A cell is flagged at z > 4.0 (≈ Bonferroni for ~1,700 cells per run) and only if the shift is material (≥ 2pp of errors or ≥ 50% p95). Requires ≥ 3 baseline samples.
-4. Top 5 anomalies by z-score are serialized to JSON.
+4. Top 5 anomalies by z-score are serialized to JSON, each with the hour it happened (`window_start`).
+4b. `deploys.py` adds a `release_context` to each anomaly from raw events + the `deployments` table: which release served that route in that hour, whether it was first seen within the week before (so the baseline ran on something else), and for a new release the previous release plus before/after error rate and p95 on that route.
 5. If `GROQ_API_KEY` is set, the structured anomaly JSON is sent to Llama 3.3-70b-versatile (temperature 0.3, max 600 tokens) with a system prompt that explicitly forbids inventing root causes. Otherwise the raw statistical findings are formatted as plain text.
 6. The result is upserted into `insight_reports`.
 
@@ -121,6 +122,8 @@ Single-page React app built with Vite. State is TanStack Query — metrics are p
 
 ## 4. Database Schema
 
+The ingest contract (fields, limits, retry semantics) is specified in [INGEST_SPEC.md](INGEST_SPEC.md). Schema v2 (migration `002_event_v2.sql`) adds optional `release`, `environment`, `consumer_id`, byte counts and LLM token columns to `request_events`, plus a `deployments` table (first/last seen per service, environment and release) that ingest maintains for deploy-aware insights.
+
 - `request_events` — hypertable; `event_id UUID`, `time TIMESTAMPTZ`, `service_name TEXT`, `method TEXT`, `route TEXT`, `status_code SMALLINT`, `duration_ms DOUBLE PRECISION`, `is_error BOOLEAN`, `error_type TEXT`, `host TEXT`. Partitioned daily. 14-day retention.
 - `route_latency_1min` — continuous aggregate; `bucket`, `service_name`, `route`, `request_count`, `p50_ms`, `p95_ms`, `p99_ms`, `avg_ms`. 90-day retention.
 - `route_errors_1hour` — continuous aggregate; `bucket`, `service_name`, `route`, `request_count`, `error_count`, `error_rate`, `p95_ms`. 180-day retention.
@@ -167,9 +170,11 @@ Groq call has a 30 s timeout. On any exception (timeout, rate limit, provider ou
 |---|---|---|---|
 | `GET` | `/v1/health` | None | Liveness probe — returns `{"status": "ok"}` |
 | `POST` | `/v1/ingest` | Ingest key | Batch ingest of request events (≤ 1 000 per call); partial-batch acceptance |
+| `POST` | `/otlp/v1/traces` | Ingest key | OTLP/HTTP trace receiver (protobuf or JSON, gzip) — HTTP server spans become request events; see [OTEL.md](OTEL.md) |
 | `GET` | `/v1/services` | Read key | List all service names with recorded traffic |
 | `GET` | `/v1/services/{service_name}/routes` | Read key | List all route templates for a service |
 | `GET` | `/v1/metrics/summary` | Read key | Latency series, error rate series, status distribution, top routes, requests/min for a service+window |
+| `GET` | `/v1/services/{service_name}/releases` | Read key | Recent releases with first/last seen, request volume, error rate and p95 (14-day raw window) |
 | `GET` | `/v1/insights/latest` | Read key | Latest weekly AI report for a service |
 | `POST` | `/v1/insights/generate` | Read key | Trigger insights generation on demand (rate-limited 5/min) |
 
