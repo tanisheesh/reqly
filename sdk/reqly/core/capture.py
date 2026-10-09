@@ -29,6 +29,8 @@ class RequestEvent:
     error: bool = False
     error_type: str | None = None
     host: str = _HOSTNAME
+    request_bytes: int | None = None
+    response_bytes: int | None = None
     sdk_version: str = field(default_factory=_get_sdk_version)
 
     def to_dict(self) -> dict:
@@ -55,6 +57,8 @@ def build_event(
     error: bool,
     error_type: str | None,
     sdk_version: str,
+    request_bytes: int | None = None,
+    response_bytes: int | None = None,
 ) -> RequestEvent:
     return RequestEvent(
         service_name=service_name,
@@ -65,4 +69,6 @@ def build_event(
         error=error,
         error_type=error_type,
         sdk_version=sdk_version,
+        request_bytes=request_bytes,
+        response_bytes=response_bytes,
     )

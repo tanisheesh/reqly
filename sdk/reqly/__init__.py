@@ -46,6 +46,8 @@ def instrument(
     max_queue_size: int | None = None,
     ignore_routes: list[str] | None = None,
     capture_request_body: bool | None = None,
+    release: str | None = None,
+    environment: str | None = None,
 ) -> ReqlyClient | None:
     """Instrument a FastAPI or Flask app with one line.
 
@@ -79,6 +81,8 @@ def instrument(
             max_queue_size=max_queue_size,
             ignore_routes=ignore_routes,
             capture_request_body=capture_request_body,
+            release=release,
+            environment=environment,
         )
         client = ReqlyClient(config)
 

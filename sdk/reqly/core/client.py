@@ -34,6 +34,8 @@ class ReqlyClient:
                 api_key=config.api_key,
                 service_name=config.service_name,
                 sdk_version=config.sdk_version,
+                release=config.release,
+                environment=config.environment,
             )
             self._buffer = EventBuffer(
                 shipper=shipper,
@@ -57,6 +59,8 @@ class ReqlyClient:
         duration_ms: float,
         error: bool,
         error_type: str | None,
+        request_bytes: int | None = None,
+        response_bytes: int | None = None,
     ) -> None:
         if self._disabled:
             return
@@ -74,6 +78,8 @@ class ReqlyClient:
                 error=error,
                 error_type=error_type,
                 sdk_version=self.config.sdk_version,
+                request_bytes=request_bytes,
+                response_bytes=response_bytes,
             )
             self._buffer.add(event)
         except Exception:

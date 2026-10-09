@@ -31,15 +31,28 @@ class ReqlyASGIMiddleware:
         status_code = 500
         error = False
         error_type = None
+        # Counted from the actual ASGI messages rather than Content-Length,
+        # so chunked/streamed bodies are measured too.
+        request_bytes = 0
+        response_bytes = 0
+
+        async def receive_wrapper():
+            nonlocal request_bytes
+            message = await receive()
+            if message["type"] == "http.request":
+                request_bytes += len(message.get("body", b""))
+            return message
 
         async def send_wrapper(message):
-            nonlocal status_code
+            nonlocal status_code, response_bytes
             if message["type"] == "http.response.start":
                 status_code = message["status"]
+            elif message["type"] == "http.response.body":
+                response_bytes += len(message.get("body", b""))
             await send(message)
 
         try:
-            await self.app(scope, receive, send_wrapper)
+            await self.app(scope, receive_wrapper, send_wrapper)
         except Exception as exc:
             error = True
             error_type = type(exc).__name__
@@ -57,6 +70,8 @@ class ReqlyASGIMiddleware:
                 duration_ms=duration_ms,
                 error=error or status_code >= 500,
                 error_type=error_type,
+                request_bytes=request_bytes,
+                response_bytes=response_bytes,
             )
 
 
