@@ -14,7 +14,7 @@ from .db.late_data import run_refresh_loop
 from .db.pool import close_pool, create_pool
 from .insights.scheduler import start_scheduler
 from .rate_limit import limiter
-from .routers import ingest, insights, metrics
+from .routers import ingest, insights, metrics, otlp
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("reqly.collector")
@@ -59,6 +59,7 @@ app.add_middleware(
 )
 
 app.include_router(ingest.router)
+app.include_router(otlp.router)
 app.include_router(metrics.router)
 app.include_router(insights.router)
 

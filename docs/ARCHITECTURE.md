@@ -169,6 +169,7 @@ Groq call has a 30 s timeout. On any exception (timeout, rate limit, provider ou
 |---|---|---|---|
 | `GET` | `/v1/health` | None | Liveness probe — returns `{"status": "ok"}` |
 | `POST` | `/v1/ingest` | Ingest key | Batch ingest of request events (≤ 1 000 per call); partial-batch acceptance |
+| `POST` | `/otlp/v1/traces` | Ingest key | OTLP/HTTP trace receiver (protobuf or JSON, gzip) — HTTP server spans become request events; see [OTEL.md](OTEL.md) |
 | `GET` | `/v1/services` | Read key | List all service names with recorded traffic |
 | `GET` | `/v1/services/{service_name}/routes` | Read key | List all route templates for a service |
 | `GET` | `/v1/metrics/summary` | Read key | Latency series, error rate series, status distribution, top routes, requests/min for a service+window |
