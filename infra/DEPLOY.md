@@ -83,7 +83,7 @@ cd infra/sam
 sam build
 
 sam deploy --parameter-overrides \
-  "DatabaseUrl=postgresql://reqly:your_password@<ec2-ip>:5432/reqly" \
+  "DatabaseUrl=postgresql://reqly:your_password@<ec2-ip>:5432/reqly?sslmode=require" \
   "GroqApiKey=gsk_your_key_here" \
   "Environment=production"
 ```
@@ -135,7 +135,7 @@ docker run -d \
 
 Set these environment variables wherever you deploy the collector:
 ```env
-DATABASE_URL=postgresql://reqly:your_password@<ec2-ip>:5432/reqly
+DATABASE_URL=postgresql://reqly:your_password@<ec2-ip>:5432/reqly?sslmode=require
 REQLY_INGEST_KEY=your_ingest_key
 REQLY_READ_KEY=your_read_key
 GROQ_API_KEY=gsk_your_key_here

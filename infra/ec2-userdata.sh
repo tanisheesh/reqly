@@ -51,6 +51,16 @@ echo "Docker started"
 mkdir -p /data/pgdata
 chown -R 1000:1000 /data/pgdata
 
+# Postgres is reachable from the internet (see DEPLOY.md), so it must use TLS.
+# The -ha image doesn't enable SSL by default; generate a self-signed cert for
+# this instance. Clients connect with ?sslmode=require (encrypted; the cert
+# isn't verified, which is fine for a password-authenticated private DB).
+mkdir -p /data/certs
+openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=reqly-db" \
+  -keyout /data/certs/server.key -out /data/certs/server.crt
+chown 1000:1000 /data/certs/server.key /data/certs/server.crt
+chmod 600 /data/certs/server.key
+
 # Pull + run TimescaleDB
 docker pull timescale/timescaledb-ha:pg16
 
@@ -61,8 +71,10 @@ docker run -d \
   -e POSTGRES_USER=${POSTGRES_USER} \
   -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} \
   -v /data/pgdata:/home/postgres/pgdata \
+  -v /data/certs:/certs:ro \
   --restart unless-stopped \
-  timescale/timescaledb-ha:pg16
+  timescale/timescaledb-ha:pg16 \
+  postgres -c ssl=on -c ssl_cert_file=/certs/server.crt -c ssl_key_file=/certs/server.key
 
 echo "Container started, waiting for DB to be ready..."
 
