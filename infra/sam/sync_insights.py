@@ -20,7 +20,7 @@ SOURCE = REPO / "collector" / "app" / "insights"
 TARGET = REPO / "infra" / "sam" / "insights_lambda" / "reqly_insights"
 
 # Modules with no imports from the collector app (stdlib/asyncpg only).
-VENDORED_MODULES = ("anomaly_detection.py", "deploys.py", "report.py")
+VENDORED_MODULES = ("anomaly_detection.py", "deploys.py", "hints.py", "report.py")
 
 INIT = '''"""Vendored copies of collector/app/insights modules -- DO NOT EDIT.
 

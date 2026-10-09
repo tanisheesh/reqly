@@ -14,7 +14,7 @@ from .db.late_data import run_refresh_loop
 from .db.pool import close_pool, create_pool
 from .insights.scheduler import start_scheduler
 from .rate_limit import limiter
-from .routers import ingest, insights, metrics, otlp
+from .routers import alerts, ingest, insights, metrics, otlp
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("reqly.collector")
@@ -30,11 +30,15 @@ async def lifespan(app: FastAPI):
         run_refresh_loop(pool, settings.late_data_refresh_seconds)
     )
     global _scheduler
-    if settings.insights_scheduler_enabled:
-        _scheduler = start_scheduler()
-        logger.info("Reqly collector: weekly insights scheduler started")
-    else:
-        logger.info("Reqly collector: weekly insights scheduler disabled")
+    if settings.insights_scheduler_enabled or settings.alerts_enabled:
+        _scheduler = start_scheduler(
+            weekly=settings.insights_scheduler_enabled, hourly_alerts=settings.alerts_enabled
+        )
+    logger.info(
+        "Reqly collector: weekly insights %s, hourly alerts %s",
+        "on" if settings.insights_scheduler_enabled else "off",
+        "on" if settings.alerts_enabled else "off",
+    )
     try:
         yield
     finally:
@@ -46,7 +50,7 @@ async def lifespan(app: FastAPI):
         await close_pool()
 
 
-app = FastAPI(title="Reqly Collector", version="0.3.0", lifespan=lifespan)
+app = FastAPI(title="Reqly Collector", version="0.4.0", lifespan=lifespan)
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -62,6 +66,7 @@ app.include_router(ingest.router)
 app.include_router(otlp.router)
 app.include_router(metrics.router)
 app.include_router(insights.router)
+app.include_router(alerts.router)
 
 
 @app.get("/v1/health")
