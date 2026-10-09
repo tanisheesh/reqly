@@ -13,7 +13,7 @@ _REPO = Path(__file__).resolve().parents[2]
 _SOURCE = _REPO / "collector" / "app" / "insights"
 _VENDORED = _REPO / "infra" / "sam" / "insights_lambda" / "reqly_insights"
 
-MODULES = ("anomaly_detection.py", "deploys.py", "report.py")
+MODULES = ("anomaly_detection.py", "deploys.py", "hints.py", "report.py")
 
 
 @pytest.mark.parametrize("name", MODULES)

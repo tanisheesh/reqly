@@ -77,6 +77,24 @@ export interface Anomaly {
   z_score: number;
   window_start?: string;
   release_context?: ReleaseContext | null;
+  hints?: Hint[];
+}
+
+export interface Hint {
+  dimension: string;
+  value: string;
+  text: string;
+}
+
+export interface Alert {
+  id: number;
+  service_name: string;
+  route: string;
+  opened_at: string;
+  first_hour: string;
+  last_hour: string;
+  resolved_at: string | null;
+  details: Anomaly;
 }
 
 export interface ReleaseStats {
@@ -150,6 +168,9 @@ export const api = {
     getJSON<{ releases: Release[] }>(
       `/v1/services/${encodeURIComponent(serviceName)}/releases`
     ),
+
+  listAlerts: (serviceName: string) =>
+    getJSON<{ alerts: Alert[] }>(`/v1/alerts?service_name=${encodeURIComponent(serviceName)}`),
 
   getLatestInsight: (serviceName: string) =>
     getJSON<InsightReport>(
