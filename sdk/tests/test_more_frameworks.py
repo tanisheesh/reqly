@@ -55,6 +55,38 @@ def test_starlette_records_route_templates_including_mounts(fake_collector):
     ]
 
 
+def test_fastapi_mounted_sub_app_gets_the_mount_prefix(fake_collector):
+    from fastapi import APIRouter, FastAPI
+    from fastapi.testclient import TestClient
+
+    sub = FastAPI()
+
+    @sub.get("/items/{item_id}")
+    def item(item_id: int):
+        return {"id": item_id}
+
+    router = APIRouter(prefix="/v2")
+
+    @router.get("/users/{user_id}")
+    def user(user_id: int):
+        return {"id": user_id}
+
+    app = FastAPI()
+    app.include_router(router)
+    app.mount("/api", sub)
+    url, batches = fake_collector
+    client = reqly.instrument(app, service_name="s", collector_url=url, flush_interval_seconds=999)
+    try:
+        tc = TestClient(app)
+        tc.get("/api/items/3")
+        tc.get("/v2/users/9")
+        events = _events(client, batches)
+    finally:
+        client.shutdown()
+
+    assert [e["route"] for e in events] == ["/api/items/{item_id}", "/v2/users/{user_id}"]
+
+
 def test_subclassed_fastapi_app_is_detected_as_fastapi():
     from fastapi import FastAPI
 

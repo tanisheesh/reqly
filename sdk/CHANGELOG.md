@@ -2,6 +2,26 @@
 
 All notable changes to the `reqly` Python SDK.
 
+## 0.3.0 — 2026-10-10
+
+### Added
+- **Django** (incl. Django REST Framework and Django Ninja): add
+  `reqly.integrations.django.ReqlyMiddleware` to `MIDDLEWARE`, optional `REQLY = {...}`
+  settings. Sync- and async-capable. Routes are normalized to the `{param}` style used by
+  the other integrations (`users/<int:pk>/` and `^users/(?P<pk>[^/.]+)/$` → `/users/{pk}/`).
+- **Litestar**: `reqly.instrument(app)`; the route comes from Litestar's `path_template`.
+- Extras: `reqly[django]`, `reqly[litestar]`, `reqly[starlette]`.
+
+### Fixed
+- Plain **Starlette** apps recorded every request as `__unmatched__` (only FastAPI puts the
+  matched route in the ASGI scope on older Starlette versions). Routes are now resolved,
+  including inside `Mount`.
+- Routes inside mounted sub-apps (FastAPI `app.mount()`, Starlette `Mount`) were recorded
+  without the mount prefix (`/items/{id}` instead of `/api/items/{id}`).
+- Subclasses of app classes (`class App(FastAPI)`) are detected by framework, and a repeat
+  `instrument()` call is recognized without setting attributes on the app (Litestar apps
+  use `__slots__`).
+
 ## 0.2.0 — 2026-10-09
 
 First release since 0.1.4: also contains the fixes prepared as 0.1.5, which was never
