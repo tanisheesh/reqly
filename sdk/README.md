@@ -84,6 +84,10 @@ Resolution order: **kwarg → env var → default**.
 
 **Bounded memory** — events are held in a fixed-size in-memory queue; under backpressure, oldest events are dropped and counted rather than growing unbounded.
 
+**Safe retries** — batches are retried with exponential backoff on `408`, `429` and any `5xx` (e.g. a collector restart behind a proxy); other `4xx` responses are dropped immediately. Every event carries a unique `event_id` the collector dedups on, so a retry never double-counts.
+
+**Pre-fork servers** — under gunicorn `--preload` (or uWSGI without lazy-apps), each forked worker restarts its own flush thread and HTTP connection pool, so events from workers are shipped instead of silently queuing forever.
+
 ## Self-hosting
 
 Reqly is fully self-hostable. Run the full stack (collector + TimescaleDB + dashboard) with Docker Compose:
