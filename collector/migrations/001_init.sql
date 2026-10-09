@@ -1,6 +1,7 @@
--- ObserveAI collector schema.
--- Applied automatically on first TimescaleDB container boot via
--- docker-entrypoint-initdb.d (see docker-compose.yml).
+-- Reqly collector schema.
+-- Applied automatically by the collector on startup (app/db/pool.py), which
+-- records each applied file in schema_migrations. This is the only copy of
+-- the schema -- every deployment path gets it from here.
 
 CREATE EXTENSION IF NOT EXISTS timescaledb;
 

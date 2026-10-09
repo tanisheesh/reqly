@@ -10,12 +10,13 @@ import {
 } from "recharts";
 import { LatencyPoint } from "../api/client";
 import { Card } from "./Card";
-import { formatBucketLabel } from "../format";
+import { formatBucketLabel, spansMultipleDays } from "../format";
 
 export function LatencyChart({ data }: { data: LatencyPoint[] }) {
+  const withDate = spansMultipleDays(data.map((d) => d.bucket));
   const chartData = data.map((d) => ({
     ...d,
-    label: formatBucketLabel(d.bucket),
+    label: formatBucketLabel(d.bucket, withDate),
   }));
 
   return (

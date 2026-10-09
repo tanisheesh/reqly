@@ -6,10 +6,13 @@ from importlib.metadata import PackageNotFoundError, version as _pkg_version
 
 
 def _get_sdk_version() -> str:
+    """Single source of truth for the SDK version: the installed package
+    metadata. A source checkout that was never pip-installed has none, and
+    reports that honestly rather than a hardcoded number that goes stale."""
     try:
         return _pkg_version("reqly")
     except PackageNotFoundError:
-        return "0.1.0"
+        return "0.0.0+unknown"
 
 
 def _env_float(name: str, default: float) -> float:
@@ -111,7 +114,11 @@ class Config:
             ignore_routes=(
                 ignore_routes
                 if ignore_routes is not None
-                else (os.environ.get("REQLY_IGNORE_ROUTES", "/health,/metrics").split(","))
+                else [
+                    r.strip()
+                    for r in os.environ.get("REQLY_IGNORE_ROUTES", "/health,/metrics").split(",")
+                    if r.strip()
+                ]
             ),
             capture_request_body=(
                 capture_request_body

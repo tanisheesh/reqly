@@ -14,6 +14,13 @@ _MAX_RETRIES = 3
 _BACKOFF_BASE_SECONDS = 0.5
 
 
+def _is_retryable(status_code: int) -> bool:
+    # 408/429 and any 5xx (collector restarting, proxy 502/503, transient DB
+    # error) are worth retrying -- the collector dedups on event_id, so a
+    # retry of a batch that actually landed can't double-count.
+    return status_code in (408, 429) or status_code >= 500
+
+
 class Shipper:
     """Ships batches of events to the collector over HTTP.
 
@@ -39,12 +46,22 @@ class Shipper:
         if api_key:
             headers["X-Reqly-Key"] = api_key
 
-        self._client = httpx.Client(
-            base_url=collector_url.rstrip("/"),
-            headers=headers,
+        self._base_url = collector_url.rstrip("/")
+        self._headers = headers
+        self._client = self._make_client()
+
+    def _make_client(self) -> httpx.Client:
+        return httpx.Client(
+            base_url=self._base_url,
+            headers=self._headers,
             timeout=httpx.Timeout(connect=1.0, read=2.0, write=2.0, pool=1.0),
             http2=False,
         )
+
+    def reset_after_fork(self) -> None:
+        """Pooled sockets inherited from the parent process are shared with
+        it, so a forked child must open its own connections."""
+        self._client = self._make_client()
 
     def send_batch(self, events: list[RequestEvent]) -> bool:
         if not events:
@@ -62,7 +79,7 @@ class Shipper:
                 if response.status_code < 400:
                     self.shipped_events += len(events)
                     return True
-                if response.status_code != 429:
+                if not _is_retryable(response.status_code):
                     # permanent client error (auth failure, bad payload, etc.) — no point retrying
                     logger.warning(
                         "reqly: collector rejected batch with %s, dropping",
@@ -71,7 +88,8 @@ class Shipper:
                     self.dropped_batches += 1
                     return False
                 logger.debug(
-                    "reqly: rate-limited (429), attempt %d/%d",
+                    "reqly: collector returned %s, attempt %d/%d",
+                    response.status_code,
                     attempt + 1,
                     _MAX_RETRIES,
                 )

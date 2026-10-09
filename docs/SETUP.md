@@ -22,7 +22,7 @@ docker compose up -d
 ```
 
 That's it for the full local stack. Docker Compose starts:
-1. **timescaledb** — TimescaleDB pg16; schema applied automatically from `collector/migrations/001_init.sql`
+1. **timescaledb** — TimescaleDB pg16 (the collector applies `collector/migrations/001_init.sql` on startup)
 2. **collector** — FastAPI ingest + metrics API on `http://localhost:8000`
 3. **dashboard** — React SPA on `http://localhost:5173`
 4. **load-generator** — backfills 8 weeks of synthetic history then generates ~2 RPS of live traffic
@@ -43,10 +43,12 @@ cp .env.example .env
 |---|---|---|
 | `POSTGRES_PASSWORD` | `localdev` | Any value — used internally by Docker Compose |
 | `REQLY_INGEST_KEY` | `demo-key` | Any secret string — sent by the SDK as `X-Reqly-Key` on ingest |
-| `REQLY_READ_KEY` | same as `REQLY_INGEST_KEY` | Any secret string — sent by the dashboard to read metrics; set separately in production so you can share read access without sharing write credentials |
+| `REQLY_READ_KEY` | `demo-read-key` | Sent by the dashboard to read metrics. It is compiled into the dashboard bundle, so treat it as public to dashboard viewers — it must differ from `REQLY_INGEST_KEY` |
 | `GROQ_API_KEY` | *(empty)* | [console.groq.com/keys](https://console.groq.com/keys) — free tier; leave empty to use plain-text fallback for AI insights |
 | `GROQ_MODEL` | `llama-3.3-70b-versatile` | See Groq docs for available models |
 | `CORS_ORIGINS` | `*` | Comma-separated list of allowed origins; restrict in production |
+| `INSIGHTS_SCHEDULER_ENABLED` | `true` | Set `false` when the SAM Lambda runs the weekly job, so it doesn't run twice |
+| `FORWARDED_ALLOW_IPS` | `127.0.0.1` | Behind a proxy, the proxy's IP — lets rate limiting see the real client IP |
 | `VITE_COLLECTOR_URL` | `http://localhost:8000` | Collector URL as seen from the **browser** (not the Docker network) |
 | `BACKFILL_WEEKS` | `8` | Weeks of synthetic history to generate on first load-generator run |
 | `BACKFILL_EVENTS_PER_HOUR` | `30` | Synthetic events per hour during backfill |
@@ -55,9 +57,9 @@ cp .env.example .env
 
 ## 3. No database setup required
 
-The TimescaleDB schema (`request_events` hypertable, continuous aggregates, retention policies, `insight_reports` table) is applied automatically when the TimescaleDB container first boots — via `docker-entrypoint-initdb.d`. No manual migration step needed.
+The TimescaleDB schema (`request_events` hypertable, continuous aggregates, retention policies, `insight_reports` table) is applied automatically by the collector on startup — it runs every file in `collector/migrations/` once and records it in a `schema_migrations` table. This works the same against an external TimescaleDB instance. No manual migration step needed.
 
-If you need to apply the schema manually (e.g., connecting to an external TimescaleDB instance):
+If you want to apply the schema by hand anyway:
 
 ```bash
 psql postgresql://reqly:your_password@your-host:5432/reqly \
@@ -147,14 +149,14 @@ The weekly insights job runs automatically via APScheduler. To trigger it on dem
 
 ```bash
 curl -X POST "http://localhost:8000/v1/insights/generate?service_name=your-service" \
-  -H "X-Reqly-Key: demo-key"
+  -H "X-Reqly-Key: demo-read-key"
 ```
 
 The report is stored and served at:
 
 ```bash
 curl "http://localhost:8000/v1/insights/latest?service_name=your-service" \
-  -H "X-Reqly-Key: demo-key"
+  -H "X-Reqly-Key: demo-read-key"
 ```
 
 ---

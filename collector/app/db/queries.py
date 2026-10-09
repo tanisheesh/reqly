@@ -247,19 +247,30 @@ async def get_top_routes(pool: asyncpg.Pool, service_name: str, window: str) -> 
     # For longer windows, use the pre-aggregated views for performance.
     # max(p95_ms) over time buckets per route: conservative upper bound, avoids
     # the invalid avg-of-percentiles pattern while staying in the right direction.
+    # Each view is reduced to one row per route BEFORE joining -- joining the
+    # 1-minute rows to hourly rows directly repeats every hourly error row once
+    # per active minute, which skews the error rate toward busy hours.
     rows = await pool.fetch(
         f"""
-        SELECT l.route,
-               sum(l.request_count) AS request_count,
-               max(l.p95_ms) AS p95_ms,
-               coalesce(sum(e.error_count)::float / nullif(sum(e.request_count), 0), 0) AS error_rate
-        FROM route_latency_1min l
-        LEFT JOIN route_errors_1hour e
-            ON e.service_name = l.service_name AND e.route = l.route
-            AND e.bucket = time_bucket('1 hour', l.bucket)
-        WHERE l.service_name = $1 AND l.bucket > now() - interval '{interval}'
-        GROUP BY l.route
-        ORDER BY request_count DESC
+        WITH latency AS (
+            SELECT route,
+                   sum(request_count) AS request_count,
+                   max(p95_ms) AS p95_ms
+            FROM route_latency_1min
+            WHERE service_name = $1 AND bucket > now() - interval '{interval}'
+            GROUP BY route
+        ),
+        errors AS (
+            SELECT route,
+                   sum(error_count)::float / nullif(sum(request_count), 0) AS error_rate
+            FROM route_errors_1hour
+            WHERE service_name = $1 AND bucket > now() - interval '{interval}'
+            GROUP BY route
+        )
+        SELECT l.route, l.request_count, l.p95_ms, coalesce(e.error_rate, 0) AS error_rate
+        FROM latency l
+        LEFT JOIN errors e USING (route)
+        ORDER BY l.request_count DESC
         LIMIT 20
         """,
         service_name,

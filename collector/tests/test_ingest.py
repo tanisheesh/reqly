@@ -74,3 +74,37 @@ def test_ingest_partial_acceptance_drops_only_bad_events(client):
     body = response.json()
     assert body == {"accepted": 1, "rejected": 1}
     assert len(client.captured_rows) == 1
+
+
+def test_ingest_rejects_oversized_route(client):
+    response = client.post(
+        "/v1/ingest",
+        headers={"X-Reqly-Key": "demo-key"},
+        json={
+            "service_name": "svc",
+            "events": [_valid_event(), _valid_event(route="/" + "x" * 600)],
+        },
+    )
+    assert response.status_code == 200
+    assert response.json() == {"accepted": 1, "rejected": 1}
+
+
+def test_ingest_rejects_oversized_service_name(client):
+    response = client.post(
+        "/v1/ingest",
+        headers={"X-Reqly-Key": "demo-key"},
+        json={"service_name": "s" * 200, "events": [_valid_event()]},
+    )
+    assert response.status_code == 422
+
+
+def test_read_key_cannot_ingest(client):
+    from app.config import settings
+
+    assert settings.read_key != settings.ingest_key
+    response = client.post(
+        "/v1/ingest",
+        headers={"X-Reqly-Key": settings.read_key},
+        json={"service_name": "svc", "events": [_valid_event()]},
+    )
+    assert response.status_code == 401
