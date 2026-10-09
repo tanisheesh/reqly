@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import AwareDatetime, BaseModel, Field, ValidationError, field_validator
 
 from ..auth import verify_api_key
+from ..db.late_data import tracker as late_data_tracker
 from ..db.pool import get_pool
 from ..db.queries import insert_events
 from ..rate_limit import RATE_LIMIT, limiter
@@ -82,4 +83,6 @@ async def ingest(request: Request, body: IngestRequest):
 
     pool = get_pool()
     await insert_events(pool, rows)
+    if rows:
+        late_data_tracker.note(min(r[1] for r in rows))
     return {"accepted": len(rows), "rejected": rejected}

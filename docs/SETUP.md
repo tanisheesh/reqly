@@ -48,6 +48,7 @@ cp .env.example .env
 | `GROQ_MODEL` | `llama-3.3-70b-versatile` | See Groq docs for available models |
 | `CORS_ORIGINS` | `*` | Comma-separated list of allowed origins; restrict in production |
 | `INSIGHTS_SCHEDULER_ENABLED` | `true` | Set `false` when the SAM Lambda runs the weekly job, so it doesn't run twice |
+| `LATE_DATA_REFRESH_SECONDS` | `60` | How often late-arriving events (older than 1h) are materialized into the aggregates |
 | `FORWARDED_ALLOW_IPS` | `127.0.0.1` | Behind a proxy, the proxy's IP — lets rate limiting see the real client IP |
 | `VITE_COLLECTOR_URL` | `http://localhost:8000` | Collector URL as seen from the **browser** (not the Docker network) |
 | `BACKFILL_WEEKS` | `8` | Weeks of synthetic history to generate on first load-generator run |
@@ -176,3 +177,4 @@ See [infra/DEPLOY.md](../infra/DEPLOY.md) for the full AWS production deployment
 - The load generator is a Docker service, not a real app — it generates synthetic traffic patterns. To see AI insights from real traffic, instrument your own app or run the [EventFlow demo](../demo/README.md).
 - `GROQ_API_KEY` is required for AI-written insights. Without it the insights panel shows plain-text statistical findings — fully functional, just not LLM-narrated.
 - The continuous aggregate `end_offset` is 1 minute, so the most recent ~1 minute of data may not appear in dashboard queries (it's in the raw table but not yet in the aggregate). This is expected TimescaleDB behavior.
+- On first start, the load generator backfills weeks of history. The collector materializes it into the aggregates in the background (about a minute per few weeks of demo data), so the 7d chart and AI insights fill in shortly after the backfill finishes. Re-running the backfill doesn't duplicate data — events are deterministic and deduplicated.
