@@ -1,12 +1,15 @@
 services:
   timescaledb:
-    image: timescale/timescaledb:latest-pg16
+    # The -ha image bundles the TimescaleDB Toolkit (mergeable percentile
+    # sketches) on top of TimescaleDB. It runs as uid 1000 with PGDATA under
+    # /home/postgres/pgdata, hence its own volume.
+    image: timescale/timescaledb-ha:pg16
     environment:
       POSTGRES_DB: reqly
       POSTGRES_USER: reqly
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-localdev}
     volumes:
-      - timescale_data:/var/lib/postgresql/data
+      - timescale_ha_data:/home/postgres/pgdata
     ports:
       - "5432:5432"
     healthcheck:
@@ -68,4 +71,4 @@ services:
 
 
 volumes:
-  timescale_data:
+  timescale_ha_data:
