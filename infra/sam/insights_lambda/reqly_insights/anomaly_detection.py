@@ -118,7 +118,11 @@ def _p95_z(recent_samples: list[dict], baseline_samples: list[dict]) -> float:
     return delta / spread
 
 
-def detect_anomalies(rows: list[dict], now: datetime | None = None) -> list[Anomaly]:
+def detect_anomalies(
+    rows: list[dict],
+    now: datetime | None = None,
+    recent_window: timedelta = timedelta(days=7),
+) -> list[Anomaly]:
     """rows: hourly (bucket, route, request_count, error_count, error_rate,
     p95_ms) records spanning ~8 trailing weeks, as returned by
     db.queries.get_hourly_seasonal_data.
@@ -127,9 +131,13 @@ def detect_anomalies(rows: list[dict], now: datetime | None = None) -> list[Anom
     (the most recent 7 days), grouped by (route, day_of_week, hour_of_day) --
     this segmentation is exactly what makes a recurring pattern like "every
     Monday morning" visible; a flat rolling average would never surface it.
+
+    recent_window is 7 days for the weekly report and 1 hour for the hourly
+    alert check (one hour compared against the same weekday-hour in earlier
+    weeks).
     """
     now = now or datetime.now(timezone.utc)
-    cutoff = now - timedelta(days=7)
+    cutoff = now - recent_window
 
     baseline_buckets: dict[tuple, list[dict]] = defaultdict(list)
     recent_buckets: dict[tuple, list[dict]] = defaultdict(list)

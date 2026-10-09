@@ -36,6 +36,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 
 from reqly_insights.anomaly_detection import detect_anomalies
 from reqly_insights.deploys import add_release_context
+from reqly_insights.hints import add_hints
 from reqly_insights.report import SYSTEM_PROMPT, fallback_report
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -178,10 +179,11 @@ async def run_for_service(pool: asyncpg.Pool, service_name: str) -> dict:
     rows = await get_hourly_seasonal_data(pool, service_name)
     anomalies = detect_anomalies(rows)
     anomalies_dicts = [a.to_dict() for a in anomalies]
-    try:
-        await add_release_context(pool, service_name, anomalies_dicts)
-    except Exception:
-        logger.exception("release context failed for service=%s", service_name)
+    for enrich in (add_release_context, add_hints):
+        try:
+            await enrich(pool, service_name, anomalies_dicts)
+        except Exception:
+            logger.exception("%s failed for service=%s", enrich.__name__, service_name)
     week_start = _current_week_start()
 
     report_text = generate_report(service_name, week_start.isoformat(), anomalies_dicts)

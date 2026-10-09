@@ -10,6 +10,7 @@ from ..db import queries
 from ..db.pool import get_pool
 from .anomaly_detection import detect_anomalies
 from .deploys import add_release_context
+from .hints import add_hints
 from .groq_client import generate_report
 
 logger = logging.getLogger("reqly.collector")
@@ -31,12 +32,13 @@ async def run_insights_for_service(service_name: str) -> dict:
     rows = await queries.get_hourly_seasonal_data(pool, service_name)
     anomalies = detect_anomalies(rows)
     anomalies_dicts = [a.to_dict() for a in anomalies]
-    try:
-        await add_release_context(pool, service_name, anomalies_dicts)
-    except Exception:
-        # Release context is an enrichment; the report is still worth
-        # producing without it.
-        logger.exception("release context failed for service=%s", service_name)
+    for enrich in (add_release_context, add_hints):
+        try:
+            await enrich(pool, service_name, anomalies_dicts)
+        except Exception:
+            # Release context and hints are enrichments; the report is still
+            # worth producing without them.
+            logger.exception("%s failed for service=%s", enrich.__name__, service_name)
     week_start = _current_week_start()
 
     report_text = await generate_report(service_name, week_start.isoformat(), anomalies_dicts)
@@ -62,18 +64,45 @@ async def run_insights_for_all_services() -> None:
             logger.exception("insights generation failed for service=%s", service_name)
 
 
-def start_scheduler() -> AsyncIOScheduler:
-    """Runs Sunday 23:00 UTC. The manual trigger endpoint exists precisely
-    so a live demo doesn't require waiting for this to fire.
-    """
-    scheduler = AsyncIOScheduler(timezone="UTC")
-    scheduler.add_job(
-        run_insights_for_all_services,
-        trigger="cron",
-        day_of_week="sun",
-        hour=23,
-        minute=0,
-        id="weekly_insights",
+async def run_hourly_alerts() -> None:
+    from ..alerts import hourly, notifier
+    from ..config import settings
+
+    pool = get_pool()
+    services = await queries.list_services(pool)
+    channels = notifier.Channels(
+        slack_webhook_url=settings.alert_slack_webhook_url,
+        discord_webhook_url=settings.alert_discord_webhook_url,
+        webhook_url=settings.alert_webhook_url,
+        dashboard_url=settings.dashboard_url,
     )
+    await hourly.run_hourly_check(
+        pool, services, channels, timedelta(hours=settings.alert_renotify_hours)
+    )
+
+
+def start_scheduler(weekly: bool = True, hourly_alerts: bool = True) -> AsyncIOScheduler:
+    """Weekly report: Sunday 23:00 UTC (the manual trigger endpoint exists
+    so a live demo doesn't have to wait for it). Hourly alert check: :15
+    past every hour, once the previous hour's data is in."""
+    scheduler = AsyncIOScheduler(timezone="UTC")
+    if weekly:
+        scheduler.add_job(
+            run_insights_for_all_services,
+            trigger="cron",
+            day_of_week="sun",
+            hour=23,
+            minute=0,
+            id="weekly_insights",
+        )
+    if hourly_alerts:
+        scheduler.add_job(
+            run_hourly_alerts,
+            trigger="cron",
+            minute=15,
+            id="hourly_alerts",
+            max_instances=1,
+            coalesce=True,
+        )
     scheduler.start()
     return scheduler
