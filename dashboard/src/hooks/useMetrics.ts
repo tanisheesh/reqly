@@ -34,6 +34,16 @@ export function useReleases(serviceName: string | null) {
   });
 }
 
+export function useAlerts(serviceName: string | null) {
+  return useQuery({
+    queryKey: ["alerts", serviceName],
+    queryFn: () => api.listAlerts(serviceName!),
+    enabled: !!serviceName,
+    refetchInterval: 60_000, // alerts change at most hourly
+    retry: false, // collectors older than 0.4 have no /v1/alerts
+  });
+}
+
 export function useMetricsSummary(
   serviceName: string | null,
   route: string | null,

@@ -6,6 +6,7 @@ import { ErrorRateChart } from "../components/ErrorRateChart";
 import { StatusDistributionChart } from "../components/StatusDistributionChart";
 import { TopRoutesTable } from "../components/TopRoutesTable";
 import { ReleasesTable } from "../components/ReleasesTable";
+import { AlertsBanner } from "../components/AlertsBanner";
 import { InsightsPanel } from "../components/InsightsPanel";
 import { useMetricsSummary } from "../hooks/useMetrics";
 import { COLLECTOR_URL, TimeWindow } from "../api/client";
@@ -158,6 +159,9 @@ export function Dashboard() {
 
         {serviceName && summary && (
           <div className="space-y-4">
+            {/* Open alerts from the hourly check (hidden when none) */}
+            <AlertsBanner serviceName={serviceName} />
+
             {/* KPI strip */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <KpiTile
