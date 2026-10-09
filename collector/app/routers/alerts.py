@@ -20,7 +20,7 @@ async def list_alerts(
     pool = get_pool()
     rows = await pool.fetch(
         """
-        SELECT id, service_name, route, opened_at, first_hour, last_hour, resolved_at, details
+        SELECT id, kind, service_name, route, opened_at, first_hour, last_hour, resolved_at, details
         FROM alerts
         WHERE ($1::text IS NULL OR service_name = $1)
           AND ($2 = 'all' OR resolved_at IS NULL)

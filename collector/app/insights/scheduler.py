@@ -81,6 +81,19 @@ async def run_hourly_alerts() -> None:
     )
 
 
+async def run_slo_alerts() -> None:
+    from ..alerts import notifier, slo_alerts
+    from ..config import settings
+
+    channels = notifier.Channels(
+        slack_webhook_url=settings.alert_slack_webhook_url,
+        discord_webhook_url=settings.alert_discord_webhook_url,
+        webhook_url=settings.alert_webhook_url,
+        dashboard_url=settings.dashboard_url,
+    )
+    await slo_alerts.run_slo_check(get_pool(), channels, timedelta(hours=settings.alert_renotify_hours))
+
+
 def start_scheduler(weekly: bool = True, hourly_alerts: bool = True) -> AsyncIOScheduler:
     """Weekly report: Sunday 23:00 UTC (the manual trigger endpoint exists
     so a live demo doesn't have to wait for it). Hourly alert check: :15
@@ -96,6 +109,15 @@ def start_scheduler(weekly: bool = True, hourly_alerts: bool = True) -> AsyncIOS
             id="weekly_insights",
         )
     if hourly_alerts:
+        # SLO burn rates: every 5 minutes (the fast-burn short window).
+        scheduler.add_job(
+            run_slo_alerts,
+            trigger="cron",
+            minute="*/5",
+            id="slo_alerts",
+            max_instances=1,
+            coalesce=True,
+        )
         scheduler.add_job(
             run_hourly_alerts,
             trigger="cron",

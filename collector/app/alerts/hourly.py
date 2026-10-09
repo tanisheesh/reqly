@@ -92,7 +92,8 @@ async def apply_detections(
             open_alerts = {
                 r["route"]: r
                 for r in await conn.fetch(
-                    "SELECT * FROM alerts WHERE service_name = $1 AND resolved_at IS NULL FOR UPDATE",
+                    "SELECT * FROM alerts WHERE service_name = $1 AND kind = 'anomaly' "
+                    "AND resolved_at IS NULL FOR UPDATE",
                     service_name,
                 )
             }
