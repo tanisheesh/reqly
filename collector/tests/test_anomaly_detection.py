@@ -43,6 +43,7 @@ def test_detects_recurring_monday_morning_degradation():
     assert anomaly.hour_range == "08:00-09:00"
     assert anomaly.observed_error_rate > anomaly.baseline_error_rate
     assert anomaly.z_score > 2.0
+    assert anomaly.window_start == "2027-02-01T08:00:00+00:00"
 
 
 def test_no_anomalies_when_traffic_is_uniform():
