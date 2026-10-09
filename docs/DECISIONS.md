@@ -40,7 +40,7 @@ the way it is. Every entry answers a question an interviewer might ask.
 
 **Reason:** Hypertables partition the data into time-based chunks automatically — a 6-hour query touches only the last 6 chunks rather than scanning the full table. Continuous aggregates run the heavy `percentile_cont()` aggregation on insert rather than on every dashboard load, so dashboard queries hit a pre-computed materialized view instead of the raw event table. The wire protocol and query language are identical to standard Postgres — no new ORM, no migration friction, and asyncpg works unchanged.
 
-**Tradeoff:** TimescaleDB requires the TimescaleDB extension, which means the standard Postgres Docker image isn't enough. This adds a small operational dependency — self-hosters need to use the `timescale/timescaledb` image. Managed Postgres offerings (Neon, Supabase, RDS) don't include TimescaleDB, so production deployment requires either EC2 or a TimescaleDB Cloud account. This is documented and mitigated by the provided EC2 user-data script that auto-installs everything.
+**Tradeoff:** TimescaleDB requires the TimescaleDB extension, which means the standard Postgres Docker image isn't enough. This adds a small operational dependency — self-hosters need to use the `timescale/timescaledb-ha` image (TimescaleDB plus the Toolkit, which provides the mergeable percentile sketches). Managed Postgres offerings (Neon, Supabase, RDS) don't include TimescaleDB, so production deployment requires either EC2 or a TimescaleDB Cloud account. This is documented and mitigated by the provided EC2 user-data script that auto-installs everything.
 
 ---
 

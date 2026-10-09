@@ -1,5 +1,6 @@
 #!/bin/bash
-# Amazon Linux 2023 bootstrap — installs Docker + TimescaleDB.
+# Amazon Linux 2023 bootstrap — installs Docker + TimescaleDB (the -ha image,
+# which bundles the TimescaleDB Toolkit).
 # Usage: pass as --user-data when launching an EC2 instance (see infra/DEPLOY.md)
 # Replace POSTGRES_PASSWORD with your own secure password before use.
 #
@@ -33,10 +34,12 @@ usermod -aG docker ec2-user
 echo "Docker started"
 
 # Create data dir
-mkdir -p /data/postgres
+# The -ha image runs Postgres as uid 1000 with PGDATA under /home/postgres/pgdata.
+mkdir -p /data/pgdata
+chown -R 1000:1000 /data/pgdata
 
 # Pull + run TimescaleDB
-docker pull timescale/timescaledb:latest-pg16
+docker pull timescale/timescaledb-ha:pg16
 
 docker run -d \
   --name timescaledb \
@@ -44,9 +47,9 @@ docker run -d \
   -e POSTGRES_DB=${POSTGRES_DB} \
   -e POSTGRES_USER=${POSTGRES_USER} \
   -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} \
-  -v /data/postgres:/var/lib/postgresql/data \
+  -v /data/pgdata:/home/postgres/pgdata \
   --restart unless-stopped \
-  timescale/timescaledb:latest-pg16
+  timescale/timescaledb-ha:pg16
 
 echo "Container started, waiting for DB to be ready..."
 
