@@ -10,14 +10,15 @@ import {
 } from "recharts";
 import { ErrorRatePoint } from "../api/client";
 import { Card } from "./Card";
-import { formatBucketLabel, formatPercent } from "../format";
+import { formatBucketLabel, spansMultipleDays, formatPercent } from "../format";
 
 const ERROR_THRESHOLD = 5; // 5%
 
 export function ErrorRateChart({ data }: { data: ErrorRatePoint[] }) {
+  const withDate = spansMultipleDays(data.map((d) => d.bucket));
   const chartData = data.map((d) => ({
     ...d,
-    label: formatBucketLabel(d.bucket),
+    label: formatBucketLabel(d.bucket, withDate),
     error_rate_pct: d.error_rate * 100,
   }));
 
@@ -35,7 +36,7 @@ export function ErrorRateChart({ data }: { data: ErrorRatePoint[] }) {
                 : "bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20"
             }`}
           >
-            {formatPercent(latest)} now
+            {formatPercent(latest)} latest
           </span>
         ) : null
       }

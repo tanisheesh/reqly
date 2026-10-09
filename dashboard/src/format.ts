@@ -1,7 +1,24 @@
-export function formatBucketLabel(iso: string): string {
+export function formatBucketLabel(iso: string, includeDate = false): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
+  if (includeDate) {
+    return d.toLocaleString([], {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+/** True when the buckets fall on more than one local calendar day, i.e. a
+ * bare HH:MM axis label would be ambiguous. */
+export function spansMultipleDays(buckets: string[]): boolean {
+  if (buckets.length < 2) return false;
+  const first = new Date(buckets[0]).toDateString();
+  const last = new Date(buckets[buckets.length - 1]).toDateString();
+  return first !== last;
 }
 
 export function formatPercent(value: number | null | undefined): string {

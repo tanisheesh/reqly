@@ -48,8 +48,14 @@ Parameters:
     Default: demo
     AllowedValues: [demo, production]
     Description: >
-      demo: Lambda Function URL has no auth (convenient for walkthrough).
-      production: remove the FunctionUrl resource and add API Gateway + IAM.
+      demo: creates a Lambda Function URL with no auth (convenient for a
+      walkthrough -- anyone with the URL can trigger a run).
+      production: no Function URL is created; the function only runs on the
+      weekly schedule. Trigger ad-hoc runs with the collector's authenticated
+      POST /v1/insights/generate instead.
+
+Conditions:
+  CreateDemoFunctionUrl: !Equals [!Ref Environment, demo]
 
 Globals:
   Function:
@@ -131,19 +137,20 @@ Resources:
   # trigger a fresh report during a live walkthrough without waiting for
   # Sunday night.
   #
-  # AuthType NONE is intentional for the demo environment. For production,
-  # remove this resource and put the Lambda behind API Gateway + IAM auth
-  # (or use the collector's /v1/insights/generate endpoint instead, which
-  # already has X-Reqly-Key auth).
+  # AuthType NONE is intentional for the demo environment only, so both
+  # resources are gated on Environment=demo. Deploy with
+  # --parameter-overrides Environment=production to leave them out.
   # ---------------------------------------------------------------------------
   InsightsFunctionUrl:
     Type: AWS::Lambda::Url
+    Condition: CreateDemoFunctionUrl
     Properties:
       TargetFunctionArn: !GetAtt InsightsFunction.Arn
       AuthType: NONE
 
   InsightsFunctionUrlPermission:
     Type: AWS::Lambda::Permission
+    Condition: CreateDemoFunctionUrl
     Properties:
       FunctionName: !GetAtt InsightsFunction.Arn
       Action: lambda:InvokeFunctionUrl
@@ -156,6 +163,7 @@ Outputs:
     Value: !GetAtt InsightsFunction.Arn
 
   InsightsFunctionUrl:
+    Condition: CreateDemoFunctionUrl
     Description: >
       Function URL for manual trigger (demo only — no auth).
       POST to this URL to regenerate insights for all services immediately.

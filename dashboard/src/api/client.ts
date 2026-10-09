@@ -1,9 +1,9 @@
-const COLLECTOR_URL = import.meta.env.VITE_COLLECTOR_URL ?? "http://localhost:8000";
-const READ_KEY = import.meta.env.VITE_READ_KEY ?? "demo-key";
+export const COLLECTOR_URL = import.meta.env.VITE_COLLECTOR_URL ?? "http://localhost:8000";
+const READ_KEY = import.meta.env.VITE_READ_KEY ?? "demo-read-key";
 
 if (!import.meta.env.VITE_READ_KEY) {
   console.warn(
-    "[reqly] VITE_READ_KEY is not set — using the default 'demo-key'. " +
+    "[reqly] VITE_READ_KEY is not set — using the default 'demo-read-key'. " +
     "Set it in .env before deploying."
   );
 }
@@ -69,12 +69,21 @@ export interface InsightReport {
   generated_at?: string;
 }
 
+export class HttpError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number
+  ) {
+    super(message);
+  }
+}
+
 async function getJSON<T>(path: string): Promise<T> {
   const response = await fetch(`${COLLECTOR_URL}${path}`, {
     headers: AUTH_HEADERS,
   });
   if (!response.ok) {
-    throw new Error(`GET ${path} failed: ${response.status}`);
+    throw new HttpError(`GET ${path} failed: ${response.status}`, response.status);
   }
   return response.json();
 }
@@ -85,7 +94,7 @@ async function postJSON<T>(path: string): Promise<T> {
     headers: AUTH_HEADERS,
   });
   if (!response.ok) {
-    throw new Error(`POST ${path} failed: ${response.status}`);
+    throw new HttpError(`POST ${path} failed: ${response.status}`, response.status);
   }
   return response.json();
 }

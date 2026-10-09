@@ -67,3 +67,23 @@ def test_background_thread_flushes_on_interval():
         assert shipper.shipped_events >= 1
     finally:
         buf.shutdown()
+
+
+def test_reinit_after_fork_restarts_flush_thread_and_drops_parent_events():
+    shipper = FakeShipper()
+    shipper.reset_after_fork = lambda: None
+    buf = EventBuffer(
+        shipper=shipper, max_queue_size=100, max_batch_size=10, flush_interval_seconds=999
+    )
+    try:
+        buf.add(_event(1))  # queued in the "parent" before the fork
+        old_thread = buf._thread
+        buf._reinit_after_fork()
+        assert buf._thread is not old_thread
+        assert buf._thread.is_alive()
+        assert buf.stats()["queued_events"] == 0
+        buf.add(_event(2))
+        buf.flush()
+        assert [e.route for b in shipper.batches for e in b] == ["/r2"]
+    finally:
+        buf.shutdown()

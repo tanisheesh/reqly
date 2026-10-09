@@ -70,10 +70,10 @@ the way it is. Every entry answers a question an interviewer might ask.
 
 ## What I'd do differently in v2
 
-- **Configurable anomaly threshold per service** — the global z > 2.0 threshold works for balanced traffic but produces too many false positives for high-volume services and too few anomalies for low-volume ones. Per-service thresholds or adaptive thresholds based on historical false-positive rates would improve signal quality.
+- **Configurable anomaly threshold per service** — the global z > 4.0 threshold (with count-based error tests and minimum effect sizes) keeps false positives near one every ~20 weeks, but low-volume services need large shifts to clear it. Per-service thresholds or adaptive thresholds based on historical false-positive rates would improve signal quality.
 - **Structured logging from the SDK** — currently the SDK uses Python's stdlib `logging` at WARNING level. Structured JSON logs (with service name, event counts, error types) would make SDK health far easier to observe in a log aggregator.
 - **Collector connection pooling configuration exposed** — the asyncpg pool min/max sizes are env vars but not documented in the SDK README. Under high ingest volume, pool exhaustion is a silent failure; exposing this more clearly would help operators.
-- **End-to-end integration test against real TimescaleDB** — current tests mock the DB. A Docker-based integration test suite that spins up a real TimescaleDB container would catch schema drift and continuous aggregate policy bugs before deploy.
+- **Broader integration tests against real TimescaleDB** — CI now runs the migrations and the top-routes query against a TimescaleDB service container (`collector/tests/test_queries_db.py`), but the other metrics queries and the aggregate refresh policies are still untested.
 
 ---
 

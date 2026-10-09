@@ -51,7 +51,7 @@ jobs:
         env:
           DATABASE_URL: "postgresql://reqly:reqly@localhost:5432/reqly"
           REQLY_INGEST_KEY: "test-key"
-          REQLY_READ_KEY: "test-key"
+          REQLY_READ_KEY: "test-read-key"
 
   dashboard:
     name: Dashboard type-check

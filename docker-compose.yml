@@ -7,7 +7,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-localdev}
     volumes:
       - timescale_data:/var/lib/postgresql/data
-      - ./collector/migrations:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
     healthcheck:
@@ -22,10 +21,12 @@ services:
     environment:
       DATABASE_URL: postgresql://reqly:${POSTGRES_PASSWORD:-localdev}@timescaledb:5432/reqly
       REQLY_INGEST_KEY: ${REQLY_INGEST_KEY:-demo-key}
-      REQLY_READ_KEY: ${REQLY_READ_KEY:-demo-key}
+      REQLY_READ_KEY: ${REQLY_READ_KEY:-demo-read-key}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      INSIGHTS_SCHEDULER_ENABLED: ${INSIGHTS_SCHEDULER_ENABLED:-true}
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-127.0.0.1}
     depends_on:
       timescaledb:
         condition: service_healthy
@@ -43,7 +44,7 @@ services:
       context: ./dashboard
       args:
         VITE_COLLECTOR_URL: ${VITE_COLLECTOR_URL:-http://localhost:8000}
-        VITE_READ_KEY: ${REQLY_READ_KEY:-demo-key}
+        VITE_READ_KEY: ${REQLY_READ_KEY:-demo-read-key}
     ports:
       - "5173:5173"
     depends_on:

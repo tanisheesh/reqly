@@ -154,7 +154,7 @@ sam build
 sam deploy --guided
 ```
 
-SAM will ask for `DatabaseUrl` and `GroqApiKey`. See [infra/DEPLOY.md](infra/DEPLOY.md) for the full production setup.
+SAM will ask for `DatabaseUrl`, `GroqApiKey` and `Environment` (use `production` unless you want an unauthenticated trigger URL). If you deploy it, set `INSIGHTS_SCHEDULER_ENABLED=false` on the collector so the job doesn't run twice. See [infra/DEPLOY.md](infra/DEPLOY.md) for the full production setup.
 
 ---
 

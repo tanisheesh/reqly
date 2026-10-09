@@ -50,11 +50,15 @@ ROUTES: list[tuple[str, str, float, float, float]] = [
 ]
 
 # Monday 08:00-09:00 degradation injected into /auth/login for interview demo.
+# Only injected in the most recent 7 days: the detector compares this week
+# against the same (day, hour) slot in earlier weeks, so a degradation that
+# happens EVERY Monday is the seasonal baseline, not an anomaly.
 _DEGRADE_ROUTE      = "/auth/login"
 _DEGRADE_DOW        = 0   # Monday
 _DEGRADE_HOUR       = 8
-_DEGRADE_ERROR_RATE = 0.18
+_DEGRADE_ERROR_RATE = 0.45  # strong enough to stand out at ~30 req/hour
 _DEGRADE_P95_MS     = 1800.0
+_DEGRADE_SINCE      = datetime.now(timezone.utc) - timedelta(days=7)
 
 
 def _sample_duration_ms(p50: float, p95: float) -> float:
@@ -72,7 +76,12 @@ def _make_event(
     error_rate: float,
     ts: datetime,
 ) -> dict:
-    if route == _DEGRADE_ROUTE and ts.weekday() == _DEGRADE_DOW and ts.hour == _DEGRADE_HOUR:
+    if (
+        route == _DEGRADE_ROUTE
+        and ts >= _DEGRADE_SINCE
+        and ts.weekday() == _DEGRADE_DOW
+        and ts.hour == _DEGRADE_HOUR
+    ):
         error_rate = _DEGRADE_ERROR_RATE
         p95_ms     = _DEGRADE_P95_MS
 

@@ -2,9 +2,21 @@ import { useState } from "react";
 import { useGenerateInsight, useLatestInsight } from "../hooks/useInsights";
 import { Card } from "./Card";
 import { formatMs, formatPercent } from "../format";
+import { HttpError } from "../api/client";
+
+function describeError(error: unknown): string {
+  if (error instanceof HttpError && error.status === 401) {
+    return "The collector rejected the dashboard's read key (401). Check VITE_READ_KEY.";
+  }
+  if (error instanceof HttpError && error.status === 429) {
+    return "Rate limited — report generation is capped at 5 per minute. Try again shortly.";
+  }
+  return error instanceof Error ? error.message : "Unexpected error.";
+}
 
 export function InsightsPanel({ serviceName }: { serviceName: string }) {
-  const { data, isLoading, isError } = useLatestInsight(serviceName);
+  const { data, isLoading, isError, error } = useLatestInsight(serviceName);
+  const noReportYet = error instanceof HttpError && error.status === 404;
   const generate = useGenerateInsight(serviceName);
   const [showData, setShowData] = useState(false);
 
@@ -35,7 +47,19 @@ export function InsightsPanel({ serviceName }: { serviceName: string }) {
         </div>
       )}
 
-      {isError && !isLoading && (
+      {generate.isError && (
+        <p className="mb-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+          Couldn't generate a report: {describeError(generate.error)}
+        </p>
+      )}
+
+      {isError && !isLoading && !noReportYet && (
+        <p className="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+          Couldn't load the latest report: {describeError(error)}
+        </p>
+      )}
+
+      {noReportYet && !isLoading && (
         <div className="rounded-lg border border-dashed border-slate-800 py-8 text-center">
           <p className="mb-1 text-sm text-slate-400">No report yet for this service.</p>
           <p className="text-xs text-slate-600">

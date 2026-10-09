@@ -83,7 +83,7 @@ Developers running Python microservices (FastAPI, Flask) have no lightweight, se
 ### 6.4 AI Insights
 
 - Weekly pipeline: z-score anomaly detection over 8 weeks of hourly data, grouped by day-of-week × hour-of-day.
-- Anomaly threshold: z-score > 2.0, minimum 3 baseline samples required (to avoid false positives on thin data).
+- Anomaly threshold: z-score > 4.0 (≈ Bonferroni for ~1,700 cells per weekly run), error rates tested on request/error counts, p95 only on hours with ≥ 100 requests, minimum effect size (≥ 2pp errors or ≥ 50% p95), minimum 3 baseline samples.
 - Top 5 anomalies by z-score sent to Groq (Llama 3.3-70b-versatile).
 - If no Groq API key: plain-text statistical findings shown instead (not an error).
 - On-demand trigger via `POST /v1/insights/generate` (rate-limited at 5/min for demo safety).
@@ -127,7 +127,7 @@ Developers running Python microservices (FastAPI, Flask) have no lightweight, se
 
 - **TimescaleDB continuous aggregate lag:** continuous aggregate policies have a 1-minute end_offset — the last minute of data is not yet aggregated. Dashboard queries fall back to raw table for the most recent window. Acceptable for v1; time-series freshness vs. query cost tradeoff.
 - **Groq rate limits:** free-tier Groq has token/minute caps. The weekly batch job is well within limits, but on-demand generation triggered frequently by demo visitors could hit them. Mitigated by the 5/min rate limit on `POST /v1/insights/generate`.
-- **Open question:** should the anomaly threshold (z > 2.0) be configurable per service, or is a global default sufficient for v1?
+- **Open question:** should the anomaly threshold (z > 4.0) be configurable per service, or is a global default sufficient for v1?
 
 ---
 

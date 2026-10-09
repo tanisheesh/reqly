@@ -4,7 +4,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 ARG VITE_COLLECTOR_URL=http://localhost:8000
-ARG VITE_READ_KEY=demo-key
+ARG VITE_READ_KEY=demo-read-key
 ENV VITE_COLLECTOR_URL=$VITE_COLLECTOR_URL
 ENV VITE_READ_KEY=$VITE_READ_KEY
 RUN npm run build
