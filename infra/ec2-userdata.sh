@@ -1,5 +1,6 @@
 #!/bin/bash
-# Amazon Linux 2023 bootstrap — installs Docker + TimescaleDB.
+# Amazon Linux 2023 bootstrap — installs Docker + TimescaleDB (the -ha image,
+# which bundles the TimescaleDB Toolkit).
 # Usage: pass as --user-data when launching an EC2 instance (see infra/DEPLOY.md)
 # Replace POSTGRES_PASSWORD with your own secure password before use.
 #
@@ -25,6 +26,19 @@ fi
 echo "=== Reqly TimescaleDB Setup ==="
 date
 
+# Small instances (t3.micro / t4g.micro have 1 GB RAM): add 1 GB of swap so a
+# memory spike (aggregate refresh, big backfill) slows Postgres down instead
+# of getting it OOM-killed.
+MEM_KB=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+if [ "$MEM_KB" -lt 2000000 ] && [ ! -f /swapfile ]; then
+  dd if=/dev/zero of=/swapfile bs=1M count=1024
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  echo "Added 1 GB swap"
+fi
+
 # Install Docker
 amazon-linux-extras install docker -y 2>/dev/null || dnf install -y docker
 systemctl start docker
@@ -33,10 +47,22 @@ usermod -aG docker ec2-user
 echo "Docker started"
 
 # Create data dir
-mkdir -p /data/postgres
+# The -ha image runs Postgres as uid 1000 with PGDATA under /home/postgres/pgdata.
+mkdir -p /data/pgdata
+chown -R 1000:1000 /data/pgdata
+
+# Postgres is reachable from the internet (see DEPLOY.md), so it must use TLS.
+# The -ha image doesn't enable SSL by default; generate a self-signed cert for
+# this instance. Clients connect with ?sslmode=require (encrypted; the cert
+# isn't verified, which is fine for a password-authenticated private DB).
+mkdir -p /data/certs
+openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=reqly-db" \
+  -keyout /data/certs/server.key -out /data/certs/server.crt
+chown 1000:1000 /data/certs/server.key /data/certs/server.crt
+chmod 600 /data/certs/server.key
 
 # Pull + run TimescaleDB
-docker pull timescale/timescaledb:latest-pg16
+docker pull timescale/timescaledb-ha:pg16
 
 docker run -d \
   --name timescaledb \
@@ -44,9 +70,11 @@ docker run -d \
   -e POSTGRES_DB=${POSTGRES_DB} \
   -e POSTGRES_USER=${POSTGRES_USER} \
   -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} \
-  -v /data/postgres:/var/lib/postgresql/data \
+  -v /data/pgdata:/home/postgres/pgdata \
+  -v /data/certs:/certs:ro \
   --restart unless-stopped \
-  timescale/timescaledb:latest-pg16
+  timescale/timescaledb-ha:pg16 \
+  postgres -c ssl=on -c ssl_cert_file=/certs/server.crt -c ssl_key_file=/certs/server.key
 
 echo "Container started, waiting for DB to be ready..."
 

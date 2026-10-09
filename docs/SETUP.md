@@ -22,7 +22,7 @@ docker compose up -d
 ```
 
 That's it for the full local stack. Docker Compose starts:
-1. **timescaledb** — TimescaleDB pg16 (the collector applies `collector/migrations/001_init.sql` on startup)
+1. **timescaledb** — `timescale/timescaledb-ha:pg16` (TimescaleDB + Toolkit; the collector applies `collector/migrations/` on startup)
 2. **collector** — FastAPI ingest + metrics API on `http://localhost:8000`
 3. **dashboard** — React SPA on `http://localhost:5173`
 4. **load-generator** — backfills 8 weeks of synthetic history then generates ~2 RPS of live traffic
@@ -173,6 +173,10 @@ See [infra/DEPLOY.md](../infra/DEPLOY.md) for the full AWS production deployment
 - AWS SAM stack for Lambda weekly insights + EventBridge + S3 archive
 
 ---
+
+## Upgrading an existing local stack
+
+The database image moved to `timescale/timescaledb-ha:pg16`, which runs as a different user and keeps its data in a different directory, so it uses a new volume (`timescale_ha_data`). After pulling, `docker compose up -d` starts with an empty database and the load generator backfills it again. The old volume is no longer used; remove it with `docker volume rm reqly_timescale_data` once you don't need it.
 
 ## Known local-only limitations
 
