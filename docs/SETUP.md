@@ -141,6 +141,8 @@ All options can also be set via environment variables (resolution order: kwarg â
 | `max_batch_size` | `REQLY_MAX_BATCH_SIZE` | `200` |
 | `max_queue_size` | `REQLY_MAX_QUEUE_SIZE` | `2000` |
 | `ignore_routes` | `REQLY_IGNORE_ROUTES` | `/health,/metrics` |
+| `release` | `REQLY_RELEASE` (then CI vars like `GITHUB_SHA`, `RENDER_GIT_COMMIT`) | auto-detected or `None` |
+| `environment` | `REQLY_ENVIRONMENT` | `None` |
 
 ---
 

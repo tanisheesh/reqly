@@ -4,25 +4,98 @@ from datetime import date, datetime
 
 import asyncpg
 
-_INSERT_EVENT_SQL = """
-INSERT INTO request_events
-    (event_id, time, service_name, method, route, status_code, duration_ms, is_error, error_type, host)
-VALUES
-    ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+# Column order for insert_events rows. Build rows with event_row() rather
+# than positional tuples so a new column can't silently shift values.
+EVENT_COLUMNS: tuple[str, ...] = (
+    "event_id",
+    "time",
+    "service_name",
+    "method",
+    "route",
+    "status_code",
+    "duration_ms",
+    "is_error",
+    "error_type",
+    "host",
+    "release",
+    "environment",
+    "consumer_id",
+    "request_bytes",
+    "response_bytes",
+    "llm_model",
+    "llm_input_tokens",
+    "llm_output_tokens",
+)
+_TIME_INDEX = EVENT_COLUMNS.index("time")
+
+_INSERT_EVENT_SQL = f"""
+INSERT INTO request_events ({", ".join(EVENT_COLUMNS)})
+VALUES ({", ".join(f"${i}" for i in range(1, len(EVENT_COLUMNS) + 1))})
 ON CONFLICT (time, event_id) DO NOTHING
 """
 
 
+def event_row(**values) -> tuple:
+    """One insert_events row. Required: every v1 column; the v2 columns
+    (release, environment, consumer_id, bytes, llm_*) default to NULL."""
+    unknown = set(values) - set(EVENT_COLUMNS)
+    if unknown:
+        raise TypeError(f"unknown event columns: {sorted(unknown)}")
+    return tuple(values.get(column) for column in EVENT_COLUMNS)
+
+
+def row_time(row: tuple) -> datetime:
+    return row[_TIME_INDEX]
+
+
 async def insert_events(pool: asyncpg.Pool, rows: list[tuple]) -> None:
-    """Bulk insert via executemany. `rows` are already-validated tuples in
-    the exact column order of _INSERT_EVENT_SQL. event_id is the dedup key
-    (ON CONFLICT DO NOTHING) so a batch retried by the SDK's shipper after a
-    timeout can't double-count events that actually succeeded server-side.
+    """Bulk insert via executemany. `rows` come from event_row(). event_id
+    is the dedup key (ON CONFLICT DO NOTHING) so a batch retried by the
+    SDK's shipper after a timeout can't double-count events that actually
+    succeeded server-side.
     """
     if not rows:
         return
     async with pool.acquire() as conn:
         await conn.executemany(_INSERT_EVENT_SQL, rows)
+
+
+_UPSERT_DEPLOYMENT_SQL = """
+INSERT INTO deployments (service_name, environment, release, first_seen_at, last_seen_at)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (service_name, environment, release) DO UPDATE
+SET first_seen_at = LEAST(deployments.first_seen_at, EXCLUDED.first_seen_at),
+    last_seen_at  = GREATEST(deployments.last_seen_at, EXCLUDED.last_seen_at)
+"""
+
+
+async def record_deployments(pool: asyncpg.Pool, rows: list[tuple]) -> None:
+    """Upserts one deployments row per (service, environment, release) in
+    the batch, widening its first/last-seen range. Rows without a release
+    are ignored."""
+    service_i = EVENT_COLUMNS.index("service_name")
+    env_i = EVENT_COLUMNS.index("environment")
+    release_i = EVENT_COLUMNS.index("release")
+
+    seen: dict[tuple[str, str, str], list[datetime]] = {}
+    for row in rows:
+        if not row[release_i]:
+            continue
+        key = (row[service_i], row[env_i] or "", row[release_i])
+        ts = row_time(row)
+        span = seen.get(key)
+        if span is None:
+            seen[key] = [ts, ts]
+        else:
+            span[0] = min(span[0], ts)
+            span[1] = max(span[1], ts)
+    if not seen:
+        return
+    async with pool.acquire() as conn:
+        await conn.executemany(
+            _UPSERT_DEPLOYMENT_SQL,
+            [(svc, env, rel, first, last) for (svc, env, rel), (first, last) in seen.items()],
+        )
 
 
 _WINDOW_TO_INTERVAL = {

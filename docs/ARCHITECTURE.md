@@ -121,6 +121,8 @@ Single-page React app built with Vite. State is TanStack Query — metrics are p
 
 ## 4. Database Schema
 
+The ingest contract (fields, limits, retry semantics) is specified in [INGEST_SPEC.md](INGEST_SPEC.md). Schema v2 (migration `002_event_v2.sql`) adds optional `release`, `environment`, `consumer_id`, byte counts and LLM token columns to `request_events`, plus a `deployments` table (first/last seen per service, environment and release) that ingest maintains for deploy-aware insights.
+
 - `request_events` — hypertable; `event_id UUID`, `time TIMESTAMPTZ`, `service_name TEXT`, `method TEXT`, `route TEXT`, `status_code SMALLINT`, `duration_ms DOUBLE PRECISION`, `is_error BOOLEAN`, `error_type TEXT`, `host TEXT`. Partitioned daily. 14-day retention.
 - `route_latency_1min` — continuous aggregate; `bucket`, `service_name`, `route`, `request_count`, `p50_ms`, `p95_ms`, `p99_ms`, `avg_ms`. 90-day retention.
 - `route_errors_1hour` — continuous aggregate; `bucket`, `service_name`, `route`, `request_count`, `error_count`, `error_rate`, `p95_ms`. 180-day retention.
