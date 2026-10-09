@@ -23,6 +23,12 @@ async def routes(service_name: str):
     return {"routes": await queries.list_routes(pool, service_name)}
 
 
+@router.get("/v1/services/{service_name}/releases")
+async def releases(service_name: str):
+    pool = get_pool()
+    return {"releases": await queries.list_releases(pool, service_name)}
+
+
 @router.get("/v1/metrics/summary")
 async def metrics_summary(
     service_name: str,
@@ -30,12 +36,20 @@ async def metrics_summary(
     window: str = Query(default="1h", pattern="^(1h|6h|24h|7d)$"),
 ):
     pool = get_pool()
-    latency, error_rate, status_distribution, top_routes, request_rate = await asyncio.gather(
+    (
+        latency,
+        error_rate,
+        status_distribution,
+        top_routes,
+        request_rate,
+        release_markers,
+    ) = await asyncio.gather(
         queries.get_latency_series(pool, service_name, route, window),
         queries.get_error_rate_series(pool, service_name, route, window),
         queries.get_status_distribution(pool, service_name, route, window),
         queries.get_top_routes(pool, service_name, window),
         queries.get_request_rate(pool, service_name),
+        queries.get_release_markers(pool, service_name, window),
     )
 
     return {
@@ -47,4 +61,5 @@ async def metrics_summary(
         "status_distribution": status_distribution,
         "top_routes": top_routes,
         "request_rate": request_rate,
+        "releases": release_markers,
     }

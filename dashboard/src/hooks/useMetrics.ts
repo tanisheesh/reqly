@@ -25,6 +25,15 @@ export function useRoutes(serviceName: string | null) {
   });
 }
 
+export function useReleases(serviceName: string | null) {
+  return useQuery({
+    queryKey: ["releases", serviceName],
+    queryFn: () => api.listReleases(serviceName!),
+    enabled: !!serviceName,
+    refetchInterval: LIST_POLL_MS,
+  });
+}
+
 export function useMetricsSummary(
   serviceName: string | null,
   route: string | null,
