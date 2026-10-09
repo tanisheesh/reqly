@@ -25,8 +25,11 @@ async def lifespan(app: FastAPI):
     await create_pool()
     logger.info("Reqly collector: db pool ready")
     global _scheduler
-    _scheduler = start_scheduler()
-    logger.info("Reqly collector: weekly insights scheduler started")
+    if settings.insights_scheduler_enabled:
+        _scheduler = start_scheduler()
+        logger.info("Reqly collector: weekly insights scheduler started")
+    else:
+        logger.info("Reqly collector: weekly insights scheduler disabled")
     try:
         yield
     finally:
