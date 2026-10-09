@@ -1,9 +1,20 @@
 from __future__ import annotations
 
 import time
+from typing import Callable, Optional
 
 from ..core.capture import normalize_route
 from ..core.client import ReqlyClient
+
+RouteResolver = Callable[[dict], Optional[str]]
+
+
+def route_template_from_scope(scope: dict) -> str | None:
+    """Route template set by the framework while routing: FastAPI puts the
+    matched APIRoute in scope["route"]; Litestar sets scope["path_template"]."""
+    route = scope.get("route")
+    template = getattr(route, "path", None) if route is not None else None
+    return template or scope.get("path_template")
 
 
 class ReqlyASGIMiddleware:
@@ -13,20 +24,29 @@ class ReqlyASGIMiddleware:
     duration at the point the response completes.
 
     The route template is only known AFTER the inner app has routed the
-    request (Starlette sets ``scope["route"]`` during dispatch), so the
-    timer starts before calling the inner app and the route is read from
-    the (mutated in place) scope dict afterward.
+    request (FastAPI sets ``scope["route"]``, Litestar
+    ``scope["path_template"]`` during dispatch), so the timer starts before
+    calling the inner app and the route is read from the (mutated in place)
+    scope dict afterward. Frameworks that don't record the route in the
+    scope (plain Starlette) pass a ``route_resolver``, called with a copy of
+    the scope as it was before routing.
+
+    Shared by the FastAPI, Starlette and Litestar integrations.
     """
 
-    def __init__(self, app, client: ReqlyClient) -> None:
+    def __init__(self, app, client: ReqlyClient, route_resolver: RouteResolver | None = None) -> None:
         self.app = app
         self._client = client
+        self._route_resolver = route_resolver
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
 
+        # Routers mutate the scope while dispatching (Mount rewrites
+        # root_path), so resolvers get the scope as it arrived.
+        original_scope = dict(scope) if self._route_resolver is not None else None
         start = time.perf_counter()
         status_code = 500
         error = False
@@ -60,8 +80,9 @@ class ReqlyASGIMiddleware:
             raise
         finally:
             duration_ms = (time.perf_counter() - start) * 1000
-            route = scope.get("route")
-            route_template = getattr(route, "path", None) if route else None
+            route_template = route_template_from_scope(scope)
+            if route_template is None and self._route_resolver is not None:
+                route_template = self._route_resolver(original_scope)
             normalized = normalize_route(scope.get("path", "/"), route_template)
             self._client.record_request(
                 method=scope.get("method", "GET"),
