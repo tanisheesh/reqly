@@ -113,6 +113,31 @@ def _interval_for_window(window: str) -> str:
         raise ValueError(f"unsupported window: {window!r}")
 
 
+# Chart resolution per window when reading the sketch aggregate: sketches
+# merge exactly across time, so long windows are re-bucketed instead of
+# shipping 10k one-minute points for 7 days.
+_WINDOW_TO_BUCKET = {
+    "1h": "1 minute",
+    "6h": "5 minutes",
+    "24h": "15 minutes",
+    "7d": "1 hour",
+}
+
+_sketches_available: bool | None = None
+
+
+async def sketches_available(pool: asyncpg.Pool) -> bool:
+    """True when migration 003 created api_latency_1min (TimescaleDB Toolkit
+    installed). Cached once known to be True; re-checked while False so a
+    collector started before the migration picks it up without a restart."""
+    global _sketches_available
+    if not _sketches_available:
+        _sketches_available = bool(
+            await pool.fetchval("SELECT to_regclass('api_latency_1min') IS NOT NULL")
+        )
+    return _sketches_available
+
+
 async def list_services(pool: asyncpg.Pool) -> list[str]:
     # Query the 90-day aggregate instead of the 14-day raw events table so
     # services that have been quiet for >2 weeks remain visible in the dropdown.
@@ -134,6 +159,26 @@ async def get_latency_series(
     pool: asyncpg.Pool, service_name: str, route: str | None, window: str
 ) -> list[dict]:
     interval = _interval_for_window(window)
+    if await sketches_available(pool):
+        # Real percentiles at any level: sketches roll up across routes (and
+        # methods/environments) and across time into one distribution.
+        rows = await pool.fetch(
+            f"""
+            SELECT time_bucket('{_WINDOW_TO_BUCKET[window]}', bucket) AS bucket,
+                   sum(request_count) AS request_count,
+                   approx_percentile(0.50, rollup(latency)) AS p50_ms,
+                   approx_percentile(0.95, rollup(latency)) AS p95_ms,
+                   approx_percentile(0.99, rollup(latency)) AS p99_ms
+            FROM api_latency_1min
+            WHERE service_name = $1 AND ($2::text IS NULL OR route = $2)
+              AND bucket > now() - interval '{interval}'
+            GROUP BY 1 ORDER BY 1
+            """,
+            service_name,
+            route,
+        )
+        return [dict(r) for r in rows]
+
     if route:
         # Single route: one row per (bucket, route) so avg == the value itself.
         rows = await pool.fetch(
@@ -167,6 +212,26 @@ async def get_latency_series(
 async def get_error_rate_series(
     pool: asyncpg.Pool, service_name: str, route: str | None, window: str
 ) -> list[dict]:
+    if await sketches_available(pool):
+        # The 1-minute aggregate is current to the last minute, so every
+        # window gets fresh error rates (the hourly view lags by up to 2h).
+        interval = _interval_for_window(window)
+        rows = await pool.fetch(
+            f"""
+            SELECT time_bucket('{_WINDOW_TO_BUCKET[window]}', bucket) AS bucket,
+                   sum(request_count) AS request_count,
+                   sum(error_count) AS error_count,
+                   sum(error_count)::float / nullif(sum(request_count), 0) AS error_rate
+            FROM api_latency_1min
+            WHERE service_name = $1 AND ($2::text IS NULL OR route = $2)
+              AND bucket > now() - interval '{interval}'
+            GROUP BY 1 ORDER BY 1
+            """,
+            service_name,
+            route,
+        )
+        return [dict(r) for r in rows]
+
     # route_errors_1hour has end_offset=1h so the last full hour is always a gap.
     # For the 1h window that gap covers the entire range — fall back to raw events
     # with 5-minute resolution so the chart isn't empty.
@@ -317,6 +382,23 @@ async def get_top_routes(pool: asyncpg.Pool, service_name: str, window: str) -> 
         return [dict(r) for r in rows]
 
     interval = _interval_for_window(window)
+    if await sketches_available(pool):
+        rows = await pool.fetch(
+            f"""
+            SELECT route,
+                   sum(request_count) AS request_count,
+                   approx_percentile(0.95, rollup(latency)) AS p95_ms,
+                   coalesce(sum(error_count)::float / nullif(sum(request_count), 0), 0) AS error_rate
+            FROM api_latency_1min
+            WHERE service_name = $1 AND bucket > now() - interval '{interval}'
+            GROUP BY route
+            ORDER BY request_count DESC
+            LIMIT 20
+            """,
+            service_name,
+        )
+        return [dict(r) for r in rows]
+
     # For longer windows, use the pre-aggregated views for performance.
     # max(p95_ms) over time buckets per route: conservative upper bound, avoids
     # the invalid avg-of-percentiles pattern while staying in the right direction.

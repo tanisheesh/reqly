@@ -43,6 +43,9 @@ def test_windows_are_hour_aligned_sliced_and_stop_at_end_offset():
 
 
 class _FailingConn:
+    async def fetchval(self, *args):
+        return True  # every aggregate exists
+
     async def execute(self, *args):
         raise RuntimeError("db down")
 
