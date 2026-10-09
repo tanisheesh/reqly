@@ -7,6 +7,7 @@ from pathlib import Path
 import asyncpg
 
 from ..config import settings
+from .late_data import seed_empty_aggregates
 
 _pool: asyncpg.Pool | None = None
 logger = logging.getLogger("reqly.collector")
@@ -59,6 +60,7 @@ async def create_pool() -> asyncpg.Pool:
     # Migrations run once after a successful connection — errors here are not
     # retried so they surface immediately instead of being masked as "DB not ready".
     await _run_migrations(_pool)
+    await seed_empty_aggregates(_pool)
     return _pool
 
 

@@ -68,6 +68,16 @@ the way it is. Every entry answers a question an interviewer might ask.
 
 ---
 
+## Decision — Mergeable percentile sketches over percentile_cont
+
+**Problem:** Continuous aggregates stored `percentile_cont` per route per minute. Percentiles can't be combined, so the service-level p95 was the max of the route p95s and a 7-day p95 the max of minute p95s — upper bounds that overstate latency, sometimes by an order of magnitude (a slow, rare route dominates).
+
+**Decision:** Store a UddSketch per (minute, service, environment, route, method) via the TimescaleDB Toolkit and roll it up at query time. `uddsketch(1000, 0.005)` measured within ~0.2% of exact p50/p95/p99 on log-normal latencies at ~130 bytes per route-minute; the Toolkit's default `percentile_agg` was ~2% off at p95.
+
+**Tradeoff:** Needs the Toolkit (`timescaledb-ha` image or Timescale Cloud). The migration detects it and the collector falls back to the old views without it, so plain `timescale/timescaledb` installs keep working.
+
+---
+
 ## What I'd do differently in v2
 
 - **Configurable anomaly threshold per service** — the global z > 4.0 threshold (with count-based error tests and minimum effect sizes) keeps false positives near one every ~20 weeks, but low-volume services need large shifts to clear it. Per-service thresholds or adaptive thresholds based on historical false-positive rates would improve signal quality.
