@@ -8,7 +8,7 @@ from pydantic import AwareDatetime, BaseModel, Field, ValidationError, field_val
 from ..auth import verify_api_key
 from ..db.late_data import tracker as late_data_tracker
 from ..db.pool import get_pool
-from ..db.queries import insert_events
+from ..db.queries import event_row, insert_events, record_deployments, row_time
 from ..rate_limit import RATE_LIMIT, limiter
 
 router = APIRouter()
@@ -21,6 +21,11 @@ _MAX_SERVICE_NAME_LEN = 128
 _MAX_ROUTE_LEN = 512
 _MAX_METHOD_LEN = 16
 _MAX_SHORT_TEXT_LEN = 255
+_MAX_RELEASE_LEN = 128
+_MAX_ENVIRONMENT_LEN = 32
+_MAX_CONSUMER_ID_LEN = 128
+_MAX_BYTES = 10 * 1024**3  # 10 GiB -- larger is clearly corrupt
+_MAX_TOKENS = 10_000_000
 
 
 class EventIn(BaseModel):
@@ -33,6 +38,15 @@ class EventIn(BaseModel):
     error: bool
     error_type: str | None = Field(default=None, max_length=_MAX_SHORT_TEXT_LEN)
     host: str | None = Field(default=None, max_length=_MAX_SHORT_TEXT_LEN)
+    # --- v2 (all optional; see docs/INGEST_SPEC.md) ---
+    release: str | None = Field(default=None, max_length=_MAX_RELEASE_LEN)
+    environment: str | None = Field(default=None, max_length=_MAX_ENVIRONMENT_LEN)
+    consumer_id: str | None = Field(default=None, max_length=_MAX_CONSUMER_ID_LEN)
+    request_bytes: int | None = Field(default=None, ge=0, le=_MAX_BYTES)
+    response_bytes: int | None = Field(default=None, ge=0, le=_MAX_BYTES)
+    llm_model: str | None = Field(default=None, max_length=_MAX_SHORT_TEXT_LEN)
+    llm_input_tokens: int | None = Field(default=None, ge=0, le=_MAX_TOKENS)
+    llm_output_tokens: int | None = Field(default=None, ge=0, le=_MAX_TOKENS)
 
     @field_validator("duration_ms")
     @classmethod
@@ -45,6 +59,11 @@ class EventIn(BaseModel):
 class IngestRequest(BaseModel):
     service_name: str = Field(max_length=_MAX_SERVICE_NAME_LEN)
     sdk_version: str | None = None
+    # Batch-level defaults (v2): an SDK knows its release/environment once
+    # per process, so it sends them here instead of on every event. A value
+    # on the event itself wins.
+    release: str | None = Field(default=None, max_length=_MAX_RELEASE_LEN)
+    environment: str | None = Field(default=None, max_length=_MAX_ENVIRONMENT_LEN)
     events: list[dict] = Field(min_length=1, max_length=_MAX_BATCH_SIZE)
 
 
@@ -67,22 +86,31 @@ async def ingest(request: Request, body: IngestRequest):
             rejected += 1
             continue
         rows.append(
-            (
-                str(e.event_id),
-                e.timestamp,
-                body.service_name,
-                e.method,
-                e.route,
-                e.status_code,
-                e.duration_ms,
-                e.error,
-                e.error_type,
-                e.host,
+            event_row(
+                event_id=str(e.event_id),
+                time=e.timestamp,
+                service_name=body.service_name,
+                method=e.method,
+                route=e.route,
+                status_code=e.status_code,
+                duration_ms=e.duration_ms,
+                is_error=e.error,
+                error_type=e.error_type,
+                host=e.host,
+                release=e.release or body.release,
+                environment=e.environment or body.environment,
+                consumer_id=e.consumer_id,
+                request_bytes=e.request_bytes,
+                response_bytes=e.response_bytes,
+                llm_model=e.llm_model,
+                llm_input_tokens=e.llm_input_tokens,
+                llm_output_tokens=e.llm_output_tokens,
             )
         )
 
     pool = get_pool()
     await insert_events(pool, rows)
     if rows:
-        late_data_tracker.note(min(r[1] for r in rows))
+        await record_deployments(pool, rows)
+        late_data_tracker.note(min(row_time(r) for r in rows))
     return {"accepted": len(rows), "rejected": rejected}

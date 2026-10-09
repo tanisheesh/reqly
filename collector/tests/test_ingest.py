@@ -22,8 +22,14 @@ def client(monkeypatch):
     monkeypatch.setattr(ingest_module, "get_pool", lambda: FakePool())
     monkeypatch.setattr(ingest_module, "insert_events", fake_insert_events)
 
+    async def fake_record_deployments(pool, rows):
+        test_client.deployment_rows.extend(rows)
+
+    monkeypatch.setattr(ingest_module, "record_deployments", fake_record_deployments)
+
     test_client = TestClient(app)
     test_client.captured_rows = captured_rows
+    test_client.deployment_rows = []
     return test_client
 
 
@@ -108,3 +114,52 @@ def test_read_key_cannot_ingest(client):
         json={"service_name": "svc", "events": [_valid_event()]},
     )
     assert response.status_code == 401
+
+
+def _col(row, name):
+    from app.db.queries import EVENT_COLUMNS
+
+    return row[EVENT_COLUMNS.index(name)]
+
+
+def test_batch_level_release_and_environment_apply_to_events(client):
+    response = client.post(
+        "/v1/ingest",
+        headers={"X-Reqly-Key": "demo-key"},
+        json={
+            "service_name": "svc",
+            "release": "a1b2c3",
+            "environment": "prod",
+            "events": [_valid_event(), _valid_event(release="override", environment="staging")],
+        },
+    )
+    assert response.status_code == 200
+    first, second = client.captured_rows
+    assert (_col(first, "release"), _col(first, "environment")) == ("a1b2c3", "prod")
+    assert (_col(second, "release"), _col(second, "environment")) == ("override", "staging")
+    assert len(client.deployment_rows) == 2
+
+
+def test_v1_events_without_new_fields_still_accepted(client):
+    response = client.post(
+        "/v1/ingest",
+        headers={"X-Reqly-Key": "demo-key"},
+        json={"service_name": "svc", "events": [_valid_event()]},
+    )
+    assert response.json() == {"accepted": 1, "rejected": 0}
+    row = client.captured_rows[0]
+    assert _col(row, "release") is None
+    assert _col(row, "response_bytes") is None
+
+
+def test_negative_byte_counts_reject_only_that_event(client):
+    response = client.post(
+        "/v1/ingest",
+        headers={"X-Reqly-Key": "demo-key"},
+        json={
+            "service_name": "svc",
+            "events": [_valid_event(response_bytes=512), _valid_event(response_bytes=-1)],
+        },
+    )
+    assert response.json() == {"accepted": 1, "rejected": 1}
+    assert _col(client.captured_rows[0], "response_bytes") == 512
