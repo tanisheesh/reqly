@@ -133,7 +133,7 @@ The database image moved to `timescale/timescaledb-ha:pg16`, which runs as a dif
 
 ## Known local-only limitations
 
-- The load generator is a Docker service, not a real app — it generates synthetic traffic patterns. To see AI insights from real traffic, instrument your own app or run the [EventFlow demo](../demo/README.md).
+- The load generator is a Docker service, not a real app — it generates synthetic traffic patterns. To see AI insights from real traffic, instrument your own app or run the [EventFlow demo](https://github.com/tanisheesh/EventFlow).
 - `GROQ_API_KEY` is required for AI-written insights. Without it the insights panel shows plain-text statistical findings — fully functional, just not LLM-narrated.
 - The continuous aggregate `end_offset` is 1 minute, so the most recent ~1 minute of data may not appear in dashboard queries (it's in the raw table but not yet in the aggregate). This is expected TimescaleDB behavior.
 - On first start, the load generator backfills weeks of history. The collector materializes it into the aggregates in the background (about a minute per few weeks of demo data), so the 7d chart and AI insights fill in shortly after the backfill finishes. Re-running the backfill doesn't duplicate data — events are deterministic and deduplicated.
