@@ -1,0 +1,75 @@
+{{- if .Values.dashboard.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "reqly.fullname" . }}-dashboard
+  labels:
+    {{- include "reqly.labels" (dict "ctx" $ "component" "dashboard") | nindent 4 }}
+spec:
+  replicas: {{ .Values.dashboard.replicas }}
+  selector:
+    matchLabels:
+      {{- include "reqly.selectorLabels" (dict "ctx" $ "component" "dashboard") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "reqly.selectorLabels" (dict "ctx" $ "component" "dashboard") | nindent 8 }}
+      annotations:
+        checksum/collector-url: {{ include "reqly.publicCollectorUrl" . | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: dashboard
+          image: {{ include "reqly.image" (dict "image" .Values.dashboard.image "ctx" $) }}
+          imagePullPolicy: {{ .Values.dashboard.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 5173
+          env:
+            # written into config.js at start-up; the browser calls this URL
+            - name: REQLY_COLLECTOR_URL
+              value: {{ include "reqly.publicCollectorUrl" . | quote }}
+            - name: REQLY_READ_KEY
+              valueFrom: { secretKeyRef: { name: {{ include "reqly.secretName" . }}, key: read-key } }
+          readinessProbe:
+            httpGet: { path: /, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /, port: http }
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.dashboard.resources | nindent 12 }}
+      {{- with .Values.dashboard.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.dashboard.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.dashboard.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "reqly.fullname" . }}-dashboard
+  labels:
+    {{- include "reqly.labels" (dict "ctx" $ "component" "dashboard") | nindent 4 }}
+spec:
+  type: {{ .Values.dashboard.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.dashboard.service.port }}
+      targetPort: http
+  selector:
+    {{- include "reqly.selectorLabels" (dict "ctx" $ "component" "dashboard") | nindent 4 }}
+{{- end }}

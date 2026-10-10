@@ -5,6 +5,8 @@ name: GitHub Packages
 # - container images ghcr.io/tanisheesh/reqly-collector and reqly-dashboard
 #   (linux/amd64 + linux/arm64), tagged with the collector version, the
 #   short commit SHA and `latest`;
+# - the Helm chart as an OCI artifact, oci://ghcr.io/tanisheesh/charts/reqly,
+#   versioned like the collector (after the images, which it points at);
 # - the Node SDK mirrored as @tanisheesh/reqly-node on npm.pkg.github.com
 #   (GitHub's npm registry only takes scoped names; `npm i reqly-node` from
 #   npmjs.com stays the documented install).
@@ -87,6 +89,26 @@ jobs:
             index:org.opencontainers.image.description=${{ matrix.description }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  chart:
+    name: Helm chart
+    needs: images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v4
+
+      - name: Package and push
+        env:
+          OWNER: ${{ github.repository_owner }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('collector/pyproject.toml', 'rb'))['project']['version'])")
+          helm lint deploy/helm/reqly
+          helm package deploy/helm/reqly --version "$VERSION" --app-version "$VERSION"
+          echo "$TOKEN" | helm registry login ghcr.io --username "$ACTOR" --password-stdin
+          helm push "reqly-$VERSION.tgz" "oci://ghcr.io/$OWNER/charts"
 
   node-sdk:
     name: Node SDK on GitHub Packages

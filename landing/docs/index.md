@@ -7,7 +7,7 @@ description: Reqly is self-hosted API monitoring for Python, Node.js and any Ope
 
 **Self-hosted API monitoring that tells you what broke, when, and which deploy did it** — for Python, Node.js and any OpenTelemetry stack.
 
-Reqly watches every request your APIs serve and explains problems instead of just charting them. When a route starts failing, it tells you which release was running, which host or client the errors came from, and whether you're burning your error budget. You can also ask it why in plain English. Everything runs on your own Postgres: one `docker compose up`, a one-line SDK, or plain OpenTelemetry.
+Reqly watches every request your APIs serve and explains problems instead of just charting them. When a route starts failing, it tells you which release was running, which host or client the errors came from, and whether you're burning your error budget. You can also ask it why in plain English. Everything runs on your own Postgres: one `docker compose up` or `helm install`, a one-line SDK, or plain OpenTelemetry.
 
 <div class="grid cards" markdown>
 

@@ -33,7 +33,7 @@
 
 ## What is Reqly?
 
-Reqly watches every request your APIs serve and explains problems instead of just charting them: when a route starts failing it says which release was running, which host or client the errors came from, and whether you are burning your error budget — and you can ask it why in plain English. It is a lightweight, self-hosted alternative to Datadog-style APMs for teams that want their data on their own Postgres: one `docker compose up`, a one-line SDK, or plain OpenTelemetry.
+Reqly watches every request your APIs serve and explains problems instead of just charting them: when a route starts failing it says which release was running, which host or client the errors came from, and whether you are burning your error budget — and you can ask it why in plain English. It is a lightweight, self-hosted alternative to Datadog-style APMs for teams that want their data on their own Postgres: one `docker compose up` (or `helm install`), a one-line SDK, or plain OpenTelemetry.
 
 ```python
 import reqly
@@ -62,7 +62,7 @@ reqly.instrument(app, service_name="checkout-api")   # FastAPI, Flask, Django, S
 | Database | TimescaleDB (pg16, Toolkit) · hypertables · continuous aggregates · UddSketch |
 | Dashboard | React 19 · Vite · TypeScript · Tailwind CSS 4 · Recharts · TanStack Query |
 | AI | Groq API · gpt-oss-120b (tool calling) · statistics-first anomaly detection |
-| Infra | Docker Compose · EC2 (TimescaleDB) · Render · GHCR images · PyPI / npm trusted publishing |
+| Infra | Docker Compose · Helm chart · EC2 (TimescaleDB) · Render · GHCR images · PyPI / npm trusted publishing |
 
 
 ## Engineering Decisions

@@ -60,6 +60,14 @@ Follow [infra/DEPLOY.md § Step 1](../infra/DEPLOY.md#step-1--launch-ec2-timesca
 3. New → **Static Site** for `dashboard/`: build command `npm ci && npm run build`, publish directory `dist`, with `VITE_COLLECTOR_URL` and `VITE_READ_KEY` set
 4. Add the dashboard's URL to the collector's `CORS_ORIGINS`
 
+### Kubernetes (Helm)
+
+```bash
+helm install reqly oci://ghcr.io/tanisheesh/charts/reqly --namespace reqly --create-namespace
+```
+
+The chart is in [`deploy/helm/reqly`](../deploy/helm/reqly): collector (1 replica, `Recreate`), dashboard, an optional TimescaleDB StatefulSet, generated keys and an optional ingress. Details: [Kubernetes docs](https://reqly.tanisheesh.in/docs/self-hosting/kubernetes/).
+
 ### Docker (self-host anywhere)
 
 ```bash
@@ -109,7 +117,7 @@ Each part has its own tag; pushing the tag runs the workflow.
 |---|---|---|
 | `sdk-vX.Y.Z` | `reqly` to PyPI, plus a GitHub release | `release-sdk.yml` |
 | `node-vX.Y.Z` | `reqly-node` to npm with provenance, plus a GitHub release; mirror `@tanisheesh/reqly-node` on GitHub Packages | `release-sdk-node.yml`, `github-packages.yml` |
-| `collector-vX.Y.Z` | `ghcr.io/tanisheesh/reqly-collector` and `reqly-dashboard` (amd64 + arm64; tagged with the version, the commit SHA and `latest`) | `github-packages.yml` |
+| `collector-vX.Y.Z` | `ghcr.io/tanisheesh/reqly-collector` and `reqly-dashboard` (amd64 + arm64; tagged with the version, the commit SHA and `latest`), then the Helm chart `oci://ghcr.io/tanisheesh/charts/reqly` at the same version | `github-packages.yml` |
 
 **Python SDK:** bump `version` in `sdk/pyproject.toml`, add a `## X.Y.Z — YYYY-MM-DD` section to `sdk/CHANGELOG.md`, merge to `main`, then:
 

@@ -1,0 +1,22 @@
+apiVersion: v2
+name: reqly
+description: Self-hosted API monitoring that tells you what broke, when, and which deploy did it — collector, dashboard and (optionally) TimescaleDB.
+type: application
+# Released with the collector: version and appVersion are both the collector's
+# version (github-packages.yml sets them from collector/pyproject.toml).
+version: 0.11.0
+appVersion: "0.11.0"
+home: https://reqly.tanisheesh.in
+icon: https://reqly.tanisheesh.in/docs/assets/logo.svg
+sources:
+  - https://github.com/tanisheesh/reqly
+keywords:
+  - observability
+  - apm
+  - api-monitoring
+  - opentelemetry
+  - timescaledb
+maintainers:
+  - name: Tanish Poddar
+    email: hey@tanisheesh.in
+    url: https://tanisheesh.in
