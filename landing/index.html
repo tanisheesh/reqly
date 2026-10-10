@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Reqly — API Observability for FastAPI &amp; Flask</title>
-  <meta name="description" content="Auto-instrument FastAPI and Flask in 2 lines. Latency percentiles, error rates, status codes, and weekly AI anomaly reports. Open source, self-hostable." />
+  <title>Reqly — Self-hosted API Monitoring</title>
+  <meta name="description" content="Self-hosted API monitoring that tells you what broke, when, and which deploy did it — for Python, Node.js and any OpenTelemetry stack. Deploy-aware alerts, SLOs, Ask Reqly, OpenAPI drift, consumers and LLM cost." />
+  <meta name="theme-color" content="#060b12" />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2306b6d4' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M2 12h3l3-8 4 16 3-10 2 2h5'/></svg>" />
   <style>
     /* ── tokens ─────────────────────────────────────────────── */
@@ -18,20 +19,24 @@
       --accent:      #06b6d4;
       --accent-glow: rgba(6,182,212,.1);
       --accent-mid:  rgba(6,182,212,.2);
+      --heading:     #ffffff;
       --text:        #bcd6eb;
-      --text-2:      #4d7898;
-      --text-3:      #243e56;
+      --text-2:      #6a92b0;
+      --text-3:      #35556f;
       --green:       #10d9a0;
       --green-dim:   rgba(16,217,160,.12);
       --red:         #f06a6a;
       --red-dim:     rgba(240,106,106,.1);
       --yellow:      #f0b540;
+      --violet:      #a78bfa;
       --sans:        system-ui,-apple-system,'Segoe UI',Arial,sans-serif;
       --mono:        'Cascadia Code','Fira Code','JetBrains Mono',ui-monospace,monospace;
       --nav-h:       56px;
+      --gutter:      1.5rem;
+      --max-w:       1160px;
     }
     @media (prefers-color-scheme: light) {
-      :root {
+      :root:not([data-theme="dark"]) {
         --bg:         #f2f7fc;
         --bg-sub:     #e8f1f9;
         --surface:    #ffffff;
@@ -41,28 +46,33 @@
         --accent:     #0891b2;
         --accent-glow:rgba(8,145,178,.07);
         --accent-mid: rgba(8,145,178,.18);
+        --heading:    #0a1a2b;
         --text:       #0c1e30;
         --text-2:     #4a7494;
-        --text-3:     #8aadca;
+        --text-3:     #7d9fbc;
         --green:      #0baa7e;
         --green-dim:  rgba(11,170,126,.1);
         --red:        #d94f4f;
         --red-dim:    rgba(217,79,79,.09);
         --yellow:     #c98a10;
+        --violet:     #7c3aed;
       }
     }
-    :root[data-theme="dark"]  { --bg:#060b12;--bg-sub:#0a1320;--surface:#0d1826;--surface-hi:#12203a;--border:#1a2f4a;--border-hi:#254468;--accent:#06b6d4;--accent-glow:rgba(6,182,212,.1);--accent-mid:rgba(6,182,212,.2);--text:#bcd6eb;--text-2:#4d7898;--text-3:#243e56;--green:#10d9a0;--green-dim:rgba(16,217,160,.12);--red:#f06a6a;--red-dim:rgba(240,106,106,.1);--yellow:#f0b540; }
-    :root[data-theme="light"] { --bg:#f2f7fc;--bg-sub:#e8f1f9;--surface:#ffffff;--surface-hi:#edf4fb;--border:#c2d8eb;--border-hi:#94bdd8;--accent:#0891b2;--accent-glow:rgba(8,145,178,.07);--accent-mid:rgba(8,145,178,.18);--text:#0c1e30;--text-2:#4a7494;--text-3:#8aadca;--green:#0baa7e;--green-dim:rgba(11,170,126,.1);--red:#d94f4f;--red-dim:rgba(217,79,79,.09);--yellow:#c98a10; }
+    :root[data-theme="light"] { --bg:#f2f7fc;--bg-sub:#e8f1f9;--surface:#ffffff;--surface-hi:#edf4fb;--border:#c2d8eb;--border-hi:#94bdd8;--accent:#0891b2;--accent-glow:rgba(8,145,178,.07);--accent-mid:rgba(8,145,178,.18);--heading:#0a1a2b;--text:#0c1e30;--text-2:#4a7494;--text-3:#7d9fbc;--green:#0baa7e;--green-dim:rgba(11,170,126,.1);--red:#d94f4f;--red-dim:rgba(217,79,79,.09);--yellow:#c98a10;--violet:#7c3aed; }
 
     /* ── reset ──────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
-    body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 15px; line-height: 1.6; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+    html { scroll-behavior: smooth; scroll-padding-top: calc(var(--nav-h) + 1rem); -webkit-text-size-adjust: 100%; }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 15px; line-height: 1.6; -webkit-font-smoothing: antialiased; min-height: 100vh; overflow-x: hidden; }
     a { color: inherit; text-decoration: none; }
     code { font-family: var(--mono); }
+    pre { margin: 0; font-family: inherit; font-size: inherit; line-height: inherit; }
     h1,h2,h3,h4 { text-wrap: balance; line-height: 1.2; }
-    button { font-family: inherit; cursor: pointer; border: none; background: none; }
+    p { overflow-wrap: break-word; }
+    button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
     table { border-collapse: collapse; }
+    svg { flex-shrink: 0; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 
     /* ── nav ────────────────────────────────────────────────── */
     .nav {
@@ -70,21 +80,20 @@
       height: var(--nav-h);
       border-bottom: 1px solid var(--border);
       background: color-mix(in srgb, var(--bg) 85%, transparent);
-      backdrop-filter: blur(12px);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
       display: flex; align-items: center;
     }
     .nav-inner {
-      width: 100%; max-width: 1160px; margin: 0 auto;
-      padding: 0 1.5rem;
-      display: flex; align-items: center; gap: 0;
+      width: 100%; max-width: var(--max-w); margin: 0 auto;
+      padding: 0 var(--gutter);
+      display: flex; align-items: center; gap: 0.5rem;
     }
     .nav-logo {
       display: flex; align-items: center; gap: 8px;
       font-weight: 700; font-size: 1.05rem; color: var(--text);
       margin-right: auto; letter-spacing: -0.02em;
     }
-    .nav-logo svg { flex-shrink: 0; }
-    .nav-tabs { display: flex; align-items: center; gap: 0; margin: 0 1.5rem; }
+    .nav-tabs { display: flex; align-items: center; margin: 0 1rem; }
     .nav-tab {
       padding: 0 1rem; height: var(--nav-h); display: flex; align-items: center;
       font-size: 0.875rem; font-weight: 500; color: var(--text-2);
@@ -93,51 +102,50 @@
     }
     .nav-tab:hover { color: var(--text); }
     .nav-tab.active { color: var(--text); border-bottom-color: var(--accent); }
-    .nav-right { display: flex; align-items: center; gap: 0.75rem; }
+    .nav-right { display: flex; align-items: center; gap: 0.625rem; }
     .nav-gh {
       display: flex; align-items: center; gap: 6px;
-      padding: 0.375rem 0.875rem;
+      padding: 0.375rem 0.75rem;
       font-size: 0.8125rem; color: var(--text-2);
       border: 1px solid var(--border); border-radius: 6px;
       transition: border-color .15s, color .15s;
     }
     .nav-gh:hover { border-color: var(--border-hi); color: var(--text); }
     .nav-pip {
-      padding: 0.375rem 0.875rem;
+      padding: 0.375rem 0.75rem; white-space: nowrap;
       font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.01em;
       color: var(--accent); border: 1px solid var(--accent-mid);
       border-radius: 6px; background: var(--accent-glow);
       transition: background .15s;
     }
-    .nav-pip:hover { background: color-mix(in srgb, var(--accent-glow) 200%, transparent); }
+    .nav-pip:hover { background: var(--accent-mid); }
 
     /* ── layout utility ─────────────────────────────────────── */
-    .container { max-width: 1160px; margin: 0 auto; padding: 0 1.5rem; }
-    .section { padding: 5rem 0; }
-    .section-sm { padding: 3.5rem 0; }
+    .container { width: 100%; max-width: var(--max-w); margin: 0 auto; padding: 0 var(--gutter); }
+    .section { padding: clamp(3.5rem, 7vw, 5rem) 0; }
+    .section-sm { padding: clamp(2.75rem, 6vw, 3.75rem) 0; border-top: 1px solid var(--border); }
     .section-label {
       font-size: 0.6875rem; letter-spacing: 0.12em; text-transform: uppercase;
       color: var(--text-2); font-weight: 600; margin-bottom: 1rem;
     }
     .section-title {
-      font-size: clamp(1.6rem, 3vw, 2.25rem); font-weight: 700;
-      color: var(--text); letter-spacing: -0.03em; margin-bottom: 0.75rem;
+      font-size: clamp(1.5rem, 1.1rem + 1.8vw, 2.25rem); font-weight: 700;
+      color: var(--heading); letter-spacing: -0.03em; margin-bottom: 0.75rem;
     }
-    .section-sub { font-size: 0.9375rem; color: var(--text-2); max-width: 56ch; line-height: 1.65; }
+    .section-sub { font-size: 0.9375rem; color: var(--text-2); max-width: 62ch; line-height: 1.65; margin-bottom: 2rem; }
+    .scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.875rem; }
 
     /* ── hero ───────────────────────────────────────────────── */
-    .hero {
-      padding-top: calc(var(--nav-h) + 5rem);
-      padding-bottom: 4rem;
-    }
+    .hero { padding-top: calc(var(--nav-h) + clamp(2.5rem, 7vw, 5rem)); padding-bottom: clamp(2.5rem, 6vw, 4rem); }
     .hero-grid {
       display: grid;
-      grid-template-columns: 1fr 420px;
-      gap: 3rem;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
+      gap: clamp(2rem, 4vw, 3.5rem);
       align-items: center;
     }
     .hero-badge {
-      display: inline-flex; align-items: center; gap: 6px;
+      display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px;
       padding: 0.3rem 0.75rem;
       font-size: 0.75rem; letter-spacing: 0.04em; font-weight: 600;
       color: var(--accent); border: 1px solid var(--accent-mid);
@@ -150,38 +158,40 @@
     }
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
     .hero h1 {
-      font-size: clamp(2.4rem, 4.5vw, 3.75rem);
-      font-weight: 800; color: #fff; letter-spacing: -0.04em;
+      font-size: clamp(2.1rem, 1.3rem + 3.6vw, 3.75rem);
+      font-weight: 800; color: var(--heading); letter-spacing: -0.04em;
       line-height: 1.08; margin-bottom: 1.25rem;
     }
     .hero h1 em { font-style: normal; color: var(--accent); }
     .hero-sub {
-      font-size: 1.0625rem; color: var(--text-2); max-width: 48ch;
+      font-size: clamp(0.975rem, 0.9rem + 0.3vw, 1.0625rem); color: var(--text-2); max-width: 52ch;
       line-height: 1.7; margin-bottom: 2rem;
     }
-    .hero-ctас { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 2.5rem; flex-wrap: wrap; }
-    .btn-primary {
-      display: inline-flex; align-items: center; gap: 7px;
-      padding: 0.625rem 1.25rem; border-radius: 7px;
-      background: var(--text); color: var(--bg);
-      font-size: 0.875rem; font-weight: 600;
-      transition: opacity .15s;
+    .hero-ctas { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 2rem; flex-wrap: wrap; }
+    .btn-primary, .btn-ghost {
+      display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+      padding: 0.625rem 1.25rem; border-radius: 7px; min-height: 42px;
+      font-size: 0.875rem; white-space: nowrap;
     }
+    .btn-primary { background: var(--text); color: var(--bg); font-weight: 600; transition: opacity .15s; }
     .btn-primary:hover { opacity: .88; }
     .btn-ghost {
-      display: inline-flex; align-items: center; gap: 7px;
-      padding: 0.625rem 1.25rem; border-radius: 7px;
-      border: 1px solid var(--border-hi); color: var(--text-2);
-      font-size: 0.875rem; font-weight: 500;
+      border: 1px solid var(--border-hi); color: var(--text-2); font-weight: 500;
       transition: border-color .15s, color .15s;
     }
-    .btn-ghost:hover { border-color: var(--border-hi); color: var(--text); }
+    .btn-ghost:hover { border-color: var(--accent-mid); color: var(--text); }
+    .hero-install { display: flex; flex-direction: column; gap: 0.5rem; max-width: 100%; }
     .hero-snippet {
-      display: flex; align-items: center; gap: 10px;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
       font-family: var(--mono); font-size: 0.8125rem; color: var(--text-2);
+      min-width: 0;
     }
-    .hero-snippet code { color: var(--text); }
-    .hero-snippet-sep { color: var(--text-3); }
+    .hero-snippet code { color: var(--text); overflow-wrap: anywhere; }
+    .hero-snippet .lang {
+      font-size: 0.625rem; letter-spacing: .08em; text-transform: uppercase; font-weight: 700;
+      color: var(--text-3); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px;
+      font-family: var(--sans); width: 3.5rem; text-align: center;
+    }
 
     /* ── metrics panel (hero right) ─────────────────────────── */
     .metrics-panel {
@@ -190,6 +200,7 @@
       border-radius: 10px;
       overflow: hidden;
       font-family: var(--mono);
+      min-width: 0;
     }
     .mp-header {
       padding: 0.875rem 1.125rem;
@@ -198,357 +209,328 @@
       font-size: 0.75rem; font-weight: 600; letter-spacing: 0.03em;
       color: var(--text-2);
     }
-    .mp-header-dot {
-      width: 7px; height: 7px; border-radius: 50%;
-      background: var(--green); animation: blink 1.8s ease-in-out infinite;
-    }
-    .mp-header-name { color: var(--text); margin-right: auto; }
-    .mp-live {
-      font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase;
-      color: var(--green);
-    }
-    .mp-section {
-      padding: 1rem 1.125rem;
-      border-bottom: 1px solid var(--border);
-    }
+    .mp-header-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: blink 1.8s ease-in-out infinite; }
+    .mp-header-name { color: var(--text); margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mp-live { font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--green); }
+    .mp-section { padding: 1rem 1.125rem; border-bottom: 1px solid var(--border); }
     .mp-section:last-child { border-bottom: none; }
-    .mp-label {
-      font-size: 0.6875rem; letter-spacing: 0.1em; text-transform: uppercase;
-      color: var(--text-3); margin-bottom: 0.75rem; font-weight: 600;
-    }
+    .mp-label { font-size: 0.6875rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); margin-bottom: 0.75rem; font-weight: 600; }
     .mp-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
     .mp-row:last-child { margin-bottom: 0; }
     .mp-key { font-size: 0.75rem; color: var(--text-2); width: 2.5rem; text-align: right; flex-shrink: 0; }
-    .mp-bar-track {
-      flex: 1; height: 5px; border-radius: 2px;
-      background: var(--surface-hi); overflow: hidden;
-    }
-    .mp-bar-fill {
-      height: 100%; border-radius: 2px; background: var(--accent);
-      transition: width 1.6s cubic-bezier(.4,0,.2,1);
-    }
-    .mp-val { font-size: 0.75rem; color: var(--text); width: 3.5rem; text-align: right; flex-shrink: 0; }
-    .mp-stat {
-      display: flex; align-items: baseline; justify-content: space-between;
-    }
-    .mp-stat-key { font-size: 0.75rem; color: var(--text-2); }
+    .mp-bar-track { flex: 1; height: 5px; border-radius: 2px; background: var(--surface-hi); overflow: hidden; }
+    .mp-bar-fill { height: 100%; border-radius: 2px; background: var(--accent); transition: width 1.6s cubic-bezier(.4,0,.2,1); }
+    .mp-val { font-size: 0.75rem; color: var(--text); width: 3.75rem; text-align: right; flex-shrink: 0; }
+    .mp-split { display: grid; grid-template-columns: 1fr 1fr; }
+    .mp-split .mp-section:first-child { border-right: 1px solid var(--border); }
+    .mp-split .mp-section { border-bottom: 1px solid var(--border); }
     .mp-stat-val { font-size: 1.1rem; font-weight: 700; color: var(--text); }
     .mp-stat-unit { font-size: 0.6875rem; color: var(--text-3); margin-left: 3px; }
-    .mp-stat-tag {
-      font-size: 0.6875rem; padding: 2px 6px; border-radius: 4px;
-      font-weight: 600; letter-spacing: 0.04em;
-    }
+    .mp-stat-tag { display: inline-block; margin-top: 4px; font-size: 0.6875rem; padding: 2px 6px; border-radius: 4px; font-weight: 600; letter-spacing: 0.02em; }
     .mp-stat-tag.good { background: var(--green-dim); color: var(--green); }
-    .mp-stat-tag.warn { background: rgba(240,181,64,.1); color: var(--yellow); }
-    .mp-sparkline {
-      display: flex; align-items: flex-end; gap: 3px;
-      height: 28px; margin-top: 0.625rem;
-    }
-    .mp-spark-bar {
-      flex: 1; background: var(--accent-mid); border-radius: 2px;
-      transition: height .8s ease;
-    }
+    .mp-sparkline { display: flex; align-items: flex-end; gap: 3px; height: 28px; margin-top: 0.625rem; }
+    .mp-spark-bar { flex: 1; background: var(--accent-mid); border-radius: 2px; transition: height .8s ease; }
     .mp-spark-bar.hi { background: var(--accent); }
+    .mp-release { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; color: var(--text-2); flex-wrap: wrap; }
+    .mp-release b { color: var(--text); font-weight: 600; }
+    .mp-release .pill { padding: 1px 6px; border-radius: 4px; background: var(--accent-glow); color: var(--accent); border: 1px solid var(--accent-mid); }
 
     /* ── stats strip ────────────────────────────────────────── */
-    .stats-strip {
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-      background: var(--bg-sub);
-      padding: 2.25rem 0;
-    }
-    .stats-grid {
-      display: grid; grid-template-columns: repeat(4, 1fr);
-      gap: 0; border-left: 1px solid var(--border);
-    }
-    .stat-item {
-      padding: 0 2rem;
-      border-right: 1px solid var(--border);
-    }
-    .stat-val {
-      font-family: var(--mono); font-size: 1.4rem; font-weight: 700;
-      color: var(--text); letter-spacing: -0.02em; margin-bottom: 0.25rem;
-    }
+    .stats-strip { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--bg-sub); padding: 2.25rem 0; }
+    .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .stat-item { padding: 0.25rem 1.75rem; border-left: 1px solid var(--border); }
+    .stat-item:last-child { border-right: 1px solid var(--border); }
+    .stat-val { font-family: var(--mono); font-size: clamp(1.1rem, 0.95rem + 0.6vw, 1.4rem); font-weight: 700; color: var(--text); letter-spacing: -0.02em; margin-bottom: 0.25rem; }
     .stat-desc { font-size: 0.8125rem; color: var(--text-2); }
 
     /* ── bento features ─────────────────────────────────────── */
     .bento {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      grid-template-areas:
-        "zero zero fail"
-        "lat  err  ai"
-        "host stat ai";
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       border-left: 1px solid var(--border);
       border-top: 1px solid var(--border);
     }
     .bento-card {
       border-right: 1px solid var(--border);
       border-bottom: 1px solid var(--border);
-      padding: 1.875rem;
+      padding: clamp(1.25rem, 2.5vw, 1.875rem);
       background: var(--bg);
       transition: background .15s;
+      min-width: 0;
     }
     .bento-card:hover { background: var(--surface); }
-    .bento-card.zero { grid-area: zero; }
-    .bento-card.fail { grid-area: fail; }
-    .bento-card.lat  { grid-area: lat; }
-    .bento-card.err  { grid-area: err; }
-    .bento-card.ai   { grid-area: ai; }
-    .bento-card.host { grid-area: host; }
-    .bento-card.stat { grid-area: stat; }
+    .bento-card.wide { grid-column: span 2; }
+    .bento-card.tall { grid-row: span 2; }
     .card-icon {
       width: 36px; height: 36px; border-radius: 8px;
       border: 1px solid var(--border-hi);
       display: flex; align-items: center; justify-content: center;
       margin-bottom: 1rem; color: var(--accent);
     }
-    .card-title {
-      font-size: 0.9375rem; font-weight: 600; color: var(--text);
-      margin-bottom: 0.5rem; letter-spacing: -0.01em;
-    }
+    .card-title { font-size: 0.9375rem; font-weight: 600; color: var(--text); margin-bottom: 0.5rem; letter-spacing: -0.01em; }
     .card-desc { font-size: 0.8125rem; color: var(--text-2); line-height: 1.65; }
-    .card-code {
-      margin-top: 1.25rem;
-      background: color-mix(in srgb,#000 60%, var(--bg-sub));
-      border: 1px solid var(--border); border-radius: 6px;
-      padding: 1rem 1.125rem;
-      font-family: var(--mono); font-size: 0.78125rem;
-      color: #bcd6eb; line-height: 1.7; overflow-x: auto;
+    .card-list { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.45rem; list-style: none; }
+    .card-list li { font-size: 0.75rem; color: var(--text-2); display: flex; gap: 6px; align-items: baseline; }
+    .card-list li::before { content: "✓"; color: var(--green); flex-shrink: 0; }
+
+    /* code (dark in both themes) */
+    .card-code, .code-body, .ai-json {
+      background: #070d14;
+      font-family: var(--mono); color: #bcd6eb;
+      white-space: pre; overflow-x: auto; -webkit-overflow-scrolling: touch;
+      tab-size: 2;
     }
-    .card-code .kw  { color: #ff7b72; }
-    .card-code .str { color: #a5d6ff; }
-    .card-code .fn  { color: #d2a8ff; }
-    .card-code .cm  { color: #4a7090; }
-    .card-code .hl  { color: #06b6d4; }
+    .card-code { margin-top: 1rem; border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.125rem; font-size: 0.78125rem; line-height: 1.7; }
+    .kw  { color: #ff7b72; }
+    .str { color: #a5d6ff; }
+    .fn  { color: #d2a8ff; }
+    .cm  { color: #4f7594; }
+    .hl  { color: #22c5e0; }
+    .pn  { color: #bcd6eb; }
+
+    .code-tabs { margin-top: 1rem; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: #070d14; }
+    .code-tabs-bar { display: flex; border-bottom: 1px solid var(--border); background: var(--surface); overflow-x: auto; }
+    .code-tab {
+      padding: 0.5rem 0.9rem; font-size: 0.75rem; font-weight: 500; color: var(--text-2);
+      border-bottom: 2px solid transparent; white-space: nowrap;
+    }
+    .code-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+    .code-tabs .card-code { margin: 0; border: none; border-radius: 0; }
+    .code-tabs .card-code[hidden] { display: none; }
 
     .mini-bars { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
     .mini-bar-row { display: flex; align-items: center; gap: 0.625rem; font-family: var(--mono); font-size: 0.6875rem; }
-    .mini-bar-key { color: var(--text-2); width: 2.25rem; text-align: right; }
+    .mini-bar-key { color: var(--text-2); width: 2.25rem; text-align: right; flex-shrink: 0; }
     .mini-bar-track { flex: 1; height: 4px; background: var(--surface-hi); border-radius: 2px; overflow: hidden; }
     .mini-bar-fill  { height: 100%; border-radius: 2px; transition: width 1.5s cubic-bezier(.4,0,.2,1); }
     .mini-bar-fill.p50 { background: var(--accent); }
     .mini-bar-fill.p95 { background: #3b82f6; }
     .mini-bar-fill.p99 { background: #8b5cf6; }
-    .mini-bar-val { color: var(--text); width: 3rem; text-align: right; }
+    .mini-bar-val { color: var(--text); width: 3.25rem; text-align: right; flex-shrink: 0; }
 
-    .err-gauge {
-      margin-top: 1rem;
-      padding: 0.875rem; background: var(--red-dim);
-      border: 1px solid rgba(240,106,106,.15); border-radius: 6px;
-    }
-    .err-gauge-val {
-      font-family: var(--mono); font-size: 1.5rem; font-weight: 700;
-      color: var(--red); letter-spacing: -0.02em;
-    }
+    .err-gauge { margin-top: 1rem; padding: 0.875rem; background: var(--red-dim); border: 1px solid rgba(240,106,106,.18); border-radius: 6px; }
+    .err-gauge-val { font-family: var(--mono); font-size: 1.5rem; font-weight: 700; color: var(--red); letter-spacing: -0.02em; }
     .err-gauge-sub { font-size: 0.75rem; color: var(--text-2); margin-top: 2px; }
 
-    .ai-json {
-      margin-top: 1rem;
-      background: color-mix(in srgb,#000 60%, var(--bg-sub));
-      border: 1px solid var(--border); border-radius: 6px;
-      padding: 0.875rem 1rem;
-      font-family: var(--mono); font-size: 0.71875rem;
-      color: #7a9fb8; line-height: 1.7; overflow-x: auto;
-    }
+    .budget { margin-top: 1rem; }
+    .budget-row { display: flex; justify-content: space-between; gap: 0.5rem; font-family: var(--mono); font-size: 0.6875rem; color: var(--text-2); margin-bottom: 0.4rem; }
+    .budget-row b { color: var(--text); font-weight: 600; }
+    .budget-track { height: 6px; background: var(--surface-hi); border-radius: 3px; overflow: hidden; }
+    .budget-fill { height: 100%; width: 64%; background: linear-gradient(90deg, var(--green), var(--yellow)); border-radius: 3px; }
+
+    .drift { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.4rem; font-family: var(--mono); font-size: 0.6875rem; }
+    .drift-row { display: flex; gap: 0.5rem; align-items: center; min-width: 0; }
+    .drift-row code { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tag { flex-shrink: 0; padding: 1px 6px; border-radius: 4px; font-size: 0.625rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; font-family: var(--sans); }
+    .tag.undoc { background: rgba(240,181,64,.12); color: var(--yellow); }
+    .tag.unused { background: var(--surface-hi); color: var(--text-2); }
+    .tag.depr { background: var(--red-dim); color: var(--red); }
+
+    .ai-json { margin-top: 1rem; border: 1px solid var(--border); border-radius: 6px; padding: 0.875rem 1rem; font-size: 0.71875rem; color: #7a9fb8; line-height: 1.7; }
     .aj-key { color: #569cd6; }
     .aj-str { color: #ce9178; }
     .aj-num { color: #b5cea8; }
 
-    /* ── architecture ───────────────────────────────────────── */
-    .arch-terminal {
-      background: #070d14;
-      border: 1px solid var(--border-hi);
-      border-radius: 10px; overflow: hidden;
-    }
-    .arch-bar {
-      padding: 0.625rem 1rem;
-      border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; gap: 6px;
-      background: var(--surface);
-    }
-    .arch-dot { width: 10px; height: 10px; border-radius: 50%; }
-    .arch-bar-label { margin-left: auto; font-size: 0.6875rem; color: var(--text-3); font-family: var(--mono); letter-spacing: 0.04em; }
-    .arch-body {
-      padding: 1.75rem 2rem;
-      font-family: var(--mono); font-size: 0.8125rem; line-height: 2;
-      color: #5a7e9a; overflow-x: auto;
-    }
-    .arch-body .af-app   { color: #bcd6eb; }
-    .arch-body .af-coll  { color: #56b6d0; }
-    .arch-body .af-db    { color: #50bf9b; }
-    .arch-body .af-dash  { color: #9985da; }
-    .arch-body .af-lmb   { color: #e8a44a; }
-    .arch-body .af-arrow { color: #06b6d4; }
-    .arch-body .af-dim   { color: #2c4868; }
+    /* ── terminals ──────────────────────────────────────────── */
+    .arch-terminal { background: #070d14; border: 1px solid var(--border-hi); border-radius: 10px; overflow: hidden; min-width: 0; }
+    .arch-bar { padding: 0.625rem 1rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px; background: var(--surface); }
+    .arch-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .arch-bar-label { margin-left: auto; font-size: 0.6875rem; color: var(--text-3); font-family: var(--mono); letter-spacing: 0.04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 0.75rem; }
+    .arch-body { padding: 1.5rem 1.75rem; font-family: var(--mono); font-size: 0.8125rem; line-height: 1.9; color: #5a7e9a; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .arch-body pre { white-space: pre; }
+    .arch-body pre.wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
+    .af-app   { color: #bcd6eb; }
+    .af-coll  { color: #56b6d0; }
+    .af-db    { color: #50bf9b; }
+    .af-dash  { color: #9985da; }
+    .af-lmb   { color: #e8a44a; }
+    .af-arrow { color: #06b6d4; }
+    .af-dim   { color: #4a6886; }
+    .scroll-hint { display: none; font-size: 0.6875rem; color: var(--text-3); margin-top: 0.5rem; }
 
-    /* ── ai section ─────────────────────────────────────────── */
+    /* ── pipe cards ─────────────────────────────────────────── */
+    .pipe-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.875rem; margin-bottom: 1.25rem; }
+    .pipe-grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .pipe-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.125rem; min-width: 0; }
+    .pipe-card-title { font-size: 0.8125rem; font-weight: 600; color: var(--text); margin-bottom: 0.375rem; }
+    .pipe-card-body { font-size: 0.75rem; color: var(--text-2); line-height: 1.65; }
+
+    /* ── ask section ────────────────────────────────────────── */
     .ai-callout {
       border: 1px solid color-mix(in srgb, #8b5cf6 30%, transparent);
       background: color-mix(in srgb, #8b5cf6 4%, var(--bg));
-      border-radius: 12px; padding: 2.5rem 2.75rem;
-      display: grid; grid-template-columns: 1fr 1fr; gap: 2.5rem; align-items: start;
+      border-radius: 12px; padding: clamp(1.25rem, 4vw, 2.5rem);
+      display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(1.5rem, 4vw, 2.5rem); align-items: start;
     }
-    .ai-callout-left {}
-    .ai-callout-title {
-      font-size: 1.375rem; font-weight: 700; color: var(--text);
-      letter-spacing: -0.03em; margin-bottom: 0.75rem;
-    }
+    .ai-callout-title { font-size: clamp(1.15rem, 1rem + 0.7vw, 1.375rem); font-weight: 700; color: var(--heading); letter-spacing: -0.03em; margin-bottom: 0.75rem; }
     .ai-callout-body { font-size: 0.875rem; color: var(--text-2); line-height: 1.7; margin-bottom: 1.25rem; }
     .ai-steps { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
     .ai-step { display: flex; align-items: flex-start; gap: 0.625rem; font-size: 0.8125rem; color: var(--text-2); }
     .ai-step-n {
       width: 18px; height: 18px; border-radius: 4px;
-      background: rgba(139,92,246,.15); color: #a78bfa;
+      background: rgba(139,92,246,.15); color: var(--violet);
       font-size: 0.625rem; font-weight: 700; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center; margin-top: 2px;
     }
-    .ai-quote {
-      padding: 1.125rem 1.25rem;
-      background: color-mix(in srgb, #8b5cf6 8%, var(--surface));
-      border-left: 3px solid #8b5cf6;
-      border-radius: 0 6px 6px 0;
-      font-size: 0.875rem; color: var(--text-2); line-height: 1.65;
-      font-style: italic; margin-top: 1.25rem;
+    .chat { display: flex; flex-direction: column; gap: 0.75rem; min-width: 0; }
+    .chat-q {
+      align-self: flex-end; max-width: 90%;
+      padding: 0.625rem 0.875rem; border-radius: 10px 10px 2px 10px;
+      background: var(--accent-glow); border: 1px solid var(--accent-mid);
+      font-size: 0.8125rem; color: var(--text);
     }
-    .ai-quote em { font-style: normal; color: var(--text); }
+    .chat-a {
+      padding: 0.875rem 1rem; border-radius: 10px 10px 10px 2px;
+      background: color-mix(in srgb, #8b5cf6 8%, var(--surface));
+      border: 1px solid color-mix(in srgb, #8b5cf6 25%, transparent);
+      font-size: 0.8125rem; color: var(--text-2); line-height: 1.65;
+    }
+    .chat-a b { color: var(--text); font-weight: 600; }
+    .chat-tools { margin-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.375rem; }
+    .chat-tools code { font-size: 0.6875rem; padding: 1px 6px; border-radius: 4px; background: var(--surface-hi); color: var(--violet); border: 1px solid var(--border); }
+    .chat-note { font-size: 0.6875rem; color: var(--text-3); }
 
-    /* ── stack table ────────────────────────────────────────── */
-    .stack-table { width: 100%; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-    .stack-table th {
-      padding: 0.75rem 1.25rem; text-align: left;
-      font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase;
+    /* ── benchmark bars ─────────────────────────────────────── */
+    .bench { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.875rem; }
+    .bench-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.125rem 1.25rem; min-width: 0; }
+    .bench-title { font-size: 0.75rem; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; color: var(--text-3); margin-bottom: 0.875rem; }
+    .bench-row { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr) 3.75rem; align-items: center; gap: 0.75rem; margin-bottom: 0.625rem; font-size: 0.8125rem; }
+    .bench-row:last-child { margin-bottom: 0; }
+    .bench-name { color: var(--text); }
+    .bench-track { height: 8px; background: var(--surface-hi); border-radius: 4px; overflow: hidden; }
+    .bench-fill { height: 100%; background: var(--accent); border-radius: 4px; }
+    .bench-val { font-family: var(--mono); font-size: 0.75rem; color: var(--text); text-align: right; }
+    .bench-note { font-size: 0.75rem; color: var(--text-2); margin-top: 1rem; line-height: 1.65; }
+
+    /* ── tables ─────────────────────────────────────────────── */
+    .tbl-wrap { border: 1px solid var(--border); border-radius: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 1rem 0; }
+    .tbl-wrap table { width: 100%; }
+    .tbl-wrap th {
+      padding: 0.7rem 1.1rem; text-align: left; white-space: nowrap;
+      font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase;
       font-weight: 600; color: var(--text-3); background: var(--surface);
       border-bottom: 1px solid var(--border);
     }
-    .stack-table td { padding: 0.875rem 1.25rem; font-size: 0.875rem; border-bottom: 1px solid var(--border); }
-    .stack-table tr:last-child td { border-bottom: none; }
-    .stack-table td:first-child { font-weight: 600; color: var(--text); width: 140px; }
+    .tbl-wrap td { padding: 0.8rem 1.1rem; font-size: 0.8125rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .tbl-wrap tr:last-child td { border-bottom: none; }
+    .stack-table td:first-child { font-weight: 600; color: var(--text); width: 140px; white-space: nowrap; }
     .stack-table td:last-child { color: var(--text-2); }
     .stack-table tbody tr:hover td { background: var(--surface); }
-    .stack-table tbody tr { transition: background .1s; }
+    .url-table td:first-child { font-family: var(--mono); color: var(--accent); font-size: 0.75rem; white-space: nowrap; }
+    .url-table td:nth-child(2) { font-family: var(--mono); color: var(--green); font-size: 0.75rem; white-space: nowrap; }
+    .url-table td:last-child { color: var(--text-2); min-width: 14rem; }
+    .cfg-table td { font-family: var(--mono); font-size: 0.75rem; white-space: nowrap; }
+    .cfg-table td:first-child { color: var(--accent); }
+    .cfg-table td:nth-child(2) { color: var(--text-2); }
+    .cfg-table td:last-child { color: var(--text-3); white-space: normal; min-width: 12rem; }
 
     /* ── developers view ────────────────────────────────────── */
-    .dev-content { max-width: 800px; margin: 0 auto; padding: 5rem 1.5rem 6rem; }
-    .dev-h1 { font-size: clamp(1.75rem, 3.5vw, 2.5rem); font-weight: 800; color: var(--text); letter-spacing: -0.04em; margin-bottom: 0.625rem; }
-    .dev-sub { font-size: 1rem; color: var(--text-2); line-height: 1.65; margin-bottom: 3rem; }
-    .dev-toc {
-      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
-      padding: 1.25rem 1.5rem; margin-bottom: 3.5rem;
-    }
+    .dev-content { max-width: 860px; margin: 0 auto; padding: calc(var(--nav-h) + clamp(2rem, 6vw, 4rem)) var(--gutter) clamp(3.5rem, 8vw, 6rem); }
+    .dev-h1 { font-size: clamp(1.75rem, 1.3rem + 2vw, 2.5rem); font-weight: 800; color: var(--heading); letter-spacing: -0.04em; margin-bottom: 0.625rem; }
+    .dev-sub { font-size: 1rem; color: var(--text-2); line-height: 1.65; margin-bottom: 2.5rem; }
+    .dev-toc { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem 1.5rem; margin-bottom: 3rem; }
     .dev-toc-label { font-size: 0.6875rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); font-weight: 600; margin-bottom: 0.75rem; }
-    .dev-toc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem 2rem; }
-    .dev-toc a { font-size: 0.875rem; color: var(--accent); display: block; padding: 0.25rem 0; }
+    .dev-toc-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.125rem 2rem; }
+    .dev-toc a { font-size: 0.875rem; color: var(--accent); display: block; padding: 0.3rem 0; }
     .dev-toc a:hover { text-decoration: underline; text-underline-offset: 3px; }
-    .dev-section { margin-bottom: 3.5rem; }
-    .dev-section:last-child { margin-bottom: 0; }
-    .dev-h2 {
-      font-size: 1.25rem; font-weight: 700; color: var(--text); letter-spacing: -0.02em;
-      margin-bottom: 1.25rem;
-      display: flex; align-items: center; gap: 0.625rem;
-    }
-    .dev-h2 .dev-num {
+    .dev-section { margin-bottom: 3.25rem; }
+    .dev-section:last-of-type { margin-bottom: 0; }
+    .dev-h2 { font-size: clamp(1.1rem, 1rem + 0.5vw, 1.25rem); font-weight: 700; color: var(--heading); letter-spacing: -0.02em; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.625rem; }
+    .dev-h3 { font-size: 0.9375rem; font-weight: 600; color: var(--text); margin: 1.5rem 0 0.75rem; }
+    .dev-num {
       width: 26px; height: 26px; border-radius: 6px;
       background: var(--accent-glow); border: 1px solid var(--accent-mid);
       color: var(--accent); font-size: 0.75rem; font-weight: 700;
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     }
-    .prereq-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.875rem; }
-    .prereq-card {
-      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
-      padding: 1.125rem; font-size: 0.8125rem;
-    }
+    .prereq-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.875rem; }
+    .prereq-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.125rem; font-size: 0.8125rem; }
     .prereq-title { font-weight: 600; color: var(--text); margin-bottom: 0.25rem; }
     .prereq-desc { color: var(--text-2); font-size: 0.75rem; }
-    .code-block {
-      background: #070d14; border: 1px solid var(--border-hi); border-radius: 8px;
-      overflow: hidden; margin-bottom: 1rem;
-    }
-    .code-header {
-      padding: 0.5rem 1rem;
-      border-bottom: 1px solid var(--border);
-      background: var(--surface);
-      font-size: 0.6875rem; color: var(--text-3); font-family: var(--mono); letter-spacing: 0.04em;
-    }
-    .code-body { padding: 1.125rem 1.25rem; font-family: var(--mono); font-size: 0.8125rem; color: #8fb8cc; line-height: 1.75; overflow-x: auto; }
-    .code-body .kw  { color: #ff7b72; }
-    .code-body .str { color: #a5d6ff; }
-    .code-body .fn  { color: #d2a8ff; }
-    .code-body .cm  { color: #3a5e7a; }
-    .code-body .hl  { color: #06b6d4; }
-    .code-body .pn  { color: #bcd6eb; }
+    .code-block { background: #070d14; border: 1px solid var(--border-hi); border-radius: 8px; overflow: hidden; margin-bottom: 1rem; min-width: 0; }
+    .code-header { padding: 0.5rem 1rem; border-bottom: 1px solid var(--border); background: var(--surface); font-size: 0.6875rem; color: var(--text-3); font-family: var(--mono); letter-spacing: 0.04em; }
+    .code-body { padding: 1.125rem 1.25rem; font-size: 0.8125rem; color: #8fb8cc; line-height: 1.75; }
     .dev-text { font-size: 0.875rem; color: var(--text-2); line-height: 1.7; margin-bottom: 1rem; }
-    .code-inline { font-family: var(--mono); font-size: 0.8125rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; color: var(--accent); }
-    .url-table { width: 100%; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin: 1rem 0; }
-    .url-table th { padding: 0.625rem 1rem; font-size: 0.6875rem; letter-spacing: .06em; text-transform: uppercase; font-weight: 600; color: var(--text-3); background: var(--surface); border-bottom: 1px solid var(--border); text-align: left; }
-    .url-table td { padding: 0.75rem 1rem; font-size: 0.8125rem; border-bottom: 1px solid var(--border); }
-    .url-table tr:last-child td { border-bottom: none; }
-    .url-table td:first-child { font-family: var(--mono); color: var(--accent); font-size: 0.75rem; }
-    .url-table td:nth-child(2) { font-family: var(--mono); color: var(--green); font-size: 0.75rem; }
-    .url-table td:last-child { color: var(--text-2); }
-    .tip {
-      padding: 0.875rem 1.125rem;
-      background: var(--accent-glow); border: 1px solid var(--accent-mid);
-      border-radius: 6px; font-size: 0.8125rem; color: var(--text-2);
-      margin: 1rem 0;
-    }
+    .dev-text a, .tip a { color: var(--accent); }
+    .dev-text a:hover, .tip a:hover { text-decoration: underline; text-underline-offset: 3px; }
+    .code-inline { font-family: var(--mono); font-size: 0.8em; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: var(--accent); overflow-wrap: anywhere; }
+    .tip { padding: 0.875rem 1.125rem; background: var(--accent-glow); border: 1px solid var(--accent-mid); border-radius: 6px; font-size: 0.8125rem; color: var(--text-2); margin: 1rem 0; }
     .tip strong { color: var(--accent); }
-    .code-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 0.875rem; }
-    .cfg-table { width: 100%; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-    .cfg-table th { padding: 0.625rem 1rem; font-size: 0.6875rem; letter-spacing: .06em; text-transform: uppercase; font-weight: 600; color: var(--text-3); background: var(--surface); border-bottom: 1px solid var(--border); text-align: left; }
-    .cfg-table td { padding: 0.75rem 1rem; font-size: 0.75rem; font-family: var(--mono); border-bottom: 1px solid var(--border); }
-    .cfg-table tr:last-child td { border-bottom: none; }
-    .cfg-table td:first-child { color: var(--accent); }
-    .cfg-table td:nth-child(2) { color: var(--text-2); }
-    .cfg-table td:last-child { color: var(--text-3); }
-    .pipe-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.875rem; margin-top: 1.25rem; }
-    .pipe-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.125rem; }
-    .pipe-card-title { font-size: 0.8125rem; font-weight: 600; color: var(--text); margin-bottom: 0.375rem; }
-    .pipe-card-body { font-size: 0.75rem; color: var(--text-2); line-height: 1.65; }
-    .dev-links {
-      display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 2.5rem;
-      padding-top: 2rem; border-top: 1px solid var(--border);
-    }
+    .code-2col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.875rem; margin-bottom: 1rem; }
+    .code-2col .code-block { margin-bottom: 0; }
+    .dev-links { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 2.5rem; padding-top: 2rem; border-top: 1px solid var(--border); }
 
     /* ── footer ─────────────────────────────────────────────── */
-    footer {
-      border-top: 1px solid var(--border);
-      padding: 2rem 0;
-    }
-    .footer-inner {
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 1.5rem; flex-wrap: wrap;
-      font-size: 0.8125rem; color: var(--text-2);
-    }
+    footer { border-top: 1px solid var(--border); padding: 2rem 0; }
+    .footer-inner { display: flex; align-items: center; justify-content: space-between; gap: 1rem 1.5rem; flex-wrap: wrap; font-size: 0.8125rem; color: var(--text-2); }
     .footer-brand { display: flex; align-items: center; gap: 7px; }
-    .footer-links { display: flex; align-items: center; gap: 1.5rem; }
-    .footer-links a { transition: color .15s; }
-    .footer-links a:hover { color: var(--text); }
+    .footer-links { display: flex; align-items: center; gap: 0.5rem 1.5rem; flex-wrap: wrap; }
+    .footer-links a, .footer-links button { color: var(--text-2); font-size: 0.8125rem; transition: color .15s; }
+    .footer-links a:hover, .footer-links button:hover { color: var(--text); }
     .footer-copy { font-size: 0.8125rem; color: var(--text-3); }
     .footer-copy a { color: var(--text-2); transition: color .15s; }
     .footer-copy a:hover { color: var(--text); }
     .footer-copy .heart { color: var(--red); }
 
     /* ── responsive ─────────────────────────────────────────── */
-    @media (max-width: 900px) {
-      .hero-grid { grid-template-columns: 1fr; }
-      .metrics-panel { display: none; }
-      .stats-grid { grid-template-columns: repeat(2,1fr); }
-      .bento { grid-template-columns: 1fr; grid-template-areas: "zero""fail""lat""err""ai""host""stat"; }
-      .ai-callout { grid-template-columns: 1fr; }
-      .code-2col { grid-template-columns: 1fr; }
-      .prereq-grid { grid-template-columns: 1fr 1fr; }
-      .pipe-grid { grid-template-columns: 1fr; }
+    @media (min-width: 1440px) {
+      :root { --max-w: 1280px; }
+      body { font-size: 16px; }
+      .hero-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 460px); }
+    }
+    @media (max-width: 1100px) {
+      .pipe-grid.four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 1024px) {
+      .hero-grid { grid-template-columns: minmax(0, 1fr); }
+      .metrics-panel { max-width: 560px; width: 100%; }
+      .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 1.5rem; }
+      .stat-item:nth-child(2n) { border-right: 1px solid var(--border); }
+      .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .ai-callout { grid-template-columns: minmax(0, 1fr); }
+    }
+    @media (max-width: 768px) {
+      :root { --gutter: 1.25rem; }
+      .nav-tabs { margin: 0 0.25rem; }
+      .nav-tab { padding: 0 0.625rem; }
+      .nav-gh span { display: none; }
+      .pipe-grid, .grid-2, .code-2col, .bench { grid-template-columns: minmax(0, 1fr); }
+      .prereq-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .arch-body { padding: 1.125rem 1.25rem; font-size: 0.75rem; }
+      .scroll-hint { display: block; }
       .footer-inner { flex-direction: column; align-items: flex-start; }
     }
-    @media (max-width: 560px) {
-      .nav-tabs { display: none; }
-      .stats-grid { grid-template-columns: 1fr 1fr; }
-      .prereq-grid { grid-template-columns: 1fr; }
-      .dev-toc-grid { grid-template-columns: 1fr; }
-      .stat-item { padding: 0 1.25rem; }
+    @media (max-width: 640px) {
+      .nav-pip { display: none; }
+      .bento { grid-template-columns: minmax(0, 1fr); }
+      .bento-card.wide { grid-column: auto; }
+      .bento-card.tall { grid-row: auto; }
+      .pipe-grid.four { grid-template-columns: minmax(0, 1fr); }
+      .hero-ctas .btn-primary, .hero-ctas .btn-ghost { flex: 1 1 calc(50% - 0.75rem); }
+      .dev-toc-grid { grid-template-columns: minmax(0, 1fr); }
+    }
+    @media (max-width: 480px) {
+      :root { --gutter: 1rem; --nav-h: 52px; }
+      body { font-size: 14.5px; }
+      .stats-strip { padding: 1.75rem 0; }
+      .stats-grid { grid-template-columns: minmax(0, 1fr); row-gap: 0; }
+      .stat-item, .stat-item:nth-child(2n), .stat-item:last-child { border: none; border-bottom: 1px solid var(--border); padding: 0.875rem 0; }
+      .stat-item:last-child { border-bottom: none; }
+      .prereq-grid { grid-template-columns: minmax(0, 1fr); }
+      .hero-ctas .btn-primary, .hero-ctas .btn-ghost { flex: 1 1 100%; }
+      .mp-split { grid-template-columns: minmax(0, 1fr); }
+      .mp-split .mp-section:first-child { border-right: none; }
+      .bench-row { grid-template-columns: 4.5rem minmax(0, 1fr) 3.25rem; gap: 0.5rem; }
+      .code-body, .card-code { font-size: 0.75rem; padding: 0.875rem 1rem; }
+      .dev-toc { padding: 1rem 1.125rem; }
+    }
+    @media (max-width: 360px) {
+      .nav-logo span { display: none; }
+      .nav-tab { padding: 0 0.5rem; font-size: 0.8125rem; }
+      .hero h1 { font-size: 1.9rem; }
     }
     @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
       *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
     }
   </style>
@@ -558,73 +540,72 @@
 <!-- ══ NAV ════════════════════════════════════════════════════ -->
 <nav class="nav">
   <div class="nav-inner">
-    <button class="nav-logo" onclick="showView('product')">
+    <button class="nav-logo" onclick="showView('product')" aria-label="Reqly home">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l3-8 4 16 3-10 2 2h5"/></svg>
-      Reqly
+      <span>Reqly</span>
     </button>
     <div class="nav-tabs">
       <button id="tab-product" class="nav-tab active" onclick="showView('product')">Product</button>
       <button id="tab-developers" class="nav-tab" onclick="showView('developers')">Developers</button>
     </div>
     <div class="nav-right">
-      <a href="https://github.com/tanisheesh/reqly" target="_blank" rel="noopener" class="nav-gh">
+      <a href="https://github.com/tanisheesh/reqly" target="_blank" rel="noopener" class="nav-gh" aria-label="GitHub">
         <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
-        GitHub
+        <span>GitHub</span>
       </a>
-      <a href="https://pypi.org/project/reqly/" target="_blank" rel="noopener" class="nav-pip">pip install reqly</a>
+      <a href="https://github.com/tanisheesh/reqly#readme" target="_blank" rel="noopener" class="nav-pip">pip · npm · OTLP</a>
     </div>
   </div>
 </nav>
 
 <!-- ══ PRODUCT VIEW ═══════════════════════════════════════════ -->
-<div id="view-product">
+<main id="view-product">
 
   <!-- HERO -->
   <section class="hero">
     <div class="container">
       <div class="hero-grid">
 
-        <!-- left -->
         <div>
           <div class="hero-badge">
             <span class="hero-badge-dot"></span>
-            v0.2.0 · Open source · GPL-3.0
+            Python SDK 0.5 · Node SDK 0.1 · Open source
           </div>
-          <h1>API monitoring<br/>that doesn't<br/><em>get in your way</em></h1>
+          <h1>API monitoring that tells you <em>what broke</em> — and which deploy did it</h1>
           <p class="hero-sub">
-            Add one call to your FastAPI or Flask app — or point any OpenTelemetry
-            exporter at it. Get accurate latency percentiles, per-route error rates,
-            deploy markers, hourly alerts and weekly AI anomaly reports that say
-            what changed — self-hosted, no agents, no SaaS bill.
+            One line in your Python or Node.js app, or plain OpenTelemetry from anything else.
+            Reqly gives you real latency percentiles and error rates per route, alerts that name
+            the release, host and clients behind a problem, SLOs, and answers to
+            <em style="font-style:normal;color:var(--text)">“why did /orders start failing?”</em>
+            — self-hosted on your own Postgres.
           </p>
-          <div class="hero-ctас">
-            <a href="https://eventflow-g2h5.onrender.com" target="_blank" rel="noopener" class="btn-primary">
-              <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-              Live Demo
+          <div class="hero-ctas">
+            <a href="https://reqly-eventflow-dashboard.onrender.com" target="_blank" rel="noopener" class="btn-primary">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l3-8 4 16 3-10 2 2h5"/></svg>
+              Live dashboard
             </a>
             <a href="https://github.com/tanisheesh/reqly" target="_blank" rel="noopener" class="btn-ghost">
               <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
-              View on GitHub
+              GitHub
             </a>
             <button class="btn-ghost" onclick="showView('developers')">
               <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
-              Developer docs
+              Developer guide
             </button>
           </div>
-          <div class="hero-snippet">
-            <code>reqly.instrument(app, service_name=<span style="color:var(--accent)">"checkout-api"</span>)</code>
-            <span class="hero-snippet-sep">— that's it</span>
+          <div class="hero-install">
+            <div class="hero-snippet"><span class="lang">Python</span><code>reqly.instrument(app, service_name=<span style="color:var(--accent)">"checkout-api"</span>)</code></div>
+            <div class="hero-snippet"><span class="lang">Node</span><code>app.use(reqlyExpress({ serviceName: <span style="color:var(--accent)">"checkout-api"</span> }))</code></div>
           </div>
         </div>
 
         <!-- right: live metrics panel -->
-        <div class="metrics-panel">
+        <div class="metrics-panel" aria-hidden="true">
           <div class="mp-header">
             <span class="mp-header-dot"></span>
-            <span class="mp-header-name">reqly / checkout-api</span>
+            <span class="mp-header-name">checkout-api · POST /orders</span>
             <span class="mp-live">● live</span>
           </div>
-
           <div class="mp-section">
             <div class="mp-label">Latency</div>
             <div class="mp-row">
@@ -643,27 +624,25 @@
               <span class="mp-val"><span id="num-p99">312</span> ms</span>
             </div>
           </div>
-
-          <div class="mp-section">
-            <div class="mp-stat">
-              <div>
-                <div class="mp-label">Error rate</div>
-                <div style="display:flex;align-items:baseline;gap:8px">
-                  <div class="mp-stat-val"><span id="num-err">0.8</span><span class="mp-stat-unit">%</span></div>
-                  <span class="mp-stat-tag good">↓ within baseline</span>
-                </div>
-              </div>
+          <div class="mp-split">
+            <div class="mp-section">
+              <div class="mp-label">Error rate</div>
+              <div class="mp-stat-val"><span id="num-err">0.8</span><span class="mp-stat-unit">%</span></div>
+              <span class="mp-stat-tag good">within baseline</span>
+            </div>
+            <div class="mp-section">
+              <div class="mp-label">Error budget</div>
+              <div class="mp-stat-val">64<span class="mp-stat-unit">% left</span></div>
+              <span class="mp-stat-tag good">SLO 99.5% · 28d</span>
             </div>
           </div>
-
           <div class="mp-section">
-            <div class="mp-stat">
-              <div>
-                <div class="mp-label">Requests / min</div>
-                <div class="mp-stat-val"><span id="num-rpm">247</span></div>
-              </div>
-            </div>
+            <div class="mp-label">Requests / min</div>
+            <div class="mp-stat-val"><span id="num-rpm">247</span></div>
             <div class="mp-sparkline" id="sparkline"></div>
+          </div>
+          <div class="mp-section">
+            <div class="mp-release"><span class="pill">release</span><b>v42</b> deployed 2h ago · no regression</div>
           </div>
         </div>
 
@@ -677,19 +656,19 @@
       <div class="stats-grid">
         <div class="stat-item">
           <div class="stat-val">p50 · p95 · p99</div>
-          <div class="stat-desc">Latency percentiles per route, per minute</div>
+          <div class="stat-desc">Real percentiles at every level, from mergeable sketches</div>
         </div>
         <div class="stat-item">
-          <div class="stat-val">Per-route</div>
-          <div class="stat-desc">Error rates vs a day-of-week × hour seasonal baseline</div>
+          <div class="stat-val">~6–33 µs</div>
+          <div class="stat-desc">Added per request by the SDKs, measured in CI</div>
         </div>
         <div class="stat-item">
           <div class="stat-val">Any stack</div>
-          <div class="stat-desc">Python SDK, or OpenTelemetry for Node, Java, Go, .NET</div>
+          <div class="stat-desc">Python, Node.js, or OpenTelemetry from Go, Java, .NET…</div>
         </div>
         <div class="stat-item">
-          <div class="stat-val">Hourly + weekly</div>
-          <div class="stat-desc">Slack / Discord alerts and AI reports via Groq</div>
+          <div class="stat-val">1 command</div>
+          <div class="stat-desc"><code class="code-inline">docker compose up</code> — your data, your Postgres</div>
         </div>
       </div>
     </div>
@@ -700,63 +679,65 @@
     <div class="container">
       <p class="section-label">Features</p>
       <h2 class="section-title">Everything you need. Nothing you don't.</h2>
-      <p class="section-sub" style="margin-bottom:2.5rem">A native SDK for FastAPI and Flask, OpenTelemetry for everything else — not a generic agent that ships 50 MB of overhead and a $400/month bill.</p>
+      <p class="section-sub">Native SDKs for Python and Node.js, OpenTelemetry for everything else — not a generic agent with a per-host bill.</p>
 
       <div class="bento">
 
-        <!-- zero-code: 2 cols wide -->
-        <div class="bento-card zero">
+        <!-- instrument -->
+        <div class="bento-card wide">
           <div class="card-icon">
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
           </div>
-          <div class="card-title">Zero-code instrumentation</div>
-          <div class="card-desc">One <code class="code-inline">instrument()</code> call. No decorators, no manual spans, no config files. Auto-detects FastAPI vs Flask.</div>
-          <div class="card-code"><span class="kw">import</span> reqly
-<span class="kw">from</span> fastapi <span class="kw">import</span> FastAPI
+          <div class="card-title">One line of instrumentation</div>
+          <div class="card-desc">No decorators, no manual spans. Routes are recorded as templates (<code class="code-inline">/users/{id}</code>), never raw paths. The release is picked up from your CI or host automatically.</div>
+          <div class="code-tabs" data-tabs>
+            <div class="code-tabs-bar" role="tablist">
+              <button class="code-tab active" role="tab" data-tab="py">Python</button>
+              <button class="code-tab" role="tab" data-tab="node">Node.js</button>
+              <button class="code-tab" role="tab" data-tab="otel">OpenTelemetry</button>
+            </div>
+<div class="card-code" data-panel="py"><span class="kw">import</span> <span class="hl">reqly</span>
 
-app = <span class="fn">FastAPI</span>()
-<span class="hl">reqly</span>.<span class="fn">instrument</span>(
-    app,
-    service_name=<span class="str">"checkout-api"</span>,
-    collector_url=<span class="str">"http://localhost:8000"</span>,
-    api_key=<span class="str">"your_key"</span>
-)
-<span class="cm"># Every route is now tracked.</span></div>
+app = <span class="fn">FastAPI</span>()   <span class="cm"># or Flask, Starlette, Litestar</span>
+<span class="hl">reqly</span>.<span class="fn">instrument</span>(app, service_name=<span class="str">"checkout-api"</span>)
+
+<span class="cm"># Django: add "reqly.integrations.django.ReqlyMiddleware"</span>
+<span class="cm"># any WSGI/ASGI app: reqly.instrument_wsgi(app, route_resolver=...)</span></div>
+<div class="card-code" data-panel="node" hidden><span class="kw">import</span> { <span class="fn">reqlyExpress</span> } <span class="kw">from</span> <span class="str">"reqly-node"</span>;
+
+app.<span class="fn">use</span>(<span class="fn">reqlyExpress</span>({ serviceName: <span class="str">"checkout-api"</span> }));
+
+<span class="cm">// Fastify: app.register(reqlyFastify({ ... }))</span>
+<span class="cm">// Hono:    app.use(reqlyHono({ ... }))</span></div>
+<div class="card-code" data-panel="otel" hidden><span class="cm"># any OpenTelemetry SDK — exporter settings only</span>
+<span class="hl">OTEL_EXPORTER_OTLP_ENDPOINT</span>=<span class="str">https://reqly.example.com/otlp</span>
+<span class="hl">OTEL_EXPORTER_OTLP_HEADERS</span>=<span class="str">x-reqly-key=rqk_...</span>
+<span class="hl">OTEL_SERVICE_NAME</span>=<span class="str">checkout-api</span></div>
+          </div>
         </div>
 
         <!-- fail-open -->
-        <div class="bento-card fail">
+        <div class="bento-card">
           <div class="card-icon" style="color:var(--green)">
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
           </div>
-          <div class="card-title">Fail-open SDK</div>
-          <div class="card-desc">SDK errors never reach your app. Instrumentation disables itself on failure. A dead collector adds zero latency — all shipping is on a background thread with strict timeouts.</div>
-          <div style="margin-top:1.25rem;display:flex;flex-direction:column;gap:0.5rem">
-            <div style="font-size:.75rem;color:var(--text-2);display:flex;gap:6px;align-items:center">
-              <span style="color:var(--green)">✓</span> Background thread shipping
-            </div>
-            <div style="font-size:.75rem;color:var(--text-2);display:flex;gap:6px;align-items:center">
-              <span style="color:var(--green)">✓</span> Queue capped at 2 000 events
-            </div>
-            <div style="font-size:.75rem;color:var(--text-2);display:flex;gap:6px;align-items:center">
-              <span style="color:var(--green)">✓</span> Retries 429 / 5xx with backoff — deduped server-side
-            </div>
-            <div style="font-size:.75rem;color:var(--text-2);display:flex;gap:6px;align-items:center">
-              <span style="color:var(--green)">✓</span> Safe under gunicorn <code class="code-inline">--preload</code>
-            </div>
-            <div style="font-size:.75rem;color:var(--text-2);display:flex;gap:6px;align-items:center">
-              <span style="color:var(--green)">✓</span> Route templates, never raw paths
-            </div>
-          </div>
+          <div class="card-title">Fail-open and cheap</div>
+          <div class="card-desc">SDK errors never reach your app, and a dead collector adds no latency.</div>
+          <ul class="card-list">
+            <li>Shipping in the background, batched</li>
+            <li>Bounded queue; retries 408 / 429 / 5xx</li>
+            <li>~6–33 µs per request, benchmarked</li>
+            <li>No request bodies, query strings or headers</li>
+          </ul>
         </div>
 
         <!-- latency -->
-        <div class="bento-card lat">
+        <div class="bento-card">
           <div class="card-icon" style="color:#3b82f6">
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
           </div>
-          <div class="card-title">Latency percentiles</div>
-          <div class="card-desc">p50, p95, p99 per route per minute via TimescaleDB continuous aggregates.</div>
+          <div class="card-title">Percentiles that are right</div>
+          <div class="card-desc">Per-route sketches merge exactly across routes and time, so a 7-day service p95 is a real p95 — not the max of per-minute ones.</div>
           <div class="mini-bars">
             <div class="mini-bar-row">
               <span class="mini-bar-key">p50</span>
@@ -776,56 +757,90 @@ app = <span class="fn">FastAPI</span>()
           </div>
         </div>
 
-        <!-- error rate -->
-        <div class="bento-card err">
+        <!-- errors -->
+        <div class="bento-card">
           <div class="card-icon" style="color:var(--red)">
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
           </div>
-          <div class="card-title">Error rate tracking</div>
-          <div class="card-desc">Per-route hourly error rates. 5xx responses and unhandled exceptions both captured.</div>
+          <div class="card-title">Deploy-aware alerts</div>
+          <div class="card-desc">Hourly checks against each route's weekday × hour baseline. Slack, Discord or a webhook — with the release, the host and the clients behind it.</div>
           <div class="err-gauge">
             <div class="err-gauge-val"><span id="mn-err">0.8</span>%</div>
             <div class="err-gauge-sub">error rate · /checkout · last hour</div>
           </div>
         </div>
 
-        <!-- AI insights: 2 rows tall -->
-        <div class="bento-card ai">
-          <div class="card-icon" style="color:#a78bfa;border-color:rgba(139,92,246,.3)">
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+        <!-- Ask Reqly (tall) -->
+        <div class="bento-card tall">
+          <div class="card-icon" style="color:var(--violet);border-color:rgba(139,92,246,.3)">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
           </div>
-          <div class="card-title">Weekly AI anomaly reports</div>
-          <div class="card-desc" style="margin-bottom:.875rem">Statistics first, Groq writes the narrative last. Each route is compared against the same day-of-week and hour in the previous 7 weeks, using the real request and error counts — tuned to about one false alarm every ~20 weeks. The LLM never sees raw events, only the structured anomaly JSON.</div>
-          <div class="ai-json"><span class="aj-key">"route"</span>: <span class="aj-str">"/auth/login"</span>,
-<span class="aj-key">"day_of_week"</span>: <span class="aj-str">"Monday"</span>,
-<span class="aj-key">"hour_range"</span>: <span class="aj-str">"08:00-09:00"</span>,
-<span class="aj-key">"observed_error_rate"</span>: <span class="aj-num">0.1833</span>,
-<span class="aj-key">"baseline_error_rate"</span>: <span class="aj-num">0.0274</span>,
-<span class="aj-key">"observed_p95_ms"</span>: <span class="aj-num">1840.0</span>,
-<span class="aj-key">"baseline_p95_ms"</span>: <span class="aj-num">320.8</span>,
-<span class="aj-key">"z_score"</span>: <span class="aj-num">23.68</span></div>
-          <div style="margin-top:1rem;padding:1rem;background:rgba(139,92,246,.07);border:1px solid rgba(139,92,246,.15);border-radius:6px;font-size:.8125rem;color:var(--text-2);line-height:1.65;font-style:italic">
-            "This Monday 08:00–09:00, <span style="color:var(--text);font-style:normal">/auth/login</span> ran at an 18.3% error rate vs. a 2.7% baseline for that hour, with p95 at 1840ms vs. 321ms — likely worth checking what changed before Monday morning."
+          <div class="card-title">Ask Reqly + weekly AI report</div>
+          <div class="card-desc" style="margin-bottom:.875rem">Statistics find the anomalies; the LLM only explains them. Ask questions in plain English and get answers from your own data — every query shown, every number checked.</div>
+          <div class="ai-json"><span class="aj-key">"route"</span>: <span class="aj-str">"/orders"</span>,
+<span class="aj-key">"observed_error_rate"</span>: <span class="aj-num">0.300</span>,
+<span class="aj-key">"baseline_error_rate"</span>: <span class="aj-num">0.022</span>,
+<span class="aj-key">"release"</span>: <span class="aj-str">"v2"</span>,
+<span class="aj-key">"top_host"</span>: <span class="aj-str">"pod-3"</span>,
+<span class="aj-key">"z_score"</span>: <span class="aj-num">5.37</span></div>
+          <div style="margin-top:1rem;padding:1rem;background:rgba(139,92,246,.07);border:1px solid rgba(139,92,246,.18);border-radius:6px;font-size:.8125rem;color:var(--text-2);line-height:1.65;font-style:italic">
+            “<span style="color:var(--text);font-style:normal">/orders</span> failed 30% of requests on Friday afternoon against a usual 2.2%, starting with release v2 — and every error came from pod-3.”
           </div>
-          <div style="margin-top:1rem;font-size:.75rem;color:var(--text-3)">No Groq key? Plain-text statistical summary generated instead.</div>
+          <div style="margin-top:1rem;font-size:.75rem;color:var(--text-3)">No Groq key? Reports fall back to a plain statistical summary.</div>
         </div>
 
-        <!-- self-hostable -->
-        <div class="bento-card host">
+        <!-- SLOs -->
+        <div class="bento-card">
+          <div class="card-icon" style="color:var(--green)">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+          </div>
+          <div class="card-title">SLOs and error budgets</div>
+          <div class="card-desc">Availability or latency objectives per service or route, with fast and slow burn-rate alerts from the Google SRE workbook.</div>
+          <div class="budget">
+            <div class="budget-row"><span>/checkout · 99.5%</span><b>64% budget left</b></div>
+            <div class="budget-track"><div class="budget-fill"></div></div>
+          </div>
+        </div>
+
+        <!-- drift -->
+        <div class="bento-card">
           <div class="card-icon" style="color:var(--yellow);border-color:rgba(240,181,64,.25)">
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/></svg>
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
           </div>
-          <div class="card-title">Self-hostable</div>
-          <div class="card-desc">One <code class="code-inline">docker compose up</code>. TimescaleDB + Collector + Dashboard. Your data, your infra.</div>
+          <div class="card-title">OpenAPI drift</div>
+          <div class="card-desc">Upload your spec (or let FastAPI push it) and see where it and real traffic disagree.</div>
+          <div class="drift">
+            <div class="drift-row"><span class="tag undoc">undoc</span><code>POST /internal/refund</code></div>
+            <div class="drift-row"><span class="tag unused">unused</span><code>GET /v1/legacy/export</code></div>
+            <div class="drift-row"><span class="tag depr">deprecated</span><code>GET /v1/orders · 3 clients</code></div>
+          </div>
         </div>
 
-        <!-- status distribution -->
-        <div class="bento-card stat">
+        <!-- consumers -->
+        <div class="bento-card">
           <div class="card-icon" style="color:#f472b6;border-color:rgba(244,114,182,.25)">
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
           </div>
-          <div class="card-title">Any language via OpenTelemetry</div>
-          <div class="card-desc">Point an OTel exporter at <code class="code-inline">/otlp/v1/traces</code> — Node, Java, Go, .NET. No Reqly SDK needed.</div>
+          <div class="card-title">API consumers</div>
+          <div class="card-desc">Who is calling, from an API-key header or your own logic — hashed in the SDK, so keys never leave your app. See who an incident hit.</div>
+        </div>
+
+        <!-- LLM cost -->
+        <div class="bento-card">
+          <div class="card-icon" style="color:var(--accent)">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <div class="card-title">LLM cost per route</div>
+          <div class="card-desc">Record token usage where you call a model; see tokens and cost per route, model and day — and per 1k requests.</div>
+        </div>
+
+        <!-- teams -->
+        <div class="bento-card">
+          <div class="card-icon" style="color:var(--text-2)">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+          </div>
+          <div class="card-title">Projects, keys, sign-in</div>
+          <div class="card-desc">Share one collector between teams: a project each, scoped API keys, members who only see their services.</div>
         </div>
 
       </div>
@@ -833,37 +848,37 @@ app = <span class="fn">FastAPI</span>()
   </section>
 
   <!-- WHAT CHANGED -->
-  <section class="section-sm" style="border-top:1px solid var(--border)">
+  <section class="section-sm">
     <div class="container">
       <p class="section-label">Root cause, not just charts</p>
       <h2 class="section-title">Knows what changed</h2>
-      <p class="section-sub" style="margin-bottom:2rem">Every anomaly comes with the release that was running and where the errors are concentrated — computed from your data, not guessed by a model.</p>
-      <div class="pipe-grid">
+      <p class="section-sub">Every anomaly comes with the release that was running and where the errors are concentrated — computed from your data, not guessed by a model.</p>
+      <div class="pipe-grid four">
         <div class="pipe-card">
           <div class="pipe-card-title">Deploy-aware</div>
-          <div class="pipe-card-body">Every event carries its release (auto-detected from CI variables like <code class="code-inline" style="font-size:.6875rem">GITHUB_SHA</code>). Regressions show the release they started on, with before → after numbers, and deploys appear as markers on the charts.</div>
+          <div class="pipe-card-body">Every event carries its release (from <code class="code-inline">GITHUB_SHA</code>, <code class="code-inline">RENDER_GIT_COMMIT</code>, …). Regressions show the release they started on, with before → after numbers.</div>
         </div>
         <div class="pipe-card">
-          <div class="pipe-card-title">Hourly alerts</div>
-          <div class="pipe-card-body">Each hour is compared with the same weekday-hour in earlier weeks. Slack, Discord or webhook — one alert per route, reminders while it fires, a resolve message when it's over.</div>
+          <div class="pipe-card-title">Seasonal baseline</div>
+          <div class="pipe-card-body">Each hour is compared with the same weekday-hour over 8 weeks. One alert per route, reminders while it fires, a resolve message when it's over.</div>
         </div>
         <div class="pipe-card">
-          <div class="pipe-card-title">Root-cause hints</div>
-          <div class="pipe-card-body">Errors concentrated on one pod relative to its traffic share, or a new error type that wasn't there last week — surfaced as leads in alerts and in the weekly report.</div>
+          <div class="pipe-card-title">Root-cause leads</div>
+          <div class="pipe-card-body">Errors concentrated on one host, environment, status code or error type relative to its traffic share — surfaced in alerts and reports.</div>
         </div>
         <div class="pipe-card">
-          <div class="pipe-card-title">Accurate percentiles</div>
-          <div class="pipe-card-body">Mergeable latency sketches (TimescaleDB Toolkit) make service-level and 7-day p95/p99 real percentiles, within ~0.2% of exact — not the max of per-route numbers.</div>
+          <div class="pipe-card-title">Who it hit</div>
+          <div class="pipe-card-body">With consumer tracking on, each alert lists the API clients affected, so you know who to tell before they tell you.</div>
         </div>
       </div>
-      <div class="arch-terminal" style="margin-top:1.25rem">
+      <div class="arch-terminal">
         <div class="arch-bar">
           <span class="arch-dot" style="background:#f06a6a"></span>
           <span class="arch-dot" style="background:#f0b540"></span>
           <span class="arch-dot" style="background:#10d9a0"></span>
           <span class="arch-bar-label">#alerts — example from the demo data</span>
         </div>
-        <div class="arch-body"><pre style="margin:0;font-family:inherit;font-size:inherit;line-height:inherit;white-space:pre-wrap"><span class="af-app">🔴 Anomaly — flask-demo /orders (Friday 15:00-16:00 UTC, z=5.37)</span>
+        <div class="arch-body"><pre class="wrap"><span class="af-app">🔴 Anomaly — flask-demo /orders (Friday 15:00-16:00 UTC, z=5.37)</span>
 <span class="af-dim">• error rate 30.0% vs 2.2% usual · p95 6588ms vs 1576ms usual</span>
 <span class="af-lmb">• running release v2 — vs v1: errors 2.6% → 33.1%, p95 2072ms → 4501ms</span>
 <span class="af-db">• 100% of errors came from host pod-3, which served 23% of requests</span></pre></div>
@@ -871,12 +886,41 @@ app = <span class="fn">FastAPI</span>()
     </div>
   </section>
 
+  <!-- ASK REQLY -->
+  <section class="section-sm">
+    <div class="container">
+      <p class="section-label">Ask Reqly</p>
+      <h2 class="section-title">Ask why, in plain English</h2>
+      <p class="section-sub">Not text-to-SQL: the model can only call nine read-only query tools, and its answer is checked against what they returned.</p>
+      <div class="ai-callout">
+        <div>
+          <div class="ai-callout-title">Answers you can verify</div>
+          <p class="ai-callout-body">Ask about one service — latency, errors, releases, alerts, SLOs, drift, consumers or LLM cost. The dashboard shows each query the model ran next to the answer.</p>
+          <ol class="ai-steps">
+            <li class="ai-step"><span class="ai-step-n">1</span>You ask a question about a service</li>
+            <li class="ai-step"><span class="ai-step-n">2</span>The model picks from 9 read-only tools — at most 6 calls</li>
+            <li class="ai-step"><span class="ai-step-n">3</span>Tools return rounded aggregates, never raw events or SQL</li>
+            <li class="ai-step"><span class="ai-step-n">4</span>Every number in the answer is matched against the tool results; anything unmatched is flagged</li>
+          </ol>
+        </div>
+        <div class="chat" aria-label="Example conversation">
+          <div class="chat-q">Why did /orders start failing on Friday?</div>
+          <div class="chat-a">
+            Errors on <b>/orders</b> rose to <b>30.0%</b> between 15:00 and 16:00 UTC, against a usual <b>2.2%</b>. Release <b>v2</b> was running — compared with v1, errors went from 2.6% to 33.1% — and all of them came from host <b>pod-3</b>, which served 23% of the traffic.
+            <div class="chat-tools"><code>get_alerts</code><code>compare_periods</code><code>list_releases</code><code>get_breakdown</code></div>
+          </div>
+          <div class="chat-note">Illustrative answer, using the numbers from the demo alert above.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ARCHITECTURE -->
-  <section class="section-sm" style="border-top:1px solid var(--border)">
+  <section class="section-sm">
     <div class="container">
       <p class="section-label">Architecture</p>
       <h2 class="section-title">How data flows</h2>
-      <p class="section-sub" style="margin-bottom:2rem">Every component is yours — no phone-home, no shared infrastructure.</p>
+      <p class="section-sub">Every component is yours — no phone-home, no shared infrastructure.</p>
 
       <div class="arch-terminal">
         <div class="arch-bar">
@@ -885,86 +929,102 @@ app = <span class="fn">FastAPI</span>()
           <span class="arch-dot" style="background:#10d9a0"></span>
           <span class="arch-bar-label">data flow</span>
         </div>
-        <div class="arch-body"><pre style="margin:0;font-family:inherit;font-size:inherit;line-height:inherit"><span class="af-app">[Your FastAPI / Flask app]</span>
-  <span class="af-dim">+</span> Reqly SDK  <span class="af-arrow">──►</span>  POST /v1/ingest  <span class="af-dim">(batched, background thread)</span>
-<span class="af-app">[Any app + OpenTelemetry]</span>  <span class="af-arrow">──►</span>  POST /otlp/v1/traces  <span class="af-dim">(protobuf / JSON)</span>
-                             <span class="af-dim">│  X-Reqly-Key auth · rate-limited</span>
-                     <span class="af-coll">[Collector — FastAPI + asyncpg]</span>
-                             <span class="af-dim">│  bulk insert</span>
-                     <span class="af-db">[TimescaleDB]</span>
-                      <span class="af-dim">├── request_events      (hypertable · 14-day retention)</span>
-                      <span class="af-dim">└── continuous aggregates (no cron — auto-refresh):</span>
-                           <span class="af-dim">├── api_latency_1min        (mergeable p50 / p95 / p99 sketches)</span>
-                           <span class="af-dim">├── route_errors_1hour      (error rate per hour)</span>
-                           <span class="af-dim">└── route_status_dist_1hour (status codes per hour)</span>
-                             <span class="af-dim">│</span>
-             <span class="af-dim">┌──────────────┴──────────────────────┐</span>
-             <span class="af-dim">│</span>                                     <span class="af-dim">│</span>
-      <span class="af-dash">[Dashboard]</span>                  <span class="af-lmb">[APScheduler / Lambda]</span>
-   <span class="af-dim">React 19 reads               Sunday 23:00 UTC:</span>
-   <span class="af-dim">GET /v1/metrics/*             1. Pull 8w route_errors_1hour</span>
-                                <span class="af-dim">2. Build dow × hour baseline</span>
-                                <span class="af-dim">3. Count-based tests → top 5</span>
-                                <span class="af-dim">4. POST anomaly JSON → Groq</span>
-                                <span class="af-dim">5. Store report → dashboard</span>
-                                <span class="af-dim">Hourly at :15: same checks →</span>
-                                <span class="af-dim">Slack / Discord / webhook alerts</span></pre></div>
+        <div class="arch-body"><pre><span class="af-app">[Python app + reqly]</span>      <span class="af-arrow">──►</span>  POST /v1/ingest       <span class="af-dim">(batched, background)</span>
+<span class="af-app">[Node app + reqly-node]</span>   <span class="af-arrow">──►</span>  POST /v1/ingest
+<span class="af-app">[Any app + OpenTelemetry]</span> <span class="af-arrow">──►</span>  POST /otlp/v1/traces   <span class="af-dim">(protobuf / JSON)</span>
+                                 <span class="af-dim">│  X-Reqly-Key: ingest key or project key (rqk_…)</span>
+                   <span class="af-coll">[Collector — FastAPI + asyncpg]</span>
+                                 <span class="af-dim">│  validate · bulk insert · rate limit</span>
+                   <span class="af-db">[TimescaleDB + Toolkit]</span>
+                    <span class="af-dim">├── request_events            (hypertable · 14-day retention)</span>
+                    <span class="af-dim">└── continuous aggregates:</span>
+                         <span class="af-dim">├── api_latency_1min          (mergeable latency sketches)</span>
+                         <span class="af-dim">├── route_errors_1hour        (errors per route-hour)</span>
+                         <span class="af-dim">├── route_status_distribution_1hour</span>
+                         <span class="af-dim">├── consumer_usage_1hour      (who is calling)</span>
+                         <span class="af-dim">└── llm_usage_1hour           (tokens per route & model)</span>
+                                 <span class="af-dim">│</span>
+          <span class="af-dim">┌──────────────────────┼───────────────────────┐</span>
+    <span class="af-dash">[Dashboard]</span>            <span class="af-lmb">[Scheduler]</span>             <span class="af-coll">[Ask Reqly]</span>
+  <span class="af-dim">React 19 · sign-in      hourly alerts · SLO      9 read-only tools</span>
+  <span class="af-dim">settings · projects     burn rates · weekly      → Groq → verified</span>
+  <span class="af-dim">GET /v1/metrics/*       report → Slack/Discord   answer</span></pre></div>
       </div>
+      <p class="scroll-hint">← swipe to see the whole diagram →</p>
+    </div>
+  </section>
+
+  <!-- BENCHMARKS -->
+  <section class="section-sm">
+    <div class="container">
+      <p class="section-label">Overhead</p>
+      <h2 class="section-title">Measured, not claimed</h2>
+      <p class="section-sub">Time each SDK adds to a request (p50), same app with and without Reqly, consumer tracking on and the shipper running. Rerun in CI on every SDK change.</p>
+      <div class="bench">
+        <div class="bench-card">
+          <div class="bench-title">Python · reqly 0.5.2</div>
+          <div class="bench-row"><span class="bench-name">FastAPI</span><div class="bench-track"><div class="bench-fill" style="width:39%"></div></div><span class="bench-val">~13 µs</span></div>
+          <div class="bench-row"><span class="bench-name">Starlette</span><div class="bench-track"><div class="bench-fill" style="width:45%"></div></div><span class="bench-val">~15 µs</span></div>
+          <div class="bench-row"><span class="bench-name">Flask</span><div class="bench-track"><div class="bench-fill" style="width:100%"></div></div><span class="bench-val">~33 µs</span></div>
+        </div>
+        <div class="bench-card">
+          <div class="bench-title">Node.js · reqly-node 0.1.2</div>
+          <div class="bench-row"><span class="bench-name">Fastify</span><div class="bench-track"><div class="bench-fill" style="width:30%"></div></div><span class="bench-val">~10 µs</span></div>
+          <div class="bench-row"><span class="bench-name">Hono</span><div class="bench-track"><div class="bench-fill" style="width:18%"></div></div><span class="bench-val">~6 µs</span></div>
+          <div class="bench-row"><span class="bench-name">Express</span><div class="bench-track"><div class="bench-fill" style="width:82%"></div></div><span class="bench-val">~27 µs</span></div>
+        </div>
+      </div>
+      <p class="bench-note">For scale: one round trip on a local network is usually 100–500 µs. Method and the bugs the benchmark found are in <a href="https://github.com/tanisheesh/reqly/blob/main/bench/README.md" target="_blank" rel="noopener" style="color:var(--accent)">bench/README.md</a>.</p>
     </div>
   </section>
 
   <!-- STACK -->
-  <section class="section-sm" style="border-top:1px solid var(--border)">
+  <section class="section-sm">
     <div class="container">
       <p class="section-label">Stack</p>
       <h2 class="section-title">Deliberate technology choices</h2>
-      <p class="section-sub" style="margin-bottom:2rem">Every layer has a reason. No bloat, no magic.</p>
-
-      <table class="stack-table">
-        <thead>
-          <tr><th>Layer</th><th>Technology &amp; reason</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>SDK</td><td>Python — threading, httpx, pure ASGI middleware (no Starlette BaseHTTPMiddleware overhead)</td></tr>
-          <tr><td>Collector</td><td>FastAPI + asyncpg + APScheduler + slowapi — async throughout, no ORM overhead; native ingest plus an OTLP/HTTP receiver</td></tr>
-          <tr><td>Database</td><td>TimescaleDB (<code class="code-inline">-ha</code> image) — hypertables, continuous aggregates, Toolkit percentile sketches</td></tr>
-          <tr><td>Dashboard</td><td>React 19, Vite 8, Tailwind CSS 4, recharts 3, TanStack Query 5</td></tr>
-          <tr><td>AI</td><td>Groq API · gpt-oss-120b — statistics first, LLM writes narrative only</td></tr>
-          <tr><td>AWS (optional)</td><td>Lambda + EventBridge + S3, deployed via SAM — same job as APScheduler, cloud-native cron (set <code class="code-inline">INSIGHTS_SCHEDULER_ENABLED=false</code> so it runs once)</td></tr>
-        </tbody>
-      </table>
+      <p class="section-sub">Every layer has a reason. No bloat, no magic.</p>
+      <div class="tbl-wrap">
+        <table class="stack-table">
+          <thead><tr><th>Layer</th><th>Technology &amp; reason</th></tr></thead>
+          <tbody>
+            <tr><td>SDKs</td><td>Python 3.9+ — pure ASGI/WSGI middleware, httpx, background thread · Node.js 20+ — TypeScript, zero dependencies, ESM + CJS · OTLP/HTTP for everything else</td></tr>
+            <tr><td>Collector</td><td>FastAPI · asyncpg · APScheduler · Pydantic v2 · argon2 — async throughout, no ORM; native ingest plus an OTLP receiver</td></tr>
+            <tr><td>Database</td><td>TimescaleDB (pg16, Toolkit) — hypertables, continuous aggregates, UddSketch percentiles</td></tr>
+            <tr><td>Dashboard</td><td>React 19 · Vite · TypeScript · Tailwind CSS 4 · Recharts · TanStack Query</td></tr>
+            <tr><td>AI</td><td>Groq · gpt-oss-120b with tool calling — statistics first, the LLM explains and answers only from query results</td></tr>
+            <tr><td>Infra</td><td>Docker Compose · prebuilt images on GHCR (amd64 + arm64) · PyPI and npm trusted publishing · optional AWS Lambda for the weekly job</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </section>
 
   <!-- LIVE DEMO -->
-  <section class="section-sm" style="border-top:1px solid var(--border)">
+  <section class="section-sm">
     <div class="container">
-      <p class="section-label">Live Demo</p>
+      <p class="section-label">Live demo</p>
       <h2 class="section-title">See Reqly in the wild</h2>
-      <p class="section-sub" style="margin-bottom:2rem">
-        EventFlow — a real Flask event management app — is instrumented with Reqly. Browse the live metrics or explore the source.
+      <p class="section-sub">
+        EventFlow — a real Flask event-management app — is instrumented with Reqly. The dashboard is public; use EventFlow to make some traffic and watch it arrive.
       </p>
-      <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:center;margin-bottom:2rem">
-        <a href="https://eventflow-g2h5.onrender.com" target="_blank" rel="noopener" class="btn-primary">
+      <div style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:center;margin-bottom:1.5rem">
+        <a href="https://reqly-eventflow-dashboard.onrender.com" target="_blank" rel="noopener" class="btn-primary">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l3-8 4 16 3-10 2 2h5"/></svg>
+          Live dashboard
+        </a>
+        <a href="https://eventflow-g2h5.onrender.com" target="_blank" rel="noopener" class="btn-ghost">
           <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
           Try EventFlow
         </a>
-        <a href="https://reqly-eventflow-dashboard.onrender.com" target="_blank" rel="noopener" class="btn-ghost">
-          <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 12h3l3-8 4 16 3-10 2 2h5"/></svg>
-          Live Metrics Dashboard
-        </a>
-        <a href="https://github.com/tanisheesh/EventFlow" target="_blank" rel="noopener" class="btn-ghost">
-          <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
-          EventFlow Source
-        </a>
+        <a href="https://github.com/tanisheesh/EventFlow" target="_blank" rel="noopener" class="btn-ghost">EventFlow source</a>
       </div>
       <p style="font-size:.8125rem;color:var(--text-2)">
-        To view metrics: login as <strong style="color:var(--text)">Administrator</strong> on EventFlow (<code style="font-size:.8rem;color:var(--accent)">admin@eventhub.com</code> / <code style="font-size:.8rem;color:var(--accent)">Admin@123</code>) → click <strong style="color:var(--text)">Metrics</strong> in the nav.
+        EventFlow login: <code class="code-inline">admin@eventhub.com</code> / <code class="code-inline">Admin@123</code>. Render's free tier sleeps — the first load can take ~30 s.
       </p>
     </div>
   </section>
 
-  <!-- FOOTER -->
   <footer>
     <div class="container">
       <div class="footer-inner">
@@ -977,305 +1037,341 @@ app = <span class="fn">FastAPI</span>()
         <div class="footer-links">
           <a href="https://github.com/tanisheesh/reqly" target="_blank" rel="noopener">GitHub</a>
           <a href="https://pypi.org/project/reqly/" target="_blank" rel="noopener">PyPI</a>
-          <a href="https://github.com/tanisheesh/reqly/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Docs</a>
-          <button onclick="showView('developers')" style="color:var(--text-2);font-size:.8125rem;transition:color .15s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-2)'">Developers</button>
+          <a href="https://www.npmjs.com/package/reqly-node" target="_blank" rel="noopener">npm</a>
+          <a href="https://github.com/tanisheesh/reqly/tree/main/docs" target="_blank" rel="noopener">Docs</a>
+          <button onclick="showView('developers')">Developers</button>
         </div>
         <div class="footer-copy">
-          Copyright <span id="year-p"></span> &nbsp;|&nbsp; Made with <span class="heart">♥</span> by
+          Copyright <span class="year"></span> &nbsp;|&nbsp; Made with <span class="heart">♥</span> by
           <a href="https://tanisheesh.in/" target="_blank" rel="noopener">Tanish Poddar</a>
         </div>
       </div>
     </div>
   </footer>
 
-</div><!-- /view-product -->
+</main><!-- /view-product -->
 
 
 <!-- ══ DEVELOPERS VIEW ════════════════════════════════════════ -->
-<div id="view-developers" hidden>
+<main id="view-developers" hidden>
   <div class="dev-content">
 
-    <div class="hero-badge" style="margin-bottom:1.5rem">
+    <div class="hero-badge">
       <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
-      Developer docs
+      Developer guide
     </div>
-    <h1 class="dev-h1">Get Reqly running locally</h1>
-    <p class="dev-sub">Clone to dashboard in under 5 minutes. Includes SDK usage, config reference, and architecture notes.</p>
+    <h1 class="dev-h1">Get Reqly running</h1>
+    <p class="dev-sub">The full stack in one command, then one line in your app. Python, Node.js, or any OpenTelemetry SDK.</p>
 
-    <div class="dev-toc">
+    <nav class="dev-toc" aria-label="Contents">
       <div class="dev-toc-label">Contents</div>
       <div class="dev-toc-grid">
         <a href="#dev-prereq">1. Prerequisites</a>
-        <a href="#dev-clone">2. Clone &amp; configure</a>
-        <a href="#dev-run">3. Start the stack</a>
-        <a href="#dev-instrument">4. Instrument your app</a>
-        <a href="#dev-config">5. SDK configuration</a>
-        <a href="#dev-pipeline">6. How the pipeline works</a>
-        <a href="#dev-structure">7. Project structure</a>
-        <a href="#dev-tests">8. Running tests</a>
-        <a href="#dev-otel">9. Other languages (OpenTelemetry)</a>
+        <a href="#dev-run">2. Start the stack</a>
+        <a href="#dev-python">3. Instrument a Python app</a>
+        <a href="#dev-node">4. Instrument a Node.js app</a>
+        <a href="#dev-otel">5. Other languages (OpenTelemetry)</a>
+        <a href="#dev-config">6. SDK configuration</a>
+        <a href="#dev-depth">7. Consumers, LLM cost, SLOs, OpenAPI</a>
+        <a href="#dev-teams">8. Projects, keys &amp; sign-in</a>
+        <a href="#dev-deploy">9. Deploy to production</a>
+        <a href="#dev-structure">10. Project structure &amp; tests</a>
       </div>
-    </div>
+    </nav>
 
-    <!-- 1. Prerequisites -->
-    <div class="dev-section" id="dev-prereq">
+    <!-- 1 -->
+    <section class="dev-section" id="dev-prereq">
       <h2 class="dev-h2"><span class="dev-num">1</span> Prerequisites</h2>
       <div class="prereq-grid">
         <div class="prereq-card">
-          <div class="prereq-title">Docker Desktop</div>
-          <div class="prereq-desc">Docker + Compose — required for all services</div>
+          <div class="prereq-title">Docker + Compose</div>
+          <div class="prereq-desc">Runs the database, collector, dashboard and demo traffic</div>
         </div>
         <div class="prereq-card">
-          <div class="prereq-title">Git</div>
-          <div class="prereq-desc">To clone the repo</div>
+          <div class="prereq-title">Python 3.9+ or Node 20+</div>
+          <div class="prereq-desc">For the app you instrument, or to develop the SDKs</div>
         </div>
         <div class="prereq-card">
-          <div class="prereq-title">Python 3.9+</div>
-          <div class="prereq-desc">Only for local SDK dev or running tests</div>
+          <div class="prereq-title">Groq API key</div>
+          <div class="prereq-desc">Optional — AI reports and Ask Reqly. Without it, reports are plain text</div>
         </div>
       </div>
-      <p class="dev-text" style="margin-top:1rem">Optional: a free <a href="https://console.groq.com/keys" target="_blank" rel="noopener" style="color:var(--accent)">Groq API key</a> — needed for AI insights. Without it, a plain statistical summary is shown instead.</p>
-    </div>
+    </section>
 
-    <!-- 2. Clone -->
-    <div class="dev-section" id="dev-clone">
-      <h2 class="dev-h2"><span class="dev-num">2</span> Clone &amp; configure</h2>
+    <!-- 2 -->
+    <section class="dev-section" id="dev-run">
+      <h2 class="dev-h2"><span class="dev-num">2</span> Start the stack</h2>
       <div class="code-block">
         <div class="code-header">terminal</div>
-        <div class="code-body">git clone https://github.com/tanisheesh/reqly
+<div class="code-body">git clone https://github.com/tanisheesh/reqly
 cd reqly
-cp .env.example .env</div>
+docker compose up -d</div>
       </div>
-      <p class="dev-text">Open <code class="code-inline">.env</code> and fill in:</p>
+      <p class="dev-text">No <code class="code-inline">.env</code> needed — the defaults work locally. First build takes a couple of minutes; the collector applies the schema itself on start-up.</p>
+      <div class="tbl-wrap">
+        <table class="url-table">
+          <thead><tr><th>Container</th><th>URL</th><th>Role</th></tr></thead>
+          <tbody>
+            <tr><td>timescaledb</td><td>:5432</td><td>TimescaleDB + Toolkit</td></tr>
+            <tr><td>collector</td><td>:8000 · /docs</td><td>Ingest, OTLP, metrics API, alerts, AI</td></tr>
+            <tr><td>dashboard</td><td>localhost:5173</td><td>React dashboard — open this</td></tr>
+            <tr><td>load-generator</td><td>—</td><td>8 weeks of synthetic history, then live demo traffic</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="dev-text">To override anything, <code class="code-inline">cp .env.example .env</code>. The ones you'll most likely set:</p>
       <div class="code-block">
         <div class="code-header">.env</div>
-        <div class="code-body"><span class="cm"># Database</span>
-<span class="hl">POSTGRES_PASSWORD</span>=<span class="str">your_secure_password</span>
-
-<span class="cm"># API keys — the ingest key is used by the SDK (write), the read key by the dashboard.</span>
-<span class="cm"># The read key ends up in the dashboard's JavaScript, so it must differ from the ingest key.</span>
-<span class="hl">REQLY_INGEST_KEY</span>=<span class="str">your_ingest_key</span>
-<span class="hl">REQLY_READ_KEY</span>=<span class="str">your_read_key</span>
-
-<span class="cm"># Optional — AI insights (free key at console.groq.com/keys)</span>
-<span class="hl">GROQ_API_KEY</span>=<span class="str">gsk_your_key_here</span></div>
+<div class="code-body"><span class="hl">REQLY_INGEST_KEY</span>=<span class="str">demo-key</span>          <span class="cm"># SDKs send this (write)</span>
+<span class="hl">REQLY_READ_KEY</span>=<span class="str">demo-read-key</span>       <span class="cm"># the dashboard sends this — public to its viewers</span>
+<span class="hl">GROQ_API_KEY</span>=                     <span class="cm"># optional: AI reports + Ask Reqly</span>
+<span class="hl">ALERT_SLACK_WEBHOOK_URL</span>=          <span class="cm"># or ALERT_DISCORD_WEBHOOK_URL / ALERT_WEBHOOK_URL</span>
+<span class="hl">PUBLIC_DASHBOARD</span>=<span class="str">true</span>             <span class="cm"># false = sign-in required</span></div>
       </div>
-    </div>
-
-    <!-- 3. Run -->
-    <div class="dev-section" id="dev-run">
-      <h2 class="dev-h2"><span class="dev-num">3</span> Start the stack</h2>
       <div class="code-block">
-        <div class="code-header">terminal</div>
-        <div class="code-body">docker compose up -d</div>
-      </div>
-      <p class="dev-text">Starts 4 containers. First build takes ~2 minutes; subsequent starts are fast. The collector applies the database schema itself on startup.</p>
-      <table class="url-table">
-        <thead><tr><th>Container</th><th>URL</th><th>Role</th></tr></thead>
-        <tbody>
-          <tr><td>timescaledb</td><td>:5432</td><td>Time-series database</td></tr>
-          <tr><td>collector</td><td>:8000 · /docs</td><td>FastAPI ingest + query + AI insights</td></tr>
-          <tr><td>dashboard</td><td>http://localhost:5173</td><td>React dashboard — open this</td></tr>
-          <tr><td>load-generator</td><td>—</td><td>Synthetic history + live demo traffic</td></tr>
-        </tbody>
-      </table>
-      <div class="tip"><strong>Tip:</strong> Point your app at <code class="code-inline">http://localhost:8000</code>, then open the dashboard. The AI Insights panel appears at the bottom — click "Regenerate" to trigger on-demand.</div>
-      <div class="code-block" style="margin-top:1rem">
         <div class="code-header">stop</div>
-        <div class="code-body"><span class="cm"># stop, keep data</span>
-docker compose down
-
-<span class="cm"># stop + wipe database</span>
-docker compose down -v</div>
+<div class="code-body">docker compose down      <span class="cm"># keep data</span>
+docker compose down -v   <span class="cm"># wipe the database</span></div>
       </div>
-    </div>
+    </section>
 
-    <!-- 4. Instrument -->
-    <div class="dev-section" id="dev-instrument">
-      <h2 class="dev-h2"><span class="dev-num">4</span> Instrument your app</h2>
+    <!-- 3 -->
+    <section class="dev-section" id="dev-python">
+      <h2 class="dev-h2"><span class="dev-num">3</span> Instrument a Python app</h2>
       <div class="code-block">
         <div class="code-header">install</div>
-        <div class="code-body">pip install reqly</div>
+<div class="code-body">pip install reqly</div>
       </div>
       <div class="code-2col">
-        <div class="code-block" style="margin-bottom:0">
-          <div class="code-header">FastAPI</div>
-          <div class="code-body"><span class="kw">import</span> <span class="hl">reqly</span>
-<span class="kw">from</span> fastapi <span class="kw">import</span> FastAPI
+        <div class="code-block">
+          <div class="code-header">FastAPI · Starlette · Litestar · Flask</div>
+<div class="code-body"><span class="kw">import</span> <span class="hl">reqly</span>
 
 app = <span class="fn">FastAPI</span>()
 <span class="hl">reqly</span>.<span class="fn">instrument</span>(
     app,
     service_name=<span class="str">"my-api"</span>,
     collector_url=<span class="str">"http://localhost:8000"</span>,
-    api_key=<span class="str">"your_ingest_key"</span>
+    api_key=<span class="str">"demo-key"</span>,
 )</div>
         </div>
-        <div class="code-block" style="margin-bottom:0">
-          <div class="code-header">Flask</div>
-          <div class="code-body"><span class="kw">import</span> <span class="hl">reqly</span>
-<span class="kw">from</span> flask <span class="kw">import</span> Flask
-
-app = <span class="fn">Flask</span>(__name__)
-<span class="hl">reqly</span>.<span class="fn">instrument</span>(
-    app,
-    service_name=<span class="str">"my-api"</span>,
-    collector_url=<span class="str">"http://localhost:8000"</span>,
-    api_key=<span class="str">"your_ingest_key"</span>
-)</div>
+        <div class="code-block">
+          <div class="code-header">Django (also DRF, Django Ninja)</div>
+<div class="code-body"><span class="cm"># settings.py</span>
+MIDDLEWARE = [
+    <span class="str">"reqly.integrations.django.ReqlyMiddleware"</span>,
+    <span class="cm"># ...</span>
+]
+REQLY = {
+    <span class="str">"service_name"</span>: <span class="str">"my-api"</span>,
+    <span class="str">"api_key"</span>: <span class="str">"demo-key"</span>,
+}</div>
         </div>
       </div>
-      <p class="dev-text" style="margin-top:1rem">Same call for both — <code class="code-inline">instrument()</code> auto-detects FastAPI vs Flask.</p>
+      <p class="dev-text"><code class="code-inline">instrument()</code> detects the framework itself. For any other WSGI or ASGI app (Bottle, Pyramid, Falcon, a bare ASGI app), wrap it and tell Reqly where the route template is:</p>
       <div class="code-block">
-        <div class="code-header">trigger AI insights on-demand</div>
-        <div class="code-body">curl -X POST "http://localhost:8000/v1/insights/generate?service_name=my-api" \
-  -H "X-Reqly-Key: your_read_key"</div>
+        <div class="code-header">generic WSGI / ASGI</div>
+<div class="code-body">app = <span class="hl">reqly</span>.<span class="fn">instrument_wsgi</span>(
+    app, service_name=<span class="str">"my-api"</span>,
+    route_resolver=<span class="kw">lambda</span> environ: environ[<span class="str">"bottle.route"</span>].rule,
+)
+<span class="cm"># ASGI: reqly.instrument_asgi(app, route_resolver=...)</span></div>
       </div>
-    </div>
+    </section>
 
-    <!-- 5. Config -->
-    <div class="dev-section" id="dev-config">
-      <h2 class="dev-h2"><span class="dev-num">5</span> SDK configuration reference</h2>
-      <p class="dev-text">Every option can be passed as a kwarg or set via env var. Resolution order: <strong>kwarg → env var → default</strong>.</p>
-      <table class="cfg-table">
-        <thead><tr><th>kwarg</th><th>env var</th><th>default</th></tr></thead>
-        <tbody>
-          <tr><td>service_name</td><td>REQLY_SERVICE_NAME</td><td>argv[0] basename</td></tr>
-          <tr><td>collector_url</td><td>REQLY_COLLECTOR_URL</td><td>http://localhost:8000</td></tr>
-          <tr><td>api_key</td><td>REQLY_API_KEY</td><td>None</td></tr>
-          <tr><td>sample_rate</td><td>REQLY_SAMPLE_RATE</td><td>1.0</td></tr>
-          <tr><td>flush_interval_seconds</td><td>REQLY_FLUSH_INTERVAL_SECONDS</td><td>5.0</td></tr>
-          <tr><td>max_batch_size</td><td>REQLY_MAX_BATCH_SIZE</td><td>200</td></tr>
-          <tr><td>max_queue_size</td><td>REQLY_MAX_QUEUE_SIZE</td><td>2000</td></tr>
-          <tr><td>ignore_routes</td><td>REQLY_IGNORE_ROUTES</td><td>/health,/metrics</td></tr>
-          <tr><td>capture_request_body</td><td>REQLY_CAPTURE_REQUEST_BODY</td><td>False (not implemented yet)</td></tr>
-          <tr><td>release</td><td>REQLY_RELEASE</td><td>auto: GITHUB_SHA, RENDER_GIT_COMMIT, …</td></tr>
-          <tr><td>environment</td><td>REQLY_ENVIRONMENT</td><td>None</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- 6. Pipeline -->
-    <div class="dev-section" id="dev-pipeline">
-      <h2 class="dev-h2"><span class="dev-num">6</span> How the pipeline works</h2>
-      <div class="arch-terminal">
-        <div class="arch-bar">
-          <span class="arch-dot" style="background:#f06a6a"></span>
-          <span class="arch-dot" style="background:#f0b540"></span>
-          <span class="arch-dot" style="background:#10d9a0"></span>
-          <span class="arch-bar-label">full data flow</span>
-        </div>
-        <div class="arch-body"><pre style="margin:0;font-family:inherit;font-size:inherit;line-height:inherit"><span class="af-app">[Your app + Reqly SDK]</span>
-  <span class="af-arrow">──►</span> POST /v1/ingest  <span class="af-dim">(batched, background thread, X-Reqly-Key auth)</span>
-                       <span class="af-coll">[Collector]</span> <span class="af-dim">writes raw events</span>
-                       <span class="af-db">[TimescaleDB]</span>
-                        <span class="af-dim">├── request_events      (14-day retention)</span>
-                        <span class="af-dim">├── route_latency_1min  (p50/p95/p99)</span>
-                        <span class="af-dim">├── route_errors_1hour  (error rate)</span>
-                        <span class="af-dim">└── route_status_dist   (status codes)</span>
-                               <span class="af-dim">│</span>
-               <span class="af-dim">┌──────────────┴──────────────────────┐</span>
-        <span class="af-dash">[Dashboard]</span>                   <span class="af-lmb">[Weekly job]</span>
-     <span class="af-dim">GET /v1/metrics/*             stats → Groq → report</span></pre></div>
-      </div>
-      <div class="pipe-grid">
-        <div class="pipe-card">
-          <div class="pipe-card-title">Why pure ASGI middleware?</div>
-          <div class="pipe-card-body">Avoids Starlette's <code class="code-inline" style="font-size:.6875rem">BaseHTTPMiddleware</code> stream-buffering issues. Direct ASGI callables are both simpler and faster.</div>
-        </div>
-        <div class="pipe-card">
-          <div class="pipe-card-title">Why a background thread, not asyncio?</div>
-          <div class="pipe-card-body">Flask is not async. A thread makes the same SDK work in both FastAPI and Flask with zero framework-specific shipping logic.</div>
-        </div>
-        <div class="pipe-card">
-          <div class="pipe-card-title">Why continuous aggregates?</div>
-          <div class="pipe-card-body">TimescaleDB refreshes them automatically. Dashboard queries hit pre-rolled materializations — sub-millisecond, no manual cron jobs.</div>
-        </div>
-        <div class="pipe-card">
-          <div class="pipe-card-title">Why statistics before the LLM?</div>
-          <div class="pipe-card-body">Statistics are deterministic and cheap. The LLM only writes narrative — it never hallucinates numbers because it never sees raw data.</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 7. Structure -->
-    <div class="dev-section" id="dev-structure">
-      <h2 class="dev-h2"><span class="dev-num">7</span> Project structure</h2>
+    <!-- 4 -->
+    <section class="dev-section" id="dev-node">
+      <h2 class="dev-h2"><span class="dev-num">4</span> Instrument a Node.js app</h2>
       <div class="code-block">
-        <div class="code-header">repo layout</div>
-        <div class="code-body"><span class="hl">sdk/</span>                    <span class="cm"># pip install reqly</span>
-  reqly/
-    __init__.py         <span class="cm"># reqly.instrument() — public API</span>
-    core/               <span class="cm"># client, config, buffer, shipper, sampling</span>
-    integrations/       <span class="cm"># fastapi.py, flask.py</span>
-
-<span class="hl">collector/</span>              <span class="cm"># FastAPI backend</span>
-  app/
-    routers/            <span class="cm"># ingest, metrics, insights</span>
-    insights/           <span class="cm"># anomaly_detection, groq_client, scheduler</span>
-    db/                 <span class="cm"># asyncpg pool + queries</span>
-  migrations/
-    001_init.sql        <span class="cm"># hypertable + aggregates + retention</span>
-
-<span class="hl">dashboard/</span>              <span class="cm"># React 19 + Vite 8 SPA</span>
-
-<span class="hl">infra/</span>
-  ec2-userdata.sh       <span class="cm"># Amazon Linux 2023 bootstrap</span>
-  DEPLOY.md             <span class="cm"># AWS production guide</span>
-  sam/                  <span class="cm"># Lambda + EventBridge + S3</span>
-
-docker-compose.yml
-.env.example</div>
-      </div>
-    </div>
-
-    <!-- 8. Tests -->
-    <div class="dev-section" id="dev-tests">
-      <h2 class="dev-h2"><span class="dev-num">8</span> Running tests</h2>
-      <div class="code-block">
-        <div class="code-header">SDK — 31 tests</div>
-        <div class="code-body">cd sdk
-pip install -e ".[dev]"
-pytest tests -v</div>
+        <div class="code-header">install</div>
+<div class="code-body">npm install reqly-node</div>
       </div>
       <div class="code-block">
-        <div class="code-header">Collector — DB-backed tests skip unless TimescaleDB is reachable</div>
-        <div class="code-body">docker compose up timescaledb -d   <span class="cm"># optional, for the DB tests</span>
-cd collector
-pip install -e ".[dev]"
-pytest tests -v</div>
-      </div>
-      <div class="code-block">
-        <div class="code-header">Dashboard type-check</div>
-        <div class="code-body">cd dashboard
-npm install
-npx tsc --noEmit</div>
-      </div>
-      <p class="dev-text">CI runs all three on every push — <code class="code-inline">.github/workflows/ci.yml</code></p>
-    </div>
+        <div class="code-header">Express 4 / 5</div>
+<div class="code-body"><span class="kw">import</span> express <span class="kw">from</span> <span class="str">"express"</span>;
+<span class="kw">import</span> { <span class="fn">reqlyExpress</span> } <span class="kw">from</span> <span class="str">"reqly-node"</span>;
 
-    <!-- 9. OpenTelemetry -->
-    <div class="dev-section" id="dev-otel">
-      <h2 class="dev-h2"><span class="dev-num">9</span> Other languages (OpenTelemetry)</h2>
-      <p class="dev-text">Any app with OpenTelemetry instrumentation can report to Reqly without a Reqly SDK. Every official OTel SDK reads these variables:</p>
+<span class="kw">const</span> app = <span class="fn">express</span>();
+<span class="kw">const</span> reqly = <span class="fn">reqlyExpress</span>({
+  serviceName: <span class="str">"my-api"</span>,
+  collectorUrl: <span class="str">"http://localhost:8000"</span>,
+  apiKey: process.env.REQLY_API_KEY,
+});
+app.<span class="fn">use</span>(reqly);                <span class="cm">// before your routes</span>
+<span class="cm">// ...routes...</span>
+app.<span class="fn">use</span>(reqly.errorHandler);   <span class="cm">// optional: records the error type</span></div>
+      </div>
+      <div class="code-2col">
+        <div class="code-block">
+          <div class="code-header">Fastify 4 / 5</div>
+<div class="code-body"><span class="kw">import</span> { <span class="fn">reqlyFastify</span> } <span class="kw">from</span> <span class="str">"reqly-node"</span>;
+
+<span class="kw">await</span> app.<span class="fn">register</span>(
+  <span class="fn">reqlyFastify</span>({ serviceName: <span class="str">"my-api"</span> })
+);</div>
+        </div>
+        <div class="code-block">
+          <div class="code-header">Hono (Node.js)</div>
+<div class="code-body"><span class="kw">import</span> { <span class="fn">reqlyHono</span> } <span class="kw">from</span> <span class="str">"reqly-node"</span>;
+
+app.<span class="fn">use</span>(
+  <span class="fn">reqlyHono</span>({ serviceName: <span class="str">"my-api"</span> })
+);</div>
+        </div>
+      </div>
+      <p class="dev-text">ESM and CommonJS both work, with no runtime dependencies. Requests no route matched are recorded as <code class="code-inline">__unmatched__</code>.</p>
+    </section>
+
+    <!-- 5 -->
+    <section class="dev-section" id="dev-otel">
+      <h2 class="dev-h2"><span class="dev-num">5</span> Other languages (OpenTelemetry)</h2>
+      <p class="dev-text">Any app with OpenTelemetry HTTP instrumentation can report to Reqly without a Reqly SDK. Every official OTel SDK reads these variables:</p>
       <div class="code-block">
         <div class="code-header">environment</div>
-        <div class="code-body"><span class="hl">OTEL_EXPORTER_OTLP_ENDPOINT</span>=<span class="str">http://localhost:8000/otlp</span>
+<div class="code-body"><span class="hl">OTEL_EXPORTER_OTLP_ENDPOINT</span>=<span class="str">http://localhost:8000/otlp</span>
 <span class="hl">OTEL_EXPORTER_OTLP_PROTOCOL</span>=<span class="str">http/protobuf</span>
-<span class="hl">OTEL_EXPORTER_OTLP_HEADERS</span>=<span class="str">x-reqly-key=your_ingest_key</span>
+<span class="hl">OTEL_EXPORTER_OTLP_HEADERS</span>=<span class="str">x-reqly-key=demo-key</span>
 <span class="hl">OTEL_SERVICE_NAME</span>=<span class="str">checkout-api</span>
 <span class="hl">OTEL_RESOURCE_ATTRIBUTES</span>=<span class="str">service.version=&lt;git sha&gt;,deployment.environment.name=prod</span></div>
       </div>
-      <p class="dev-text">Reqly keeps HTTP server spans only and needs <code class="code-inline">http.route</code> to group requests by route. A runnable Express example lives in <code class="code-inline">examples/otel/express</code>; details in <code class="code-inline">docs/OTEL.md</code>.</p>
-    </div>
+      <p class="dev-text">Reqly keeps HTTP server spans and needs <code class="code-inline">http.route</code> to group requests. Details in <a href="https://github.com/tanisheesh/reqly/blob/main/docs/OTEL.md" target="_blank" rel="noopener">docs/OTEL.md</a>; a runnable Express example is in <code class="code-inline">examples/otel/express</code>.</p>
+    </section>
+
+    <!-- 6 -->
+    <section class="dev-section" id="dev-config">
+      <h2 class="dev-h2"><span class="dev-num">6</span> SDK configuration</h2>
+      <p class="dev-text">Python takes a kwarg or an env var (<strong>kwarg → env var → default</strong>). The Node SDK takes the same options in camelCase (<code class="code-inline">serviceName</code>, <code class="code-inline">consumerHeader</code>, …) and the same env vars.</p>
+      <div class="tbl-wrap">
+        <table class="cfg-table">
+          <thead><tr><th>Option</th><th>Env var</th><th>Default</th></tr></thead>
+          <tbody>
+            <tr><td>service_name</td><td>REQLY_SERVICE_NAME</td><td>script name</td></tr>
+            <tr><td>collector_url</td><td>REQLY_COLLECTOR_URL</td><td>http://localhost:8000</td></tr>
+            <tr><td>api_key</td><td>REQLY_API_KEY</td><td>None</td></tr>
+            <tr><td>sample_rate</td><td>REQLY_SAMPLE_RATE</td><td>1.0</td></tr>
+            <tr><td>flush_interval_seconds</td><td>REQLY_FLUSH_INTERVAL_SECONDS</td><td>5.0</td></tr>
+            <tr><td>max_batch_size</td><td>REQLY_MAX_BATCH_SIZE</td><td>200</td></tr>
+            <tr><td>max_queue_size</td><td>REQLY_MAX_QUEUE_SIZE</td><td>2000</td></tr>
+            <tr><td>ignore_routes</td><td>REQLY_IGNORE_ROUTES</td><td>/health,/metrics</td></tr>
+            <tr><td>release</td><td>REQLY_RELEASE</td><td>auto: GITHUB_SHA, RENDER_GIT_COMMIT, VERCEL_GIT_COMMIT_SHA, …</td></tr>
+            <tr><td>environment</td><td>REQLY_ENVIRONMENT</td><td>None</td></tr>
+            <tr><td>consumer_header</td><td>REQLY_CONSUMER_HEADER</td><td>None — e.g. X-API-Key</td></tr>
+            <tr><td>consumer_salt</td><td>REQLY_CONSUMER_SALT</td><td>salt for the HMAC of consumer ids</td></tr>
+            <tr><td>push_openapi</td><td>REQLY_PUSH_OPENAPI</td><td>False (FastAPI, Litestar)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 7 -->
+    <section class="dev-section" id="dev-depth">
+      <h2 class="dev-h2"><span class="dev-num">7</span> Consumers, LLM cost, SLOs, OpenAPI</h2>
+      <h3 class="dev-h3">Who is calling, and what it costs</h3>
+      <div class="code-block">
+        <div class="code-header">python</div>
+<div class="code-body"><span class="hl">reqly</span>.<span class="fn">instrument</span>(app, consumer_header=<span class="str">"X-API-Key"</span>, consumer_salt=<span class="str">"..."</span>)
+<span class="cm"># or consumer=lambda info: info.headers.get("x-tenant-id")</span>
+
+completion = client.chat.completions.<span class="fn">create</span>(model=<span class="str">"gpt-4o-mini"</span>, ...)
+<span class="hl">reqly</span>.<span class="fn">record_llm_response</span>(completion)       <span class="cm"># OpenAI / Anthropic responses</span>
+<span class="hl">reqly</span>.<span class="fn">record_llm_usage</span>(<span class="str">"gpt-4o-mini"</span>, input_tokens=<span class="pn">1200</span>, output_tokens=<span class="pn">240</span>)</div>
+      </div>
+      <p class="dev-text">Consumer ids are HMAC-SHA256-hashed in the SDK, so raw keys never reach the collector. Node has the same: <code class="code-inline">consumerHeader</code>, <code class="code-inline">recordLlmResponse</code>, <code class="code-inline">recordLlmUsage</code>.</p>
+      <h3 class="dev-h3">SLOs</h3>
+      <div class="code-block">
+        <div class="code-header">define an availability SLO</div>
+<div class="code-body">curl -X PUT http://localhost:8000/v1/slos \
+  -H <span class="str">"X-Reqly-Key: demo-key"</span> -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"service_name": "checkout-api", "name": "checkout availability",
+       "route": "/checkout", "objective": "availability", "target": 0.995}'</span></div>
+      </div>
+      <p class="dev-text">Use <code class="code-inline">"objective": "latency"</code> with <code class="code-inline">latency_threshold_ms</code> for a latency SLO; leave out <code class="code-inline">route</code> for a service-wide one. Burn-rate alerts go to the same channels as anomaly alerts.</p>
+      <h3 class="dev-h3">OpenAPI drift</h3>
+      <div class="code-block">
+        <div class="code-header">upload a spec (JSON or YAML)</div>
+<div class="code-body">curl -X PUT http://localhost:8000/v1/services/checkout-api/openapi \
+  -H <span class="str">"X-Reqly-Key: demo-key"</span> -H <span class="str">"Content-Type: application/yaml"</span> \
+  --data-binary @openapi.yaml</div>
+      </div>
+      <p class="dev-text">Or let FastAPI / Litestar push their own: <code class="code-inline">reqly.instrument(app, push_openapi=True)</code>. The dashboard's API surface panel then lists undocumented, unused and deprecated-but-used endpoints.</p>
+    </section>
+
+    <!-- 8 -->
+    <section class="dev-section" id="dev-teams">
+      <h2 class="dev-h2"><span class="dev-num">8</span> Projects, keys &amp; sign-in</h2>
+      <p class="dev-text">For a shared collector, turn the public dashboard off and create the first admin:</p>
+      <div class="code-block">
+        <div class="code-header">.env</div>
+<div class="code-body"><span class="hl">PUBLIC_DASHBOARD</span>=<span class="str">false</span>
+<span class="hl">REQLY_ADMIN_USERNAME</span>=<span class="str">admin</span>
+<span class="hl">REQLY_ADMIN_PASSWORD</span>=<span class="str">at-least-12-characters</span></div>
+      </div>
+      <p class="dev-text">Signed-in admins manage everything from <strong>Settings</strong> in the dashboard: projects, services, API keys (shown once), members and passwords. The same works over the API:</p>
+      <div class="code-block">
+        <div class="code-header">a project and an ingest key for it</div>
+<div class="code-body">curl -X POST http://localhost:8000/v1/projects -H <span class="str">"X-Reqly-Key: demo-key"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> -d <span class="str">'{"slug": "payments", "name": "Payments team"}'</span>
+curl -X POST http://localhost:8000/v1/projects/2/keys -H <span class="str">"X-Reqly-Key: demo-key"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> -d <span class="str">'{"name": "checkout prod", "scopes": ["ingest"]}'</span></div>
+      </div>
+      <p class="dev-text">Use the <code class="code-inline">rqk_…</code> key as the SDK's <code class="code-inline">api_key</code>. A new service joins the project of the first key that sends it; members only see their projects' services.</p>
+    </section>
+
+    <!-- 9 -->
+    <section class="dev-section" id="dev-deploy">
+      <h2 class="dev-h2"><span class="dev-num">9</span> Deploy to production</h2>
+      <div class="code-block">
+        <div class="code-header">prebuilt images (amd64 + arm64)</div>
+<div class="code-body">docker run -p 8000:8000 \
+  -e DATABASE_URL=<span class="str">"postgresql://reqly:...@db-host:5432/reqly?sslmode=require"</span> \
+  -e REQLY_INGEST_KEY=<span class="str">...</span> -e REQLY_READ_KEY=<span class="str">...</span> \
+  ghcr.io/tanisheesh/reqly-collector
+
+docker run -p 5173:5173 \
+  -e REQLY_COLLECTOR_URL=<span class="str">https://reqly.example.com</span> -e REQLY_READ_KEY=<span class="str">...</span> \
+  ghcr.io/tanisheesh/reqly-dashboard</div>
+      </div>
+      <p class="dev-text">The database is <code class="code-inline">timescale/timescaledb-ha:pg16</code> (it includes the Toolkit). Run one collector instance; behind a platform proxy set <code class="code-inline">FORWARDED_ALLOW_IPS</code>. Step by step in <a href="https://github.com/tanisheesh/reqly/blob/main/docs/SETUP.md" target="_blank" rel="noopener">docs/SETUP.md</a> and <a href="https://github.com/tanisheesh/reqly/blob/main/infra/DEPLOY.md" target="_blank" rel="noopener">infra/DEPLOY.md</a>.</p>
+    </section>
+
+    <!-- 10 -->
+    <section class="dev-section" id="dev-structure">
+      <h2 class="dev-h2"><span class="dev-num">10</span> Project structure &amp; tests</h2>
+      <div class="code-block">
+        <div class="code-header">repo layout</div>
+<div class="code-body"><span class="hl">sdk/</span>              <span class="cm"># pip install reqly — core/ + integrations/ (fastapi, flask, django, …)</span>
+<span class="hl">sdk-node/</span>         <span class="cm"># npm install reqly-node — TypeScript, Express / Fastify / Hono</span>
+<span class="hl">collector/</span>        <span class="cm"># FastAPI backend</span>
+  app/            <span class="cm"># routers, otlp, alerts, slo, ask, openapi, consumers, llm, projects, users</span>
+  migrations/     <span class="cm"># 001_init.sql … 009_projects_keys.sql, applied on start-up</span>
+<span class="hl">dashboard/</span>        <span class="cm"># React 19 + Vite SPA</span>
+<span class="hl">bench/</span>            <span class="cm"># SDK overhead benchmarks</span>
+<span class="hl">infra/</span>            <span class="cm"># EC2 bootstrap, AWS SAM stack, deploy guide</span>
+<span class="hl">docs/</span>             <span class="cm"># PRD, architecture, decisions, setup, OTLP, ingest spec</span></div>
+      </div>
+      <div class="code-block">
+        <div class="code-header">tests</div>
+<div class="code-body"><span class="cm"># Python SDK</span>
+cd sdk &amp;&amp; pip install -e <span class="str">".[dev]"</span> &amp;&amp; pytest
+
+<span class="cm"># Node SDK</span>
+cd sdk-node &amp;&amp; npm ci &amp;&amp; npm test
+
+<span class="cm"># Collector — DB tests run when TimescaleDB is reachable</span>
+docker compose up timescaledb -d
+cd collector &amp;&amp; pip install -e <span class="str">".[dev]"</span> &amp;&amp; pytest
+
+<span class="cm"># Dashboard</span>
+cd dashboard &amp;&amp; npm ci &amp;&amp; npx tsc --noEmit</div>
+      </div>
+      <p class="dev-text">CI runs all of them on every push, Python 3.9–3.13 and Node 20–24.</p>
+    </section>
 
     <div class="dev-links">
-      <a href="https://github.com/tanisheesh/reqly" target="_blank" rel="noopener" class="btn-primary">
-        <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
-        View on GitHub
-      </a>
-      <a href="https://github.com/tanisheesh/reqly/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener" class="btn-ghost">Full CONTRIBUTING.md</a>
-      <a href="https://github.com/tanisheesh/reqly/blob/main/infra/DEPLOY.md" target="_blank" rel="noopener" class="btn-ghost">AWS Deploy guide</a>
+      <a href="https://github.com/tanisheesh/reqly" target="_blank" rel="noopener" class="btn-primary">View on GitHub</a>
+      <a href="https://github.com/tanisheesh/reqly/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noopener" class="btn-ghost">Architecture</a>
+      <a href="https://github.com/tanisheesh/reqly/blob/main/docs/DECISIONS.md" target="_blank" rel="noopener" class="btn-ghost">Decisions</a>
+      <a href="https://github.com/tanisheesh/reqly/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener" class="btn-ghost">Contributing</a>
     </div>
 
   </div>
@@ -1292,33 +1388,51 @@ npx tsc --noEmit</div>
         <div class="footer-links">
           <a href="https://github.com/tanisheesh/reqly" target="_blank" rel="noopener">GitHub</a>
           <a href="https://pypi.org/project/reqly/" target="_blank" rel="noopener">PyPI</a>
-          <button onclick="showView('product')" style="color:var(--text-2);font-size:.8125rem;transition:color .15s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-2)'">Product</button>
+          <a href="https://www.npmjs.com/package/reqly-node" target="_blank" rel="noopener">npm</a>
+          <button onclick="showView('product')">Product</button>
         </div>
         <div class="footer-copy">
-          Copyright <span id="year-d"></span> &nbsp;|&nbsp; Made with <span class="heart">♥</span> by
+          Copyright <span class="year"></span> &nbsp;|&nbsp; Made with <span class="heart">♥</span> by
           <a href="https://tanisheesh.in/" target="_blank" rel="noopener">Tanish Poddar</a>
         </div>
       </div>
     </div>
   </footer>
 
-</div><!-- /view-developers -->
+</main><!-- /view-developers -->
 
 <script>
   /* ── year ── */
   const y = new Date().getFullYear();
-  document.getElementById('year-p').textContent = y;
-  document.getElementById('year-d').textContent = y;
+  document.querySelectorAll('.year').forEach(el => { el.textContent = y; });
 
-  /* ── tab switching ── */
-  function showView(view) {
+  /* ── view switching (#developers deep-links to the guide) ── */
+  function showView(view, keepScroll) {
     const isProduct = view === 'product';
     document.getElementById('view-product').hidden    = !isProduct;
     document.getElementById('view-developers').hidden =  isProduct;
     document.getElementById('tab-product').classList.toggle('active',  isProduct);
     document.getElementById('tab-developers').classList.toggle('active', !isProduct);
-    if (!isProduct) window.scrollTo(0, 0);
+    const hash = isProduct ? '' : '#developers';
+    if (location.hash !== hash && !(location.hash.startsWith('#dev-') && !isProduct)) {
+      history.replaceState(null, '', hash || location.pathname + location.search);
+    }
+    if (!keepScroll) window.scrollTo(0, 0);
   }
+  if (location.hash === '#developers' || location.hash.startsWith('#dev-')) {
+    showView('developers', true);
+    const target = location.hash.startsWith('#dev-') && document.querySelector(location.hash);
+    if (target) target.scrollIntoView();
+  }
+
+  /* ── code tabs ── */
+  document.querySelectorAll('[data-tabs]').forEach(box => {
+    const tabs = box.querySelectorAll('[data-tab]');
+    tabs.forEach(tab => tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.toggle('active', t === tab));
+      box.querySelectorAll('[data-panel]').forEach(p => { p.hidden = p.dataset.panel !== tab.dataset.tab; });
+    }));
+  });
 
   /* ── metrics panel animation ── */
   const panels = {
@@ -1342,31 +1456,26 @@ npx tsc --noEmit</div>
       const num = Math.round(Math.max(1, rnd(p.numBase, p.numV)));
       p.bar.style.width = pct.toFixed(1) + '%';
       p.num.textContent = num;
-      if (miniPanels[k]) {
-        miniPanels[k].bar.style.width = pct.toFixed(1) + '%';
-        miniPanels[k].num.textContent = num;
-      }
+      miniPanels[k].bar.style.width = pct.toFixed(1) + '%';
+      miniPanels[k].num.textContent = num;
     }
     const err = Math.max(0.1, rnd(0.8, 0.4)).toFixed(1);
-    if (errEls.num)  errEls.num.textContent  = err;
-    if (errEls.mnum) errEls.mnum.textContent = err;
-    if (rpmEl) rpmEl.textContent = Math.round(rnd(247, 12));
+    errEls.num.textContent  = err;
+    errEls.mnum.textContent = err;
+    rpmEl.textContent = Math.round(rnd(247, 12));
   }
 
   /* ── sparkline bars ── */
   const sparklineEl = document.getElementById('sparkline');
-  if (sparklineEl) {
-    const heights = [40, 55, 45, 70, 60, 80, 65, 90, 75, 85, 70, 95, 80, 75, 88];
-    heights.forEach((h, i) => {
-      const bar = document.createElement('div');
-      bar.className = 'mp-spark-bar' + (i >= 12 ? ' hi' : '');
-      bar.style.height = h + '%';
-      sparklineEl.appendChild(bar);
-    });
-  }
+  [40, 55, 45, 70, 60, 80, 65, 90, 75, 85, 70, 95, 80, 75, 88].forEach((h, i) => {
+    const bar = document.createElement('div');
+    bar.className = 'mp-spark-bar' + (i >= 12 ? ' hi' : '');
+    bar.style.height = h + '%';
+    sparklineEl.appendChild(bar);
+  });
 
   tick();
-  setInterval(tick, 2500);
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) setInterval(tick, 2500);
 </script>
 
 </body>
