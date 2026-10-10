@@ -1,7 +1,8 @@
 # Local Setup — Reqly
 
 > **Just want to try it?** Use the live demo at [reqly-eventflow-dashboard.onrender.com](https://reqly-eventflow-dashboard.onrender.com) — no setup needed.
-> This guide is for running Reqly locally or self-hosting it.
+> **Using Reqly in your app?** The [documentation site](https://reqly.tanisheesh.in/docs/) has the SDK guides, every feature and the HTTP API.
+> This guide is for running the repository locally to develop Reqly.
 
 ---
 
@@ -101,135 +102,22 @@ docker compose logs load-generator -f
 
 ---
 
-## 5. Instrument your own app
+## 5. Use it
 
-Install the SDK:
+With the stack running, everything else is on the documentation site:
 
-```bash
-pip install reqly
-```
+| To | See |
+|---|---|
+| Instrument a Python, Node.js or OpenTelemetry app | [Python](https://reqly.tanisheesh.in/docs/instrument/python/) · [Node.js](https://reqly.tanisheesh.in/docs/instrument/node/) · [OpenTelemetry](https://reqly.tanisheesh.in/docs/instrument/opentelemetry/) |
+| Trigger the weekly report on demand | [Alerts & weekly report](https://reqly.tanisheesh.in/docs/features/alerts/#weekly-report) |
+| Define SLOs | [SLOs & error budgets](https://reqly.tanisheesh.in/docs/features/slos/) |
+| Upload an OpenAPI spec | [OpenAPI drift](https://reqly.tanisheesh.in/docs/features/openapi-drift/) |
+| Set up projects, keys and sign-in | [Projects, keys & sign-in](https://reqly.tanisheesh.in/docs/self-hosting/access/) |
+| Call the API | [HTTP API](https://reqly.tanisheesh.in/docs/reference/http-api/), or Swagger UI at `http://localhost:8000/docs` |
 
-**FastAPI:**
-
-```python
-import reqly
-from fastapi import FastAPI
-
-app = FastAPI()
-reqly.instrument(
-    app,
-    service_name="my-api",
-    collector_url="http://localhost:8000",  # default
-    api_key="demo-key",                     # matches REQLY_INGEST_KEY
-)
-```
-
-**Flask:**
-
-```python
-import reqly
-from flask import Flask
-
-app = Flask(__name__)
-reqly.instrument(
-    app,
-    service_name="my-api",
-    collector_url="http://localhost:8000",
-    api_key="demo-key",
-)
-```
-
-All options can also be set via environment variables (resolution order: kwarg → env var → default):
-
-| kwarg | env var | default |
-|---|---|---|
-| `service_name` | `REQLY_SERVICE_NAME` | `sys.argv[0]` basename |
-| `collector_url` | `REQLY_COLLECTOR_URL` | `http://localhost:8000` |
-| `api_key` | `REQLY_API_KEY` | `None` |
-| `sample_rate` | `REQLY_SAMPLE_RATE` | `1.0` |
-| `flush_interval_seconds` | `REQLY_FLUSH_INTERVAL_SECONDS` | `5.0` |
-| `max_batch_size` | `REQLY_MAX_BATCH_SIZE` | `200` |
-| `max_queue_size` | `REQLY_MAX_QUEUE_SIZE` | `2000` |
-| `ignore_routes` | `REQLY_IGNORE_ROUTES` | `/health,/metrics` |
-| `release` | `REQLY_RELEASE` (then CI vars like `GITHUB_SHA`, `RENDER_GIT_COMMIT`) | auto-detected or `None` |
-| `environment` | `REQLY_ENVIRONMENT` | `None` |
+The local stack accepts the ingest key `demo-key` and the read key `demo-read-key`. The demo creates SLOs and uploads an OpenAPI spec for both demo services on start-up.
 
 ---
-
-## 6. Trigger AI insights manually
-
-The weekly insights job runs automatically via APScheduler. To trigger it on demand (useful for demos and testing):
-
-```bash
-curl -X POST "http://localhost:8000/v1/insights/generate?service_name=your-service" \
-  -H "X-Reqly-Key: demo-read-key"
-```
-
-The report is stored and served at:
-
-```bash
-curl "http://localhost:8000/v1/insights/latest?service_name=your-service" \
-  -H "X-Reqly-Key: demo-read-key"
-```
-
----
-
-## 6b. Define SLOs
-
-SLOs are managed with the ingest key (the read key can't change anything):
-
-```bash
-curl -X PUT http://localhost:8000/v1/slos \
-  -H "X-Reqly-Key: demo-key" -H "Content-Type: application/json" \
-  -d '{"service_name": "checkout-api", "name": "checkout availability",
-       "route": "/checkout", "objective": "availability", "target": 0.995}'
-
-curl -X PUT http://localhost:8000/v1/slos \
-  -H "X-Reqly-Key: demo-key" -H "Content-Type: application/json" \
-  -d '{"service_name": "checkout-api", "name": "API latency",
-       "objective": "latency", "target": 0.95, "latency_threshold_ms": 800}'
-```
-
-Leave out `route` for a service-wide SLO; `window_days` defaults to 28. The dashboard shows each SLO's error budget, and burn-rate alerts go to the alert channels. The local demo creates three SLOs for the demo services on startup.
-
-## 6c. Compare traffic with your OpenAPI spec
-
-FastAPI and Litestar apps can upload their own spec: `reqly.instrument(app, push_openapi=True)`
-(or `REQLY_PUSH_OPENAPI=true`). For anything else, upload it from CI, JSON or YAML:
-
-```bash
-curl -X PUT http://localhost:8000/v1/services/checkout-api/openapi \
-  -H "X-Reqly-Key: demo-key" -H "Content-Type: application/yaml" \
-  --data-binary @openapi.yaml
-```
-
-Add `?base_path=/api` if the app serves the spec's paths under a prefix (Swagger 2.0's
-`basePath` is used automatically). The dashboard then shows an **API surface** panel:
-undocumented endpoints that get traffic, documented ones nobody called in 30 days, and
-deprecated ones still in use. The local demo uploads a spec for both demo services.
-
-## 6d. Projects and per-team keys
-
-With several teams or apps on one collector, give each its own project and keys instead of
-sharing `REQLY_INGEST_KEY` (which, like admin users, reaches every project):
-
-```bash
-# a project, then an ingest+read key for it (the key is shown once)
-curl -X POST http://localhost:8000/v1/projects -H "X-Reqly-Key: demo-key" \
-  -H "Content-Type: application/json" -d '{"slug": "payments", "name": "Payments team"}'
-curl -X POST http://localhost:8000/v1/projects/2/keys -H "X-Reqly-Key: demo-key" \
-  -H "Content-Type: application/json" -d '{"name": "checkout-api prod", "scopes": ["ingest"]}'
-```
-
-Use the `rqk_...` key as the SDK's `api_key` (or the OTLP `X-Reqly-Key` header). A new service
-joins the project of the first key that sends it; move an existing one with
-`PUT /v1/projects/{id}/services`. Add dashboard users to a project with
-`POST /v1/projects/{id}/members` — non-admin users only see their projects.
-
-Signed-in admins can do all of this from the dashboard: **Settings** (header) has projects,
-services, API keys (created keys are shown once, with a copy button; revoke asks to confirm),
-members, and changing your own password. With more than one project, a project switcher in
-the header narrows the service list.
 
 ## 7. Deploy to production
 

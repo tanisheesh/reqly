@@ -17,7 +17,7 @@ By participating, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Local setup
 
-Full instructions, every env var and how to instrument an app are in [docs/SETUP.md](docs/SETUP.md). Short version:
+Full instructions and every env var are in [docs/SETUP.md](docs/SETUP.md); how to use Reqly is on the [documentation site](https://reqly.tanisheesh.in/docs/). Short version:
 
 ```bash
 git clone https://github.com/YOUR_GITHUB_USERNAME/reqly   # your fork

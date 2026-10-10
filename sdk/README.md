@@ -131,7 +131,7 @@ An alert from the demo data looks like this:
 
 **Not on Python?** Node, Java, Go and .NET apps can report to the same collector through
 OpenTelemetry — no Reqly SDK needed. See the
-[OpenTelemetry guide](https://github.com/tanisheesh/reqly/blob/main/docs/OTEL.md).
+[OpenTelemetry guide](https://reqly.tanisheesh.in/docs/instrument/opentelemetry/).
 
 ## Configuration
 
@@ -210,10 +210,10 @@ cd reqly
 docker compose up -d
 ```
 
-Setup, configuration and AWS deployment:
-[docs/SETUP.md](https://github.com/tanisheesh/reqly/blob/main/docs/SETUP.md) ·
-[infra/DEPLOY.md](https://github.com/tanisheesh/reqly/blob/main/infra/DEPLOY.md) ·
-[ingest API spec](https://github.com/tanisheesh/reqly/blob/main/docs/INGEST_SPEC.md)
+Full documentation: **[reqly.tanisheesh.in/docs](https://reqly.tanisheesh.in/docs/)** ·
+[Python SDK guide](https://reqly.tanisheesh.in/docs/instrument/python/) ·
+[self-hosting](https://reqly.tanisheesh.in/docs/self-hosting/deploy/) ·
+[ingest API spec](https://reqly.tanisheesh.in/docs/reference/ingest-spec/)
 
 ## Live demo
 
@@ -223,7 +223,7 @@ app, in production:
 - **Demo app** → [eventflow-g2h5.onrender.com](https://eventflow-g2h5.onrender.com)
 - **Metrics dashboard** → [reqly-eventflow-dashboard.onrender.com](https://reqly-eventflow-dashboard.onrender.com)
 
-> Log in as **Administrator** (`admin@eventhub.com` / `Admin@123`) → click **Metrics** in the nav.
+> The dashboard is public. To make some traffic, use EventFlow (log in as `admin@eventhub.com` / `Admin@123`).
 
 ## Changelog
 

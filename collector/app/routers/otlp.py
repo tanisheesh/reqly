@@ -5,7 +5,7 @@ Point an exporter at it with:
     OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://<collector>/otlp/v1/traces
     OTEL_EXPORTER_OTLP_HEADERS=x-reqly-key=<ingest key>
 (or OTEL_EXPORTER_OTLP_ENDPOINT=https://<collector>/otlp -- exporters append
-/v1/traces themselves). See docs/OTEL.md.
+/v1/traces themselves). See https://reqly.tanisheesh.in/docs/instrument/opentelemetry/
 """
 
 from __future__ import annotations

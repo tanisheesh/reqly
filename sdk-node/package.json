@@ -4,7 +4,7 @@
   "description": "Reqly SDK for Node.js: per-route latency, errors, consumers and LLM cost for Express, Fastify and Hono, sent to a self-hosted Reqly collector.",
   "license": "GPL-3.0-only",
   "author": "Tanish Poddar",
-  "homepage": "https://github.com/tanisheesh/reqly/tree/main/sdk-node",
+  "homepage": "https://reqly.tanisheesh.in/docs/instrument/node/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/tanisheesh/reqly.git",

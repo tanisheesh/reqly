@@ -40,7 +40,7 @@ class EventIn(BaseModel):
     error: bool
     error_type: str | None = Field(default=None, max_length=_MAX_SHORT_TEXT_LEN)
     host: str | None = Field(default=None, max_length=_MAX_SHORT_TEXT_LEN)
-    # --- v2 (all optional; see docs/INGEST_SPEC.md) ---
+    # --- v2 (all optional; spec: https://reqly.tanisheesh.in/docs/reference/ingest-spec/) ---
     release: str | None = Field(default=None, max_length=_MAX_RELEASE_LEN)
     environment: str | None = Field(default=None, max_length=_MAX_ENVIRONMENT_LEN)
     consumer_id: str | None = Field(default=None, max_length=_MAX_CONSUMER_ID_LEN)

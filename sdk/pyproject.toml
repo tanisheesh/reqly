@@ -39,7 +39,7 @@ dependencies = [
 Homepage = "https://reqly.tanisheesh.in"
 Repository = "https://github.com/tanisheesh/reqly"
 Issues = "https://github.com/tanisheesh/reqly/issues"
-Documentation = "https://github.com/tanisheesh/reqly/blob/main/docs/SETUP.md"
+Documentation = "https://reqly.tanisheesh.in/docs/instrument/python/"
 Changelog = "https://github.com/tanisheesh/reqly/blob/main/sdk/CHANGELOG.md"
 "Live Demo" = "https://reqly-eventflow-dashboard.onrender.com"
 

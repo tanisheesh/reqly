@@ -1,7 +1,7 @@
 # Express → Reqly via OpenTelemetry
 
 An Express app reporting to Reqly with **zero Reqly code** — just OpenTelemetry's Node
-auto-instrumentation and environment variables. See [docs/OTEL.md](../../../docs/OTEL.md).
+auto-instrumentation and environment variables. See the [OpenTelemetry guide](https://reqly.tanisheesh.in/docs/instrument/opentelemetry/).
 
 ```bash
 # 1. Start Reqly (from the repo root)

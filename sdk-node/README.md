@@ -116,7 +116,9 @@ or `process.exit()`, `await reqly.client.shutdown()` first.
   batch.
 
 Prefer OpenTelemetry? Reqly also ingests OTLP traces — see the
-[OpenTelemetry guide](https://github.com/tanisheesh/reqly/blob/main/docs/OTEL.md).
+[OpenTelemetry guide](https://reqly.tanisheesh.in/docs/instrument/opentelemetry/).
+
+Full documentation: **[reqly.tanisheesh.in/docs](https://reqly.tanisheesh.in/docs/instrument/node/)**.
 
 ## License
 

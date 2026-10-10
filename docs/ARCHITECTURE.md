@@ -141,7 +141,7 @@ A service's spec (`api_specs`, one per service, uploaded with the ingest key or 
 - `users`, `sessions` — argon2id password hashes; SHA-256 of session tokens with expiry.
 - `projects`, `project_services`, `api_keys`, `project_members` — service ownership, hashed keys with scopes, membership.
 
-The ingest contract is specified in [INGEST_SPEC.md](INGEST_SPEC.md).
+The ingest contract is specified in the [ingest spec](https://reqly.tanisheesh.in/docs/reference/ingest-spec/).
 
 **Indexes:** `request_events(service_name, route, time DESC)` for per-route queries; a partial index on `request_events(service_name, time DESC) WHERE is_error` for error scans; unique `alerts(service_name, route, kind) WHERE resolved_at IS NULL` for alert dedup; unique `api_keys(key_hash)` for key lookups.
 
@@ -194,7 +194,7 @@ Groq call has a 30 s timeout. On any exception (timeout, rate limit, provider ou
 | `POST` | `/v1/keys/{id}/revoke` | Project admin | Revoke a key |
 | `GET` / `POST` / `DELETE` | `/v1/projects/{id}/members[/{user_id}]` | Admin of all projects | Who can read the project |
 | `POST` | `/v1/ingest` | Ingest key | Batch ingest of request events (≤ 1 000 per call); partial-batch acceptance |
-| `POST` | `/otlp/v1/traces` | Ingest key | OTLP/HTTP trace receiver (protobuf or JSON, gzip) — HTTP server spans become request events; see [OTEL.md](OTEL.md) |
+| `POST` | `/otlp/v1/traces` | Ingest key | OTLP/HTTP trace receiver (protobuf or JSON, gzip) — HTTP server spans become request events; see [OpenTelemetry](https://reqly.tanisheesh.in/docs/instrument/opentelemetry/) |
 | `GET` | `/v1/services` | Read key or session | List all service names with recorded traffic |
 | `GET` | `/v1/services/{service_name}/routes` | Read key or session | List all route templates for a service |
 | `GET` | `/v1/metrics/summary` | Read key or session | Latency series, error rate series, status distribution, top routes, requests/min for a service+window |

@@ -92,10 +92,8 @@ Using Reqly? Start with the **[documentation site](https://reqly.tanisheesh.in/d
 | [PRD](docs/PRD.md) | Product requirements — goals, user stories, non-goals |
 | [Architecture](docs/ARCHITECTURE.md) | System design, data flow, component breakdown |
 | [Decisions](docs/DECISIONS.md) | Every major technical decision and why |
-| [Setup](docs/SETUP.md) | Local dev setup and env vars |
+| [Setup](docs/SETUP.md) | Run the repository locally, env vars |
 | [Deploy](docs/DEPLOY.md) | Production deployment, releases, rollback |
-| [OpenTelemetry](docs/OTEL.md) | Send traces from any language via OTLP |
-| [Ingest spec](docs/INGEST_SPEC.md) | The `/v1/ingest` contract for SDK authors |
 | [Benchmarks](bench/README.md) | SDK overhead per framework and how it's measured |
 | [Contributing](CONTRIBUTING.md) | How to propose changes |
 | [Changelog](CHANGELOG.md) | What changed in each release |
