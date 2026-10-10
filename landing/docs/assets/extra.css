@@ -26,3 +26,8 @@
 /* tables and long code scroll inside their box on small screens */
 .md-typeset__table { overflow-x: auto; max-width: 100%; }
 .md-typeset .grid.cards > ul > li { border-radius: .4rem; }
+
+/* A slim footer with a clear edge: as it scrolls in, the sticky sidebars end
+   above it instead of looking like content slides under it. */
+.md-footer-meta { border-top: 1px solid #c2d8eb; }
+[data-md-color-scheme="slate"] .md-footer-meta { border-top-color: #1a2f4a; background-color: #0a1320; }
