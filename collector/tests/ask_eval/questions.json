@@ -78,6 +78,18 @@
   },
   {
     "service": "fastapi-demo",
+    "question": "Which API client sends us the most traffic, and who is still calling the deprecated GET /products?",
+    "expect_all": ["acme-mobile", "umbrella-partner"],
+    "why": "acme-mobile has the largest consumer weight; umbrella-partner makes 70% of GET /products calls"
+  },
+  {
+    "service": "fastapi-demo",
+    "question": "How much are we spending on LLM calls, and on which route?",
+    "expect_all": ["/assistant/chat", "\\$"],
+    "why": "only /assistant/chat records LLM usage"
+  },
+  {
+    "service": "fastapi-demo",
     "question": "What is the CPU usage of the database server?",
     "expect_any": ["can't", "cannot", "can not", "not available", "don't have", "do not have", "no data", "unable", "only", "not tracked", "doesn't"],
     "why": "not in the data: must decline rather than invent"

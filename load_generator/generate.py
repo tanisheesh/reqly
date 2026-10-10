@@ -48,7 +48,22 @@ ROUTES: list[tuple[str, str, float, float, float]] = [
     ("/orders/{id}",   "GET",  160,  1050, 0.015),
     ("/orders",        "POST", 290,  1900, 0.025),
     ("/health",        "GET",  4,    18,   0.000),
+    ("/assistant/chat", "POST", 620,  1600, 0.010),  # calls an LLM (see _llm_usage)
 ]
+
+# API consumers, as the SDK would send them with consumer_header= and
+# hash_consumer=False (readable tenant names instead of HMAC ids, for the
+# demo). umbrella-partner is the integration still on the deprecated
+# GET /products; health checks carry no consumer.
+_CONSUMERS = [
+    ("acme-mobile", 40), ("globex-web", 25), ("initech-batch", 12),
+    ("hooli-ios", 10), ("stark-internal", 8), ("umbrella-partner", 5),
+]
+_DEPRECATED_CALLER = ("GET", "/products", "umbrella-partner", 0.7)
+
+# LLM usage on /assistant/chat: most calls go to a small model, some to a
+# bigger one. Priced by the collector's llm_prices.yaml.
+_LLM_MODELS = [("gpt-4o-mini", 80), ("claude-haiku-4-5", 20)]
 
 # Monday 08:00-09:00 degradation injected into /auth/login for interview demo.
 # Only injected in the most recent 7 days: the detector compares this week
@@ -159,7 +174,11 @@ def _make_event(
         rng.choice([500, 502, 503]) if is_error
         else rng.choices([200, 201, 204], weights=[8, 1, 1])[0]
     )
+    extra = {"consumer_id": _consumer_for(method, route, rng)}
+    if route == "/assistant/chat" and not is_error:
+        extra.update(_llm_usage(rng))
     return {
+        **extra,
         "event_id":    event_id or str(uuid.uuid4()),
         "timestamp":   ts.isoformat(),
         "method":      method,
@@ -170,6 +189,27 @@ def _make_event(
         "error_type":  error_type if is_error else None,
         "host":        host,
         "release":     release,
+    }
+
+
+def _consumer_for(method: str, route: str, rng) -> str | None:
+    if route == "/health":
+        return None
+    dep_method, dep_route, caller, share = _DEPRECATED_CALLER
+    if (method, route) == (dep_method, dep_route) and rng.random() < share:
+        return caller
+    if rng.random() < 0.1:  # anonymous traffic
+        return None
+    names, weights = zip(*_CONSUMERS)
+    return rng.choices(names, weights=weights)[0]
+
+
+def _llm_usage(rng) -> dict:
+    models, weights = zip(*_LLM_MODELS)
+    return {
+        "llm_model": rng.choices(models, weights=weights)[0],
+        "llm_input_tokens": max(50, int(rng.gauss(1400, 350))),
+        "llm_output_tokens": max(10, int(rng.gauss(260, 90))),
     }
 
 

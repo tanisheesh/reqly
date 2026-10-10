@@ -1,6 +1,6 @@
 [project]
 name = "reqly-collector"
-version = "0.7.0"
+version = "0.8.0"
 description = "Reqly collector: ingests SDK telemetry into TimescaleDB and serves dashboard/insights queries."
 requires-python = ">=3.11"
 dependencies = [
@@ -32,3 +32,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["app*"]
+
+[tool.setuptools.package-data]
+app = ["llm/*.yaml"]

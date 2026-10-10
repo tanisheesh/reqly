@@ -53,6 +53,12 @@ function Rows({ report, tab, all }: { report: DriftReport; tab: Tab; all: boolea
           <li key={`${d.method} ${d.path}`} className="flex items-center gap-2 py-2 text-xs">
             <Method method={d.method} />
             <span className="min-w-0 flex-1 truncate font-mono text-slate-300" title={d.summary}>{d.path}</span>
+            {(d.consumers ?? []).length > 0 && (
+              <span className="hidden truncate font-mono text-[11px] text-slate-500 md:block" title="consumers still calling it">
+                {d.consumers!.slice(0, 3).map((c) => c.consumer_id).join(", ")}
+                {d.consumers!.length > 3 && ` +${d.consumers!.length - 3}`}
+              </span>
+            )}
             <span className="tabular-nums text-amber-300">{d.requests.toLocaleString()} req</span>
             <span className="hidden w-24 text-right text-slate-600 sm:block">last {shortDate(d.last_seen)}</span>
           </li>

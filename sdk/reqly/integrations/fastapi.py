@@ -5,6 +5,7 @@ from typing import Callable, Optional
 
 from ..core.capture import normalize_route
 from ..core.client import ReqlyClient
+from ..core.request_context import RequestInfo, begin_request, end_request
 
 RouteResolver = Callable[[dict], Optional[str]]
 
@@ -29,6 +30,13 @@ def route_template_from_scope(scope: dict, entry_root_path: str = "") -> str | N
     return scope.get("path_template")
 
 
+def asgi_request_info(scope: dict) -> RequestInfo:
+    headers = {
+        k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope.get("headers") or []
+    }
+    return RequestInfo(method=scope.get("method", "GET"), path=scope.get("path", "/"), headers=headers, raw=scope)
+
+
 class ReqlyASGIMiddleware:
     """Pure ASGI middleware (not Starlette's BaseHTTPMiddleware, which
     buffers streaming response bodies). Wraps ``send`` to intercept the
@@ -49,6 +57,7 @@ class ReqlyASGIMiddleware:
     def __init__(self, app, client: ReqlyClient, route_resolver: RouteResolver | None = None) -> None:
         self.app = app
         self._client = client
+        self.client = client
         self._route_resolver = route_resolver
 
     async def __call__(self, scope, receive, send):
@@ -84,6 +93,7 @@ class ReqlyASGIMiddleware:
                 response_bytes += len(message.get("body", b""))
             await send(message)
 
+        usage_token = begin_request()
         try:
             await self.app(scope, receive_wrapper, send_wrapper)
         except Exception as exc:
@@ -93,6 +103,7 @@ class ReqlyASGIMiddleware:
             raise
         finally:
             duration_ms = (time.perf_counter() - start) * 1000
+            llm = end_request(usage_token)
             route_template = route_template_from_scope(scope, entry_root_path)
             if route_template is None and self._route_resolver is not None:
                 route_template = self._route_resolver(original_scope)
@@ -106,6 +117,8 @@ class ReqlyASGIMiddleware:
                 error_type=error_type,
                 request_bytes=request_bytes,
                 response_bytes=response_bytes,
+                request_info=lambda: asgi_request_info(scope),
+                llm=llm,
             )
 
 
