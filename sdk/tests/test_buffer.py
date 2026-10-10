@@ -87,3 +87,41 @@ def test_reinit_after_fork_restarts_flush_thread_and_drops_parent_events():
         assert [e.route for b in shipper.batches for e in b] == ["/r2"]
     finally:
         buf.shutdown()
+
+
+def test_a_full_batch_is_shipped_without_waiting_for_the_interval():
+    shipper = FakeShipper()
+    buf = EventBuffer(
+        shipper=shipper, max_queue_size=1000, max_batch_size=10, flush_interval_seconds=999
+    )
+    try:
+        for i in range(25):
+            buf.add(_event(i))
+        deadline = time.monotonic() + 2
+        while shipper.shipped_events < 20 and time.monotonic() < deadline:
+            time.sleep(0.01)
+        # the two full batches went out at once; the 5 left wait for the interval
+        assert [len(b) for b in shipper.batches] == [10, 10]
+        assert buf.stats()["queued_events"] == 5
+    finally:
+        buf.shutdown()
+    assert shipper.shipped_events == 25  # shutdown sends the rest
+
+
+def test_heavy_traffic_is_not_dropped_between_intervals():
+    # 5,000 events against a 1,000-event queue: before eager flushing, 4,000
+    # would have been dropped while waiting for the interval.
+    shipper = FakeShipper()
+    buf = EventBuffer(
+        shipper=shipper, max_queue_size=1000, max_batch_size=100, flush_interval_seconds=999
+    )
+    try:
+        for i in range(5000):
+            buf.add(_event(i))
+            if i % 500 == 0:
+                time.sleep(0.01)  # let the flush thread run, as request handling would
+        buf.flush()
+        assert buf.stats()["dropped_events"] == 0
+        assert shipper.shipped_events == 5000
+    finally:
+        buf.shutdown()

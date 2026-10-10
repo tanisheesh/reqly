@@ -23,6 +23,13 @@ class EventBuffer:
     Backpressure: if the queue is full when a new event arrives, the oldest
     entry is dropped and a counter incremented. The calling request thread
     never blocks waiting for queue space.
+
+    Besides the interval, the thread is woken as soon as a full batch is
+    queued, so heavy traffic is shipped as it comes instead of piling up
+    between intervals (at 5 s and a 2,000-event queue, anything above ~400
+    requests/s per process used to be dropped). A wake-up only sends full
+    batches; the remainder waits for the interval, so a busy app never sends
+    a stream of tiny batches.
     """
 
     def __init__(
@@ -41,6 +48,7 @@ class EventBuffer:
         self._dropped_events = 0
 
         self._stop_event = threading.Event()
+        self._wake = threading.Event()
         self._start_thread()
         atexit.register(self.shutdown)
         # Pre-fork servers (gunicorn --preload, uWSGI without lazy-apps)
@@ -63,6 +71,7 @@ class EventBuffer:
         # because the child is single-threaded at this point. Events queued
         # before the fork belong to the parent, which ships them itself.
         self._lock = threading.Lock()
+        self._wake = threading.Event()
         self._queue.clear()
         self._shipper.reset_after_fork()
         self._start_thread()
@@ -72,9 +81,13 @@ class EventBuffer:
             if len(self._queue) >= self._queue.maxlen:
                 self._dropped_events += 1
             self._queue.append(event)
+            if len(self._queue) >= self._max_batch_size:
+                self._wake.set()
 
-    def _drain_batch(self) -> list[RequestEvent]:
+    def _drain_batch(self, full_only: bool = False) -> list[RequestEvent]:
         with self._lock:
+            if full_only and len(self._queue) < self._max_batch_size:
+                return []
             batch = []
             while self._queue and len(batch) < self._max_batch_size:
                 batch.append(self._queue.popleft())
@@ -82,13 +95,18 @@ class EventBuffer:
 
     def _run(self) -> None:
         while not self._stop_event.is_set():
-            self._stop_event.wait(self._flush_interval_seconds)
-            self.flush()
+            woken = self._wake.wait(self._flush_interval_seconds)
+            self._wake.clear()
+            if self._stop_event.is_set():
+                return
+            self.flush(full_only=woken)
 
-    def flush(self) -> None:
+    def flush(self, full_only: bool = False) -> None:
+        """Ships the queue. full_only: only whole batches (a wake-up on a
+        full batch), leaving the remainder for the next interval."""
         try:
             while True:
-                batch = self._drain_batch()
+                batch = self._drain_batch(full_only)
                 if not batch:
                     return
                 self._shipper.send_batch(batch)
@@ -101,6 +119,7 @@ class EventBuffer:
         if self._stop_event.is_set():
             return
         self._stop_event.set()
+        self._wake.set()  # let the thread exit now instead of at the next interval
         try:
             self.flush()
         finally:
