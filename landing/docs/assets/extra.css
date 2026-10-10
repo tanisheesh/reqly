@@ -31,3 +31,10 @@
    above it instead of looking like content slides under it. */
 .md-footer-meta { border-top: 1px solid #c2d8eb; }
 [data-md-color-scheme="slate"] .md-footer-meta { border-top-color: #1a2f4a; background-color: #0a1320; }
+
+/* Author footer: the same name + badges the repository's Markdown files end with */
+.md-copyright { display: flex; flex-direction: column; gap: .4rem; }
+.reqly-author { display: block; }
+.reqly-badges { display: flex; flex-wrap: wrap; gap: .35rem; }
+.reqly-badges img { height: 20px; display: block; }
+
