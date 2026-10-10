@@ -1,0 +1,107 @@
+{{- $secret := include "reqly.secretName" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "reqly.fullname" . }}-collector
+  labels:
+    {{- include "reqly.labels" (dict "ctx" $ "component" "collector") | nindent 4 }}
+spec:
+  # One collector only: the alert scheduler, rate limits and caches are per
+  # process. Recreate, so an upgrade never runs two side by side.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "reqly.selectorLabels" (dict "ctx" $ "component" "collector") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "reqly.selectorLabels" (dict "ctx" $ "component" "collector") | nindent 8 }}
+      annotations:
+        # restart when the chart-managed secret or config changes
+        checksum/config: {{ toJson .Values.collector.config | sha256sum }}
+        {{- if not .Values.secrets.existingSecret }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: collector
+          image: {{ include "reqly.image" (dict "image" .Values.collector.image "ctx" $) }}
+          imagePullPolicy: {{ .Values.collector.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: DATABASE_URL
+              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: database-url } }
+            - name: REQLY_INGEST_KEY
+              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: ingest-key } }
+            - name: REQLY_READ_KEY
+              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: read-key } }
+            - name: GROQ_API_KEY
+              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: groq-api-key, optional: true } }
+            - name: REQLY_ADMIN_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: admin-password, optional: true } }
+            - name: ALERT_SLACK_WEBHOOK_URL
+              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: slack-webhook-url, optional: true } }
+            - name: ALERT_DISCORD_WEBHOOK_URL
+              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: discord-webhook-url, optional: true } }
+            - name: ALERT_WEBHOOK_URL
+              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: webhook-url, optional: true } }
+            {{- range $name, $value := .Values.collector.config }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- with .Values.collector.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          startupProbe:
+            # migrations run on start-up; give a first start (and a database
+            # that is still booting) a few minutes
+            httpGet: { path: /v1/health, port: http }
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: { path: /v1/health, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /v1/health, port: http }
+            periodSeconds: 20
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.collector.resources | nindent 12 }}
+      {{- with .Values.collector.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.collector.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.collector.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "reqly.fullname" . }}-collector
+  labels:
+    {{- include "reqly.labels" (dict "ctx" $ "component" "collector") | nindent 4 }}
+spec:
+  type: {{ .Values.collector.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.collector.service.port }}
+      targetPort: http
+  selector:
+    {{- include "reqly.selectorLabels" (dict "ctx" $ "component" "collector") | nindent 4 }}

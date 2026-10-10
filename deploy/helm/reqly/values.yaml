@@ -1,0 +1,112 @@
+# Reqly Helm chart values. Every setting the collector reads is documented at
+# https://reqly.tanisheesh.in/docs/self-hosting/configuration/
+
+# -- Secrets -------------------------------------------------------------------
+# Leave a value empty to have the chart generate it once (and keep it across
+# upgrades), or point existingSecret at a Secret you manage with these keys:
+#   ingest-key, read-key, database-url, postgres-password,
+#   groq-api-key, admin-password, slack-webhook-url, discord-webhook-url, webhook-url
+secrets:
+  existingSecret: ""
+  ingestKey: ""        # REQLY_INGEST_KEY: SDKs and admin API calls (write)
+  readKey: ""          # REQLY_READ_KEY: the dashboard's key; public to dashboard viewers
+  groqApiKey: ""       # AI weekly report and Ask Reqly (optional)
+  adminPassword: ""    # first admin when publicDashboard is false (12+ characters)
+  slackWebhookUrl: ""
+  discordWebhookUrl: ""
+  webhookUrl: ""
+
+# -- Collector -----------------------------------------------------------------
+collector:
+  image:
+    repository: ghcr.io/tanisheesh/reqly-collector
+    tag: ""            # defaults to the chart's appVersion
+    pullPolicy: IfNotPresent
+  # Always one replica: the alert scheduler, rate limits and caches live in the
+  # process, so two collectors would run every check twice. Upgrades use the
+  # Recreate strategy for the same reason.
+  config:
+    PUBLIC_DASHBOARD: "true"
+    REQLY_ADMIN_USERNAME: admin
+    CORS_ORIGINS: "*"           # set to the dashboard's URL in production
+    ALERTS_ENABLED: "true"
+    ALERT_RENOTIFY_HOURS: "6"
+    LLM_COST_ALERT_MIN_USD: "1.0"
+    FORWARDED_ALLOW_IPS: "*"    # the collector is only reachable through the cluster
+    # DASHBOARD_URL: https://reqly.example.com
+    # GROQ_MODEL: openai/gpt-oss-120b
+  extraEnv: []                  # [{name: ..., value: ...}] for anything else
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { memory: 512Mi }
+  service:
+    type: ClusterIP
+    port: 8000
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# -- Dashboard -----------------------------------------------------------------
+dashboard:
+  enabled: true
+  image:
+    repository: ghcr.io/tanisheesh/reqly-dashboard
+    tag: ""            # defaults to the chart's appVersion
+    pullPolicy: IfNotPresent
+  replicas: 1
+  # The collector URL as the *browser* reaches it (the dashboard calls the
+  # collector from the user's browser). Defaults to the collector ingress host.
+  collectorUrl: ""
+  resources:
+    requests: { cpu: 20m, memory: 64Mi }
+    limits: { memory: 256Mi }
+  service:
+    type: ClusterIP
+    port: 5173
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# -- Database ------------------------------------------------------------------
+timescaledb:
+  # true: run timescale/timescaledb-ha (TimescaleDB + Toolkit) in the cluster.
+  # false: use an external database: set externalDatabaseUrl (or the
+  # database-url key of secrets.existingSecret).
+  enabled: true
+  image:
+    repository: timescale/timescaledb-ha
+    tag: pg16
+    pullPolicy: IfNotPresent
+  database: reqly
+  user: reqly
+  password: ""         # generated when empty
+  persistence:
+    size: 10Gi
+    storageClass: ""   # the cluster default when empty
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { memory: 1Gi }
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+externalDatabaseUrl: ""  # postgresql://user:pass@host:5432/reqly?sslmode=require
+
+# -- Ingress -------------------------------------------------------------------
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  # The collector needs its own host: SDKs, OTLP exporters and the browser
+  # all call it directly.
+  collector:
+    host: reqly-collector.example.com
+  dashboard:
+    host: reqly.example.com
+  tls: []
+  #  - secretName: reqly-tls
+  #    hosts: [reqly.example.com, reqly-collector.example.com]
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""

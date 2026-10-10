@@ -1,0 +1,31 @@
+Reqly {{ .Chart.AppVersion }} is installed as "{{ .Release.Name }}".
+
+Keys (the ingest key goes into your SDK or OTLP exporter; the read key is the dashboard's):
+
+  kubectl -n {{ .Release.Namespace }} get secret {{ include "reqly.secretName" . }} -o jsonpath='{.data.ingest-key}' | base64 -d; echo
+  kubectl -n {{ .Release.Namespace }} get secret {{ include "reqly.secretName" . }} -o jsonpath='{.data.read-key}' | base64 -d; echo
+
+{{- if .Values.ingress.enabled }}
+
+Collector: {{ include "reqly.publicCollectorUrl" . }}
+{{- if .Values.dashboard.enabled }}
+Dashboard: {{ ternary "https" "http" (gt (len .Values.ingress.tls) 0) }}://{{ .Values.ingress.dashboard.host }}
+{{- end }}
+{{- else }}
+
+No ingress. Reach both from your machine with:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "reqly.fullname" . }}-collector 8000:{{ .Values.collector.service.port }}
+{{- if .Values.dashboard.enabled }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "reqly.fullname" . }}-dashboard 5173:{{ .Values.dashboard.service.port }}
+
+then open http://localhost:5173 (it calls the collector at {{ include "reqly.publicCollectorUrl" . }}).
+{{- end }}
+{{- end }}
+
+Point an app at the collector:  https://reqly.tanisheesh.in/docs/quickstart/
+{{- if eq (index .Values.collector.config "PUBLIC_DASHBOARD") "true" }}
+
+PUBLIC_DASHBOARD is "true": anyone who can open the dashboard can read every project.
+For a shared cluster set collector.config.PUBLIC_DASHBOARD="false" and secrets.adminPassword.
+{{- end }}
