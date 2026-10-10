@@ -4,11 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reqly"
-version = "0.5.3"
+version = "0.5.4"
 description = "Self-hosted API monitoring for FastAPI, Flask, Django, Starlette and Litestar in two lines: latency percentiles, error rates and release tracking per route, with deploy-aware alerts and weekly AI anomaly reports."
 readme = "README.md"
 requires-python = ">=3.9"
-license = "GPL-3.0-or-later"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "Tanish Poddar" }]
 keywords = [
     "observability", "apm", "monitoring", "fastapi", "flask", "django",
