@@ -116,3 +116,18 @@ test("the CommonJS build loads with require()", () => {
   assert.equal(typeof cjs.reqlyExpress, "function");
   assert.equal(typeof cjs.ReqlyClient, "function");
 });
+
+test("queued events are sent when the process exits on its own", async () => {
+  const collector = await fakeCollector();
+  const { spawn } = await import("node:child_process");
+  const script = `
+    import { ReqlyClient } from ${JSON.stringify(new URL("../dist/esm/index.js", import.meta.url).href)};
+    const client = new ReqlyClient({ serviceName: "exit-test", collectorUrl: ${JSON.stringify(collector.url)}, flushIntervalMs: 60000 });
+    client.record({ method: "GET", route: "/bye", statusCode: 200, durationMs: 1 });
+    // no shutdown(): the script just ends
+  `;
+  const child = spawn(process.execPath, ["--input-type=module", "-e", script], { stdio: "inherit" });
+  await new Promise((resolve) => child.on("exit", resolve));
+  assert.deepEqual(collector.events().map((e) => e.route), ["/bye"]);
+  await collector.close();
+});
