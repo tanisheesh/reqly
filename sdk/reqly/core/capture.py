@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import socket
+import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -15,13 +16,16 @@ class RequestEvent:
     """One captured request. ``route`` MUST be the normalized route template
     (e.g. "/users/{id}"), never the raw path (e.g. "/users/123") -- every
     downstream aggregate's cardinality depends on this.
+
+    The request path only stores the time as a float; the event id and the
+    ISO timestamp are made when the batch is serialized on the flush thread
+    (to_dict), which keeps uuid4 and datetime formatting off the request.
+    The id is stored on first serialization, so retries resend the same one.
     """
 
-    event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    event_id: str | None = None
     service_name: str = ""
-    timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    timestamp: str | None = None
     method: str = "GET"
     route: str = "/"
     status_code: int = 200
@@ -36,9 +40,16 @@ class RequestEvent:
     llm_input_tokens: int | None = None
     llm_output_tokens: int | None = None
     sdk_version: str = field(default_factory=_get_sdk_version)
+    recorded_at: float = field(default_factory=time.time)  # not sent
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        if self.event_id is None:
+            self.event_id = str(uuid.uuid4())
+        if self.timestamp is None:
+            self.timestamp = datetime.fromtimestamp(self.recorded_at, timezone.utc).isoformat()
+        data = asdict(self)
+        del data["recorded_at"]
+        return data
 
 
 def normalize_route(raw_path: str, matched_template: str | None) -> str:

@@ -31,7 +31,7 @@ from django.core.exceptions import MiddlewareNotUsed
 from ..core.capture import normalize_route
 from ..core.client import ReqlyClient
 from ..core.config import Config
-from ..core.request_context import RequestInfo, begin_request, end_request
+from ..core.request_context import LazyHeaders, RequestInfo, begin_request, end_request
 
 logger = logging.getLogger("reqly")
 
@@ -147,7 +147,7 @@ class ReqlyMiddleware:
                 request_info=lambda: RequestInfo(
                     method=request.method,
                     path=request.path,
-                    headers={k.lower(): v for k, v in request.headers.items()},
+                    headers=LazyHeaders(request.headers.get, request.headers.items),
                     raw=request,
                 ),
                 llm=llm,

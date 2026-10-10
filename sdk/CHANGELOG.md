@@ -2,6 +2,15 @@
 
 All notable changes to the `reqly` Python SDK.
 
+## 0.5.2 — 2026-10-11
+
+### Changed
+- About half the per-request overhead (FastAPI +34 → +13 µs, Flask +63 → +33 µs; see
+  `bench/README.md`): event ids and ISO timestamps are made on the flush thread instead of in
+  the request, consumer ids are hashed once per distinct value, and request headers are read
+  lazily (`RequestInfo.headers` is now a read-only mapping that looks headers up on demand;
+  iterating it still lists them all).
+
 ## 0.5.1 — 2026-10-10
 
 ### Fixed

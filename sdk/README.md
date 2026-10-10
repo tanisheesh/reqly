@@ -162,6 +162,10 @@ latency percentiles and error rates stay unbiased.
 
 ## Design guarantees
 
+**Small overhead** — about 13 µs per request on FastAPI and Starlette and 33 µs on Flask,
+measured in-process with consumer tracking on and the shipper running
+([benchmark](https://github.com/tanisheesh/reqly/blob/main/bench/README.md)).
+
 **Fail-open** — any internal SDK error is caught and logged once; instrumentation disables
 itself rather than raise into your app. A slow or unreachable collector never blocks
 request threads — shipping happens on a background thread with strict HTTP timeouts.
