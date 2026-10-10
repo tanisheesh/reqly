@@ -3,8 +3,8 @@ name: GitHub Packages
 # Publishes to GitHub Packages, which is what the repository's "Packages"
 # sidebar lists:
 # - container images ghcr.io/tanisheesh/reqly-collector and reqly-dashboard
-#   (linux/amd64 + linux/arm64), tagged with the collector version, the
-#   short commit SHA and `latest`;
+#   (linux/amd64 + linux/arm64, each built on a native runner), tagged with
+#   the collector version, the short commit SHA and `latest`;
 # - the Helm chart as an OCI artifact, oci://ghcr.io/tanisheesh/charts/reqly,
 #   versioned like the collector (after the images, which it points at);
 # - the Node SDK mirrored as @tanisheesh/reqly-node on npm.pkg.github.com
@@ -30,20 +30,82 @@ permissions:
   packages: write
 
 jobs:
-  images:
-    name: Image ${{ matrix.image }}
+  # Each architecture is built on a native runner (no QEMU emulation, which
+  # made arm64 builds -- npm and pip under emulation -- the slow part), pushed
+  # by digest, and the merge job below joins the two digests into one
+  # multi-arch tag. Both runners are free for public repositories.
+  build:
+    name: Build ${{ matrix.image }} (${{ matrix.arch }})
     if: >-
       startsWith(github.ref, 'refs/tags/collector-v') ||
       (github.event_name == 'workflow_dispatch' && inputs.publish != 'node-sdk')
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [reqly-collector, reqly-dashboard]
+        arch: [amd64, arm64]
+        include:
+          - image: reqly-collector
+            context: collector
+          - image: reqly-dashboard
+            context: dashboard
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          labels: |
+            org.opencontainers.image.title=${{ matrix.image }}
+            org.opencontainers.image.licenses=GPL-3.0-only
+
+      - id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.context }}
+          platforms: linux/${{ matrix.arch }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
+
+      - name: Export digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${DIGEST#sha256:}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.image }}-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  images:
+    name: Image ${{ matrix.image }}
+    needs: build
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
           - image: reqly-collector
-            context: collector
             description: Reqly collector — ingest, OTLP, metrics, alerts, SLOs and Ask Reqly API
           - image: reqly-dashboard
-            context: dashboard
             description: Reqly dashboard — set REQLY_COLLECTOR_URL and REQLY_READ_KEY at run time
     steps:
       - uses: actions/checkout@v7
@@ -54,7 +116,12 @@ jobs:
           VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('collector/pyproject.toml', 'rb'))['project']['version'])")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/setup-qemu-action@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-${{ matrix.image }}-*
+          merge-multiple: true
+
       - uses: docker/setup-buildx-action@v4
 
       - uses: docker/login-action@v4
@@ -71,24 +138,21 @@ jobs:
             type=raw,value=${{ steps.version.outputs.version }}
             type=sha,format=short
             type=raw,value=latest
-          labels: |
-            org.opencontainers.image.title=${{ matrix.image }}
-            org.opencontainers.image.description=${{ matrix.description }}
-            org.opencontainers.image.licenses=GPL-3.0-only
 
-      - uses: docker/build-push-action@v7
-        with:
-          context: ${{ matrix.context }}
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          # Shown on the package page.
-          annotations: |
-            manifest:org.opencontainers.image.description=${{ matrix.description }}
-            index:org.opencontainers.image.description=${{ matrix.description }}
-          cache-from: type=gha,scope=${{ matrix.image }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+      - name: Create the multi-arch tags
+        working-directory: /tmp/digests
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          DESCRIPTION: ${{ matrix.description }}
+        run: |
+          # The tag list and the digests must split into separate arguments.
+          # The annotation is the description shown on the package page.
+          # shellcheck disable=SC2046
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            --annotation "index:org.opencontainers.image.description=$DESCRIPTION" \
+            $(printf "$IMAGE@sha256:%s " *)
+          docker buildx imagetools inspect "$IMAGE:${{ steps.version.outputs.version }}"
 
   chart:
     name: Helm chart
