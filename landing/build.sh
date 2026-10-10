@@ -7,6 +7,9 @@ rm -rf public
 mkdir -p public
 cp index.html public/
 
-python3 -m venv /tmp/reqly-docs-venv
-/tmp/reqly-docs-venv/bin/pip install --quiet --disable-pip-version-check -r requirements-docs.txt
-/tmp/reqly-docs-venv/bin/mkdocs build --strict --site-dir public/docs
+PY="$(command -v python3 || command -v python)"
+echo "Using $PY ($("$PY" --version 2>&1))"
+
+# The docs tools go into /tmp, not the project; no virtualenv needed.
+"$PY" -m pip install --quiet --disable-pip-version-check --target /tmp/reqly-docs-deps -r requirements-docs.txt
+PYTHONPATH=/tmp/reqly-docs-deps "$PY" -m mkdocs build --strict --site-dir public/docs

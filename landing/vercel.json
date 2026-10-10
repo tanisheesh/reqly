@@ -4,7 +4,7 @@
   "installCommand": "",
   "buildCommand": "sh build.sh",
   "outputDirectory": "public",
-  "ignoreCommand": "git diff --quiet \"${VERCEL_GIT_PREVIOUS_SHA:-HEAD^}\" HEAD -- .",
+  "ignoreCommand": "sh ignore-build.sh",
   "trailingSlash": true,
   "headers": [
     {
