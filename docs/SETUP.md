@@ -208,6 +208,24 @@ Add `?base_path=/api` if the app serves the spec's paths under a prefix (Swagger
 undocumented endpoints that get traffic, documented ones nobody called in 30 days, and
 deprecated ones still in use. The local demo uploads a spec for both demo services.
 
+## 6d. Projects and per-team keys
+
+With several teams or apps on one collector, give each its own project and keys instead of
+sharing `REQLY_INGEST_KEY` (which, like admin users, reaches every project):
+
+```bash
+# a project, then an ingest+read key for it (the key is shown once)
+curl -X POST http://localhost:8000/v1/projects -H "X-Reqly-Key: demo-key" \
+  -H "Content-Type: application/json" -d '{"slug": "payments", "name": "Payments team"}'
+curl -X POST http://localhost:8000/v1/projects/2/keys -H "X-Reqly-Key: demo-key" \
+  -H "Content-Type: application/json" -d '{"name": "checkout-api prod", "scopes": ["ingest"]}'
+```
+
+Use the `rqk_...` key as the SDK's `api_key` (or the OTLP `X-Reqly-Key` header). A new service
+joins the project of the first key that sends it; move an existing one with
+`PUT /v1/projects/{id}/services`. Add dashboard users to a project with
+`POST /v1/projects/{id}/members` — non-admin users only see their projects.
+
 ## 7. Deploy to production
 
 See [infra/DEPLOY.md](../infra/DEPLOY.md) for the full AWS production deployment:

@@ -172,4 +172,5 @@ def test_public_dashboard_still_accepts_the_read_key(monkeypatch):
     monkeypatch.setattr(alerts_router, "get_pool", lambda: _Empty())
     client = TestClient(app)
     assert client.get("/v1/alerts", headers={"X-Reqly-Key": settings.read_key}).status_code == 200
-    assert client.get("/v1/alerts", headers={"X-Reqly-Key": settings.ingest_key}).status_code == 401
+    # the ingest key is valid but has no read scope
+    assert client.get("/v1/alerts", headers={"X-Reqly-Key": settings.ingest_key}).status_code == 403
