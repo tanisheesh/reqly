@@ -31,7 +31,7 @@ Reqly watches every request your APIs serve and explains problems instead of jus
 
     ---
 
-    Express, Fastify and Hono, with no runtime dependencies.
+    Express, Fastify, Hono, Koa and NestJS, with no runtime dependencies.
 
     [:octicons-arrow-right-24: Node SDK](instrument/node.md)
 

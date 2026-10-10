@@ -14,7 +14,7 @@ Teams running a handful of HTTP APIs have two bad options for knowing whether th
 
 ## 2. Goals
 
-1. One-line instrumentation for Python (FastAPI, Flask, Django, Starlette, Litestar, any WSGI/ASGI app) and Node.js (Express, Fastify, Hono); any other language through OpenTelemetry (OTLP/HTTP) with exporter settings only.
+1. One-line instrumentation for Python (FastAPI, Flask, Django, Starlette, Litestar, any WSGI/ASGI app) and Node.js (Express, Fastify, Hono, Koa, NestJS); any other language through OpenTelemetry (OTLP/HTTP) with exporter settings only.
 2. Correct latency percentiles at every level (route, service, 1h to 7d) and error rates that are current to the minute.
 3. Explanations, not just charts: every alert carries the release that was running, root-cause leads (host, environment, error type, status code) and the API consumers it hit.
 4. Hourly anomaly alerts against a weekday × hour baseline, deduplicated and auto-resolved, delivered to Slack, Discord or a webhook; a weekly AI-written report.
@@ -142,7 +142,7 @@ Teams running a handful of HTTP APIs have two bad options for knowing whether th
 
 - **Docs site and a rewritten landing page** — the features outgrew the README.
 - **Helm chart** — Kubernetes deploys without hand-written manifests.
-- **Node SDK 0.2** — Koa/NestJS, a generic `http` wrapper, streamed byte counts; built when a real user asks (OTLP covers them today).
+- **Node SDK** — a generic `http` wrapper and streamed byte counts; built when a real user asks (OTLP covers them today).
 - **LLM cost from OTLP GenAI spans**, so OpenTelemetry apps get LLM cost and its alerts too.
 - **OIDC sign-in** and multi-instance collectors.
 

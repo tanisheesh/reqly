@@ -8,13 +8,15 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 
 ## [Unreleased]
 
-Collector 0.11.0
+Collector 0.11.0 · reqly-node 0.2.0
 
 ### ✨ Added
 - **LLM cost alerts:** each hour, a route's LLM spend is compared with the same weekday-hour
   over 8 weeks. A spike in cost per request or in LLM traffic opens an alert that says which
   factor rose (requests, tokens per call, price per token, or a different model). Floor:
   `LLM_COST_ALERT_MIN_USD`, default $1 extra per hour
+- Node SDK: `reqlyKoa()` for Koa 2/3 and `reqlyNest(app)` for NestJS on the Express or
+  Fastify adapter
 - A docs site at [reqly.tanisheesh.in/docs](https://reqly.tanisheesh.in/docs/)
 
 ### 🎊 Improved

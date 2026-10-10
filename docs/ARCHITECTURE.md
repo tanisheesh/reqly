@@ -9,7 +9,7 @@ Companion to [PRD.md](PRD.md): the PRD says what Reqly does, this says how.
 | Layer | Tech |
 |---|---|
 | Python SDK | Python 3.9+ · pure ASGI middleware (FastAPI, Starlette, Litestar) · Flask hooks · Django middleware · generic WSGI/ASGI wrappers · httpx · one background flush thread |
-| Node.js SDK | TypeScript, Node 20+, no runtime dependencies · Express / Fastify / Hono middleware · `AsyncLocalStorage` · `fetch` |
+| Node.js SDK | TypeScript, Node 20+, no runtime dependencies · Express / Fastify / Hono / Koa middleware, NestJS helper · `AsyncLocalStorage` · `fetch` |
 | Collector | FastAPI · Uvicorn · asyncpg · APScheduler 3 · slowapi · Pydantic v2 · argon2-cffi · opentelemetry-proto · httpx |
 | Database | TimescaleDB on PostgreSQL 16 (`timescale/timescaledb-ha`, with the Toolkit) · hypertables · continuous aggregates · UddSketch · retention policies |
 | Dashboard | React 19 · Vite · TypeScript · Tailwind CSS 4 · Recharts · TanStack Query |
