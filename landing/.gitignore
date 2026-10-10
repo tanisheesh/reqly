@@ -1,1 +1,3 @@
 public/
+# created by stray npm/npx runs; the landing build has no npm step
+package-lock.json

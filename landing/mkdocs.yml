@@ -41,7 +41,6 @@ theme:
     - navigation.tracking
     - navigation.sections
     - navigation.top
-    - navigation.footer
     - navigation.indexes
     - toc.follow
     - search.suggest
