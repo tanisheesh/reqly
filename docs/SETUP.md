@@ -45,7 +45,9 @@ cp .env.example .env
 | `REQLY_INGEST_KEY` | `demo-key` | Any secret string — sent by the SDK as `X-Reqly-Key` on ingest |
 | `REQLY_READ_KEY` | `demo-read-key` | Sent by the dashboard to read metrics. It is compiled into the dashboard bundle, so treat it as public to dashboard viewers — it must differ from `REQLY_INGEST_KEY` |
 | `GROQ_API_KEY` | *(empty)* | [console.groq.com/keys](https://console.groq.com/keys) — free tier; leave empty to use plain-text fallback for AI insights |
-| `GROQ_MODEL` | `llama-3.3-70b-versatile` | See Groq docs for available models |
+| `GROQ_MODEL` | `openai/gpt-oss-120b` | See Groq docs for available models |
+| `ASK_MODEL` | `GROQ_MODEL` | Model for Ask Reqly; needs tool calling |
+| `ASK_DAILY_LIMIT` | `200` | Ask Reqly questions per day per collector (the read key is public to dashboard viewers); `0` turns Ask off |
 | `CORS_ORIGINS` | `*` | Comma-separated list of allowed origins; restrict in production |
 | `INSIGHTS_SCHEDULER_ENABLED` | `true` | Set `false` when the SAM Lambda runs the weekly job, so it doesn't run twice |
 | `ALERTS_ENABLED` | `true` | Hourly anomaly check (open alerts appear on the dashboard) |
