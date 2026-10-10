@@ -128,8 +128,11 @@ docker run -d \
   -e CORS_ORIGINS="*" \
   -e INSIGHTS_SCHEDULER_ENABLED=false \
   -p 8000:8000 \
-  your-registry/reqly-collector:latest
+  ghcr.io/tanisheesh/reqly-collector:latest
 ```
+
+Prebuilt images (linux/amd64 and arm64) are published to GitHub Packages; pin a version
+(`:0.8.0`) instead of `latest` in production.
 
 **Option B — Separate server / Render / Fly.io**
 
@@ -161,6 +164,12 @@ npm run build
 ```
 
 Deploy `dist/` to any static host — Vercel, Netlify, S3+CloudFront, or serve via nginx.
+
+Or run the prebuilt image, configured at start-up instead of build time:
+
+```bash
+docker run -d --name reqly-dashboard -p 5173:5173   -e REQLY_COLLECTOR_URL=https://your-collector-url   -e REQLY_READ_KEY=your_read_key   ghcr.io/tanisheesh/reqly-dashboard:latest
+```
 
 ---
 
