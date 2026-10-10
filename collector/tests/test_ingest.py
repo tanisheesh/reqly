@@ -78,7 +78,8 @@ def test_ingest_partial_acceptance_drops_only_bad_events(client):
     )
     assert response.status_code == 200
     body = response.json()
-    assert body == {"accepted": 1, "rejected": 1}
+    assert (body["accepted"], body["rejected"]) == (1, 1)
+    assert body["reasons"] == ["duration_ms: Value error, duration_ms out of plausible range"]
     assert len(client.captured_rows) == 1
 
 
@@ -92,7 +93,7 @@ def test_ingest_rejects_oversized_route(client):
         },
     )
     assert response.status_code == 200
-    assert response.json() == {"accepted": 1, "rejected": 1}
+    assert (response.json()["accepted"], response.json()["rejected"]) == (1, 1)
 
 
 def test_ingest_rejects_oversized_service_name(client):
@@ -161,5 +162,30 @@ def test_negative_byte_counts_reject_only_that_event(client):
             "events": [_valid_event(response_bytes=512), _valid_event(response_bytes=-1)],
         },
     )
-    assert response.json() == {"accepted": 1, "rejected": 1}
+    assert (response.json()["accepted"], response.json()["rejected"]) == (1, 1)
     assert _col(client.captured_rows[0], "response_bytes") == 512
+
+
+def test_old_and_future_events_are_rejected_unless_backfill(client):
+    from datetime import timedelta
+
+    now = datetime.now(timezone.utc)
+    old = _valid_event(timestamp=(now - timedelta(days=20)).isoformat())
+    future = _valid_event(timestamp=(now + timedelta(hours=2)).isoformat())
+    recent = _valid_event(timestamp=(now - timedelta(days=12)).isoformat())
+    headers = {"X-Reqly-Key": "demo-key"}
+
+    body = client.post("/v1/ingest", headers=headers,
+                       json={"service_name": "svc", "events": [old, future, recent]}).json()
+    assert (body["accepted"], body["rejected"]) == (1, 2)
+    assert body["reasons"] == [
+        "timestamp older than 13 days (send it as a backfill batch)",
+        "timestamp is in the future",
+    ]
+
+    # an explicit backfill may import history (the future is still refused)
+    body = client.post("/v1/ingest", headers=headers, json={
+        "service_name": "svc", "backfill": True,
+        "events": [_valid_event(timestamp=(now - timedelta(days=20)).isoformat()), future],
+    }).json()
+    assert (body["accepted"], body["rejected"]) == (1, 1)

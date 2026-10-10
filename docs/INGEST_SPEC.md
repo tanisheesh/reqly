@@ -18,7 +18,7 @@ X-Reqly-Key: <ingest key>
 
 | Response | Meaning | SDK should |
 |---|---|---|
-| `200 {"accepted": n, "rejected": m}` | Batch processed. `rejected` events failed validation and were dropped individually. | Treat as success. |
+| `200 {"accepted": n, "rejected": m, "reasons": [...]}` | Batch processed. `rejected` events failed validation and were dropped individually; `reasons` (up to 5, only when something was rejected) says why. | Treat as success. |
 | `401` | Missing or wrong ingest key. | Drop the batch, don't retry. |
 | `422` | Batch envelope invalid (e.g. `service_name` missing or too long, more than 1,000 events). | Drop the batch, don't retry. |
 | `408`, `429`, any `5xx` | Transient (rate limited, collector restarting, proxy error). | Retry with exponential backoff. |
@@ -46,6 +46,7 @@ batch that actually landed never double-counts.
 | `sdk_version` | string | no | — | Informational. |
 | `release` | string | no | ≤ 128 chars | **v2.** Default for events that don't set their own. Git SHA or version. |
 | `environment` | string | no | ≤ 32 chars | **v2.** Default for events that don't set their own (`prod`, `staging`, …). |
+| `backfill` | bool | no | default `false` | Historical import: allows events older than 13 days. Each hour you send is rebuilt in the aggregates from exactly what you send, so only send complete hours. |
 | `events` | array | yes | 1–1,000 | Each event is validated independently. |
 
 Unknown top-level fields are ignored, so newer SDKs can talk to older collectors.
@@ -73,7 +74,7 @@ Unknown top-level fields are ignored, so newer SDKs can talk to older collectors
 | Field | Type | Required | Limits | Notes |
 |---|---|---|---|---|
 | `event_id` | UUID string | yes | — | Unique per request. Dedup key — generate once, reuse on retry. |
-| `timestamp` | ISO-8601 with timezone | yes | — | When the request completed. Naive timestamps are rejected. |
+| `timestamp` | ISO-8601 with timezone | yes | ≤ 15 min in the future; ≥ now − 13 days unless the batch is a `backfill` | When the request completed. Naive timestamps are rejected. Raw events are kept 14 days; an older straggler would otherwise overwrite days of aggregate history when it is materialized. |
 | `method` | string | yes | 1–16 chars | HTTP method, upper case. |
 | `route` | string | yes | 1–512 chars | **The framework's route template** (`/orders/{id}`), never the raw path (`/orders/123`). Send `__unmatched__` when no route matched (404s, scanners). |
 | `status_code` | int | yes | 100–599 | Response status sent to the client. |
@@ -120,6 +121,9 @@ meet all of them.
 
 ## Changelog
 
+- **collector 0.8.1:** events older than 13 days (unless the batch sets `backfill`) or more than
+  15 minutes in the future are rejected, with `reasons` in the response. OTLP spans follow the
+  same rule (reported as `partialSuccess.rejectedSpans`).
 - **v2** (collector 0.3.0): `release`, `environment` (batch and event level),
   `consumer_id`, `request_bytes`, `response_bytes`, `llm_*`. All optional; v1 payloads
   are unchanged and still accepted.

@@ -213,10 +213,13 @@ def _llm_usage(rng) -> dict:
     }
 
 
-def _post_batch(service_name: str, events: list[dict]) -> bool:
+def _post_batch(service_name: str, events: list[dict], backfill: bool = False) -> bool:
     payload = json.dumps({
         "service_name": service_name,
         "sdk_version":  "0.1.3",
+        # History older than the raw retention window is only accepted as an
+        # explicit backfill; the generator always sends complete hours.
+        "backfill":     backfill,
         "events":       events,
     }).encode()
     req = urllib.request.Request(
@@ -290,12 +293,12 @@ def backfill() -> None:
                         _make_event(service_name, route, method, p50, p95, err_rate, ts, rng, event_id)
                     )
                     if len(batch) >= BATCH_SIZE:
-                        _post_batch(service_name, batch)
+                        _post_batch(service_name, batch, backfill=True)
                         shipped += len(batch)
                         batch = []
 
         if batch:
-            _post_batch(service_name, batch)
+            _post_batch(service_name, batch, backfill=True)
             shipped += len(batch)
 
         logger.info("backfill done for %s — %d events sent", service_name, shipped)
