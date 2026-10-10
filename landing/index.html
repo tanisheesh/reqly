@@ -274,7 +274,7 @@
     .card-list li::before { content: "✓"; color: var(--green); flex-shrink: 0; }
 
     /* code (dark in both themes) */
-    .card-code, .code-body, .ai-json {
+    .card-code, .ai-json {
       background: #070d14;
       font-family: var(--mono); color: #bcd6eb;
       white-space: pre; overflow-x: auto; -webkit-overflow-scrolling: touch;
@@ -416,49 +416,9 @@
     .stack-table td:first-child { font-weight: 600; color: var(--text); width: 140px; white-space: nowrap; }
     .stack-table td:last-child { color: var(--text-2); }
     .stack-table tbody tr:hover td { background: var(--surface); }
-    .url-table td:first-child { font-family: var(--mono); color: var(--accent); font-size: 0.75rem; white-space: nowrap; }
-    .url-table td:nth-child(2) { font-family: var(--mono); color: var(--green); font-size: 0.75rem; white-space: nowrap; }
-    .url-table td:last-child { color: var(--text-2); min-width: 14rem; }
-    .cfg-table td { font-family: var(--mono); font-size: 0.75rem; white-space: nowrap; }
-    .cfg-table td:first-child { color: var(--accent); }
-    .cfg-table td:nth-child(2) { color: var(--text-2); }
-    .cfg-table td:last-child { color: var(--text-3); white-space: normal; min-width: 12rem; }
-
-    /* ── developers view ────────────────────────────────────── */
-    .dev-content { max-width: 860px; margin: 0 auto; padding: calc(var(--nav-h) + clamp(2rem, 6vw, 4rem)) var(--gutter) clamp(3.5rem, 8vw, 6rem); }
-    .dev-h1 { font-size: clamp(1.75rem, 1.3rem + 2vw, 2.5rem); font-weight: 800; color: var(--heading); letter-spacing: -0.04em; margin-bottom: 0.625rem; }
-    .dev-sub { font-size: 1rem; color: var(--text-2); line-height: 1.65; margin-bottom: 2.5rem; }
-    .dev-toc { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem 1.5rem; margin-bottom: 3rem; }
-    .dev-toc-label { font-size: 0.6875rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); font-weight: 600; margin-bottom: 0.75rem; }
-    .dev-toc-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.125rem 2rem; }
-    .dev-toc a { font-size: 0.875rem; color: var(--accent); display: block; padding: 0.3rem 0; }
-    .dev-toc a:hover { text-decoration: underline; text-underline-offset: 3px; }
-    .dev-section { margin-bottom: 3.25rem; }
-    .dev-section:last-of-type { margin-bottom: 0; }
-    .dev-h2 { font-size: clamp(1.1rem, 1rem + 0.5vw, 1.25rem); font-weight: 700; color: var(--heading); letter-spacing: -0.02em; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.625rem; }
-    .dev-h3 { font-size: 0.9375rem; font-weight: 600; color: var(--text); margin: 1.5rem 0 0.75rem; }
-    .dev-num {
-      width: 26px; height: 26px; border-radius: 6px;
-      background: var(--accent-glow); border: 1px solid var(--accent-mid);
-      color: var(--accent); font-size: 0.75rem; font-weight: 700;
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-    }
-    .prereq-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.875rem; }
-    .prereq-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.125rem; font-size: 0.8125rem; }
-    .prereq-title { font-weight: 600; color: var(--text); margin-bottom: 0.25rem; }
-    .prereq-desc { color: var(--text-2); font-size: 0.75rem; }
-    .code-block { background: #070d14; border: 1px solid var(--border-hi); border-radius: 8px; overflow: hidden; margin-bottom: 1rem; min-width: 0; }
-    .code-header { padding: 0.5rem 1rem; border-bottom: 1px solid var(--border); background: var(--surface); font-size: 0.6875rem; color: var(--text-3); font-family: var(--mono); letter-spacing: 0.04em; }
-    .code-body { padding: 1.125rem 1.25rem; font-size: 0.8125rem; color: #8fb8cc; line-height: 1.75; }
-    .dev-text { font-size: 0.875rem; color: var(--text-2); line-height: 1.7; margin-bottom: 1rem; }
-    .dev-text a, .tip a { color: var(--accent); }
-    .dev-text a:hover, .tip a:hover { text-decoration: underline; text-underline-offset: 3px; }
     .code-inline { font-family: var(--mono); font-size: 0.8em; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: var(--accent); overflow-wrap: anywhere; }
-    .tip { padding: 0.875rem 1.125rem; background: var(--accent-glow); border: 1px solid var(--accent-mid); border-radius: 6px; font-size: 0.8125rem; color: var(--text-2); margin: 1rem 0; }
-    .tip strong { color: var(--accent); }
-    .code-2col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.875rem; margin-bottom: 1rem; }
-    .code-2col .code-block { margin-bottom: 0; }
-    .dev-links { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 2.5rem; padding-top: 2rem; border-top: 1px solid var(--border); }
+    .doc-link { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); font-weight: 500; white-space: nowrap; }
+    .doc-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 
     /* ── footer ─────────────────────────────────────────────── */
     footer { border-top: 1px solid var(--border); padding: 2rem 0; }
@@ -494,8 +454,7 @@
       .nav-tabs { margin: 0 0.25rem; }
       .nav-tab { padding: 0 0.625rem; }
       .nav-gh span { display: none; }
-      .pipe-grid, .grid-2, .code-2col, .bench { grid-template-columns: minmax(0, 1fr); }
-      .prereq-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .pipe-grid, .grid-2, .bench { grid-template-columns: minmax(0, 1fr); }
       .arch-body { padding: 1.125rem 1.25rem; font-size: 0.75rem; }
       .scroll-hint { display: block; }
       .footer-inner { flex-direction: column; align-items: flex-start; }
@@ -507,7 +466,6 @@
       .bento-card.tall { grid-row: auto; }
       .pipe-grid.four { grid-template-columns: minmax(0, 1fr); }
       .hero-ctas .btn-primary, .hero-ctas .btn-ghost { flex: 1 1 calc(50% - 0.75rem); }
-      .dev-toc-grid { grid-template-columns: minmax(0, 1fr); }
     }
     @media (max-width: 480px) {
       :root { --gutter: 1rem; --nav-h: 52px; }
@@ -516,13 +474,11 @@
       .stats-grid { grid-template-columns: minmax(0, 1fr); row-gap: 0; }
       .stat-item, .stat-item:nth-child(2n), .stat-item:last-child { border: none; border-bottom: 1px solid var(--border); padding: 0.875rem 0; }
       .stat-item:last-child { border-bottom: none; }
-      .prereq-grid { grid-template-columns: minmax(0, 1fr); }
       .hero-ctas .btn-primary, .hero-ctas .btn-ghost { flex: 1 1 100%; }
       .mp-split { grid-template-columns: minmax(0, 1fr); }
       .mp-split .mp-section:first-child { border-right: none; }
       .bench-row { grid-template-columns: 4.5rem minmax(0, 1fr) 3.25rem; gap: 0.5rem; }
-      .code-body, .card-code { font-size: 0.75rem; padding: 0.875rem 1rem; }
-      .dev-toc { padding: 1rem 1.125rem; }
+      .card-code { font-size: 0.75rem; padding: 0.875rem 1rem; }
     }
     @media (max-width: 360px) {
       .nav-logo span { display: none; }
@@ -540,26 +496,26 @@
 <!-- ══ NAV ════════════════════════════════════════════════════ -->
 <nav class="nav">
   <div class="nav-inner">
-    <button class="nav-logo" onclick="showView('product')" aria-label="Reqly home">
+    <a class="nav-logo" href="/" aria-label="Reqly home">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l3-8 4 16 3-10 2 2h5"/></svg>
       <span>Reqly</span>
-    </button>
+    </a>
     <div class="nav-tabs">
-      <button id="tab-product" class="nav-tab active" onclick="showView('product')">Product</button>
-      <button id="tab-developers" class="nav-tab" onclick="showView('developers')">Developers</button>
+      <a class="nav-tab active" href="/" aria-current="page">Product</a>
+      <a class="nav-tab" href="/docs/">Docs</a>
     </div>
     <div class="nav-right">
       <a href="https://github.com/tanisheesh/reqly" target="_blank" rel="noopener" class="nav-gh" aria-label="GitHub">
         <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
         <span>GitHub</span>
       </a>
-      <a href="https://github.com/tanisheesh/reqly#readme" target="_blank" rel="noopener" class="nav-pip">pip · npm · OTLP</a>
+      <a href="/docs/quickstart/" class="nav-pip">pip · npm · OTLP</a>
     </div>
   </div>
 </nav>
 
 <!-- ══ PRODUCT VIEW ═══════════════════════════════════════════ -->
-<main id="view-product">
+<main>
 
   <!-- HERO -->
   <section class="hero">
@@ -588,10 +544,10 @@
               <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
               GitHub
             </a>
-            <button class="btn-ghost" onclick="showView('developers')">
-              <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
-              Developer guide
-            </button>
+            <a class="btn-ghost" href="/docs/">
+              <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+              Read the docs
+            </a>
           </div>
           <div class="hero-install">
             <div class="hero-snippet"><span class="lang">Python</span><code>reqly.instrument(app, service_name=<span style="color:var(--accent)">"checkout-api"</span>)</code></div>
@@ -679,7 +635,7 @@
     <div class="container">
       <p class="section-label">Features</p>
       <h2 class="section-title">Everything you need. Nothing you don't.</h2>
-      <p class="section-sub">Native SDKs for Python and Node.js, OpenTelemetry for everything else — not a generic agent with a per-host bill.</p>
+      <p class="section-sub">Native SDKs for Python and Node.js, OpenTelemetry for everything else — not a generic agent with a per-host bill. <a class="doc-link" href="/docs/">Read the docs →</a></p>
 
       <div class="bento">
 
@@ -852,7 +808,7 @@ app.<span class="fn">use</span>(<span class="fn">reqlyExpress</span>({ serviceNa
     <div class="container">
       <p class="section-label">Root cause, not just charts</p>
       <h2 class="section-title">Knows what changed</h2>
-      <p class="section-sub">Every anomaly comes with the release that was running and where the errors are concentrated — computed from your data, not guessed by a model.</p>
+      <p class="section-sub">Every anomaly comes with the release that was running and where the errors are concentrated — computed from your data, not guessed by a model. <a class="doc-link" href="/docs/features/alerts/">How alerts work →</a></p>
       <div class="pipe-grid four">
         <div class="pipe-card">
           <div class="pipe-card-title">Deploy-aware</div>
@@ -891,7 +847,7 @@ app.<span class="fn">use</span>(<span class="fn">reqlyExpress</span>({ serviceNa
     <div class="container">
       <p class="section-label">Ask Reqly</p>
       <h2 class="section-title">Ask why, in plain English</h2>
-      <p class="section-sub">Not text-to-SQL: the model can only call nine read-only query tools, and its answer is checked against what they returned.</p>
+      <p class="section-sub">Not text-to-SQL: the model can only call nine read-only query tools, and its answer is checked against what they returned. <a class="doc-link" href="/docs/features/ask-reqly/">Ask Reqly docs →</a></p>
       <div class="ai-callout">
         <div>
           <div class="ai-callout-title">Answers you can verify</div>
@@ -920,7 +876,7 @@ app.<span class="fn">use</span>(<span class="fn">reqlyExpress</span>({ serviceNa
     <div class="container">
       <p class="section-label">Architecture</p>
       <h2 class="section-title">How data flows</h2>
-      <p class="section-sub">Every component is yours — no phone-home, no shared infrastructure.</p>
+      <p class="section-sub">Every component is yours — no phone-home, no shared infrastructure. <a class="doc-link" href="/docs/self-hosting/deploy/">Self-hosting guide →</a></p>
 
       <div class="arch-terminal">
         <div class="arch-bar">
@@ -974,7 +930,7 @@ app.<span class="fn">use</span>(<span class="fn">reqlyExpress</span>({ serviceNa
           <div class="bench-row"><span class="bench-name">Express</span><div class="bench-track"><div class="bench-fill" style="width:82%"></div></div><span class="bench-val">~27 µs</span></div>
         </div>
       </div>
-      <p class="bench-note">For scale: one round trip on a local network is usually 100–500 µs. Method and the bugs the benchmark found are in <a href="https://github.com/tanisheesh/reqly/blob/main/bench/README.md" target="_blank" rel="noopener" style="color:var(--accent)">bench/README.md</a>.</p>
+      <p class="bench-note">For scale: one round trip on a local network is usually 100–500 µs. <a class="doc-link" href="/docs/reference/benchmarks/">How it's measured →</a></p>
     </div>
   </section>
 
@@ -1038,8 +994,7 @@ app.<span class="fn">use</span>(<span class="fn">reqlyExpress</span>({ serviceNa
           <a href="https://github.com/tanisheesh/reqly" target="_blank" rel="noopener">GitHub</a>
           <a href="https://pypi.org/project/reqly/" target="_blank" rel="noopener">PyPI</a>
           <a href="https://www.npmjs.com/package/reqly-node" target="_blank" rel="noopener">npm</a>
-          <a href="https://github.com/tanisheesh/reqly/tree/main/docs" target="_blank" rel="noopener">Docs</a>
-          <button onclick="showView('developers')">Developers</button>
+          <a href="/docs/">Docs</a>
         </div>
         <div class="footer-copy">
           Copyright <span class="year"></span> &nbsp;|&nbsp; Made with <span class="heart">♥</span> by
@@ -1049,381 +1004,23 @@ app.<span class="fn">use</span>(<span class="fn">reqlyExpress</span>({ serviceNa
     </div>
   </footer>
 
-</main><!-- /view-product -->
+</main>
 
-
-<!-- ══ DEVELOPERS VIEW ════════════════════════════════════════ -->
-<main id="view-developers" hidden>
-  <div class="dev-content">
-
-    <div class="hero-badge">
-      <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
-      Developer guide
-    </div>
-    <h1 class="dev-h1">Get Reqly running</h1>
-    <p class="dev-sub">The full stack in one command, then one line in your app. Python, Node.js, or any OpenTelemetry SDK.</p>
-
-    <nav class="dev-toc" aria-label="Contents">
-      <div class="dev-toc-label">Contents</div>
-      <div class="dev-toc-grid">
-        <a href="#dev-prereq">1. Prerequisites</a>
-        <a href="#dev-run">2. Start the stack</a>
-        <a href="#dev-python">3. Instrument a Python app</a>
-        <a href="#dev-node">4. Instrument a Node.js app</a>
-        <a href="#dev-otel">5. Other languages (OpenTelemetry)</a>
-        <a href="#dev-config">6. SDK configuration</a>
-        <a href="#dev-depth">7. Consumers, LLM cost, SLOs, OpenAPI</a>
-        <a href="#dev-teams">8. Projects, keys &amp; sign-in</a>
-        <a href="#dev-deploy">9. Deploy to production</a>
-        <a href="#dev-structure">10. Project structure &amp; tests</a>
-      </div>
-    </nav>
-
-    <!-- 1 -->
-    <section class="dev-section" id="dev-prereq">
-      <h2 class="dev-h2"><span class="dev-num">1</span> Prerequisites</h2>
-      <div class="prereq-grid">
-        <div class="prereq-card">
-          <div class="prereq-title">Docker + Compose</div>
-          <div class="prereq-desc">Runs the database, collector, dashboard and demo traffic</div>
-        </div>
-        <div class="prereq-card">
-          <div class="prereq-title">Python 3.9+ or Node 20+</div>
-          <div class="prereq-desc">For the app you instrument, or to develop the SDKs</div>
-        </div>
-        <div class="prereq-card">
-          <div class="prereq-title">Groq API key</div>
-          <div class="prereq-desc">Optional — AI reports and Ask Reqly. Without it, reports are plain text</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 2 -->
-    <section class="dev-section" id="dev-run">
-      <h2 class="dev-h2"><span class="dev-num">2</span> Start the stack</h2>
-      <div class="code-block">
-        <div class="code-header">terminal</div>
-<div class="code-body">git clone https://github.com/tanisheesh/reqly
-cd reqly
-docker compose up -d</div>
-      </div>
-      <p class="dev-text">No <code class="code-inline">.env</code> needed — the defaults work locally. First build takes a couple of minutes; the collector applies the schema itself on start-up.</p>
-      <div class="tbl-wrap">
-        <table class="url-table">
-          <thead><tr><th>Container</th><th>URL</th><th>Role</th></tr></thead>
-          <tbody>
-            <tr><td>timescaledb</td><td>:5432</td><td>TimescaleDB + Toolkit</td></tr>
-            <tr><td>collector</td><td>:8000 · /docs</td><td>Ingest, OTLP, metrics API, alerts, AI</td></tr>
-            <tr><td>dashboard</td><td>localhost:5173</td><td>React dashboard — open this</td></tr>
-            <tr><td>load-generator</td><td>—</td><td>8 weeks of synthetic history, then live demo traffic</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="dev-text">To override anything, <code class="code-inline">cp .env.example .env</code>. The ones you'll most likely set:</p>
-      <div class="code-block">
-        <div class="code-header">.env</div>
-<div class="code-body"><span class="hl">REQLY_INGEST_KEY</span>=<span class="str">demo-key</span>          <span class="cm"># SDKs send this (write)</span>
-<span class="hl">REQLY_READ_KEY</span>=<span class="str">demo-read-key</span>       <span class="cm"># the dashboard sends this — public to its viewers</span>
-<span class="hl">GROQ_API_KEY</span>=                     <span class="cm"># optional: AI reports + Ask Reqly</span>
-<span class="hl">ALERT_SLACK_WEBHOOK_URL</span>=          <span class="cm"># or ALERT_DISCORD_WEBHOOK_URL / ALERT_WEBHOOK_URL</span>
-<span class="hl">PUBLIC_DASHBOARD</span>=<span class="str">true</span>             <span class="cm"># false = sign-in required</span></div>
-      </div>
-      <div class="code-block">
-        <div class="code-header">stop</div>
-<div class="code-body">docker compose down      <span class="cm"># keep data</span>
-docker compose down -v   <span class="cm"># wipe the database</span></div>
-      </div>
-    </section>
-
-    <!-- 3 -->
-    <section class="dev-section" id="dev-python">
-      <h2 class="dev-h2"><span class="dev-num">3</span> Instrument a Python app</h2>
-      <div class="code-block">
-        <div class="code-header">install</div>
-<div class="code-body">pip install reqly</div>
-      </div>
-      <div class="code-2col">
-        <div class="code-block">
-          <div class="code-header">FastAPI · Starlette · Litestar · Flask</div>
-<div class="code-body"><span class="kw">import</span> <span class="hl">reqly</span>
-
-app = <span class="fn">FastAPI</span>()
-<span class="hl">reqly</span>.<span class="fn">instrument</span>(
-    app,
-    service_name=<span class="str">"my-api"</span>,
-    collector_url=<span class="str">"http://localhost:8000"</span>,
-    api_key=<span class="str">"demo-key"</span>,
-)</div>
-        </div>
-        <div class="code-block">
-          <div class="code-header">Django (also DRF, Django Ninja)</div>
-<div class="code-body"><span class="cm"># settings.py</span>
-MIDDLEWARE = [
-    <span class="str">"reqly.integrations.django.ReqlyMiddleware"</span>,
-    <span class="cm"># ...</span>
-]
-REQLY = {
-    <span class="str">"service_name"</span>: <span class="str">"my-api"</span>,
-    <span class="str">"api_key"</span>: <span class="str">"demo-key"</span>,
-}</div>
-        </div>
-      </div>
-      <p class="dev-text"><code class="code-inline">instrument()</code> detects the framework itself. For any other WSGI or ASGI app (Bottle, Pyramid, Falcon, a bare ASGI app), wrap it and tell Reqly where the route template is:</p>
-      <div class="code-block">
-        <div class="code-header">generic WSGI / ASGI</div>
-<div class="code-body">app = <span class="hl">reqly</span>.<span class="fn">instrument_wsgi</span>(
-    app, service_name=<span class="str">"my-api"</span>,
-    route_resolver=<span class="kw">lambda</span> environ: environ[<span class="str">"bottle.route"</span>].rule,
-)
-<span class="cm"># ASGI: reqly.instrument_asgi(app, route_resolver=...)</span></div>
-      </div>
-    </section>
-
-    <!-- 4 -->
-    <section class="dev-section" id="dev-node">
-      <h2 class="dev-h2"><span class="dev-num">4</span> Instrument a Node.js app</h2>
-      <div class="code-block">
-        <div class="code-header">install</div>
-<div class="code-body">npm install reqly-node</div>
-      </div>
-      <div class="code-block">
-        <div class="code-header">Express 4 / 5</div>
-<div class="code-body"><span class="kw">import</span> express <span class="kw">from</span> <span class="str">"express"</span>;
-<span class="kw">import</span> { <span class="fn">reqlyExpress</span> } <span class="kw">from</span> <span class="str">"reqly-node"</span>;
-
-<span class="kw">const</span> app = <span class="fn">express</span>();
-<span class="kw">const</span> reqly = <span class="fn">reqlyExpress</span>({
-  serviceName: <span class="str">"my-api"</span>,
-  collectorUrl: <span class="str">"http://localhost:8000"</span>,
-  apiKey: process.env.REQLY_API_KEY,
-});
-app.<span class="fn">use</span>(reqly);                <span class="cm">// before your routes</span>
-<span class="cm">// ...routes...</span>
-app.<span class="fn">use</span>(reqly.errorHandler);   <span class="cm">// optional: records the error type</span></div>
-      </div>
-      <div class="code-2col">
-        <div class="code-block">
-          <div class="code-header">Fastify 4 / 5</div>
-<div class="code-body"><span class="kw">import</span> { <span class="fn">reqlyFastify</span> } <span class="kw">from</span> <span class="str">"reqly-node"</span>;
-
-<span class="kw">await</span> app.<span class="fn">register</span>(
-  <span class="fn">reqlyFastify</span>({ serviceName: <span class="str">"my-api"</span> })
-);</div>
-        </div>
-        <div class="code-block">
-          <div class="code-header">Hono (Node.js)</div>
-<div class="code-body"><span class="kw">import</span> { <span class="fn">reqlyHono</span> } <span class="kw">from</span> <span class="str">"reqly-node"</span>;
-
-app.<span class="fn">use</span>(
-  <span class="fn">reqlyHono</span>({ serviceName: <span class="str">"my-api"</span> })
-);</div>
-        </div>
-      </div>
-      <p class="dev-text">ESM and CommonJS both work, with no runtime dependencies. Requests no route matched are recorded as <code class="code-inline">__unmatched__</code>.</p>
-    </section>
-
-    <!-- 5 -->
-    <section class="dev-section" id="dev-otel">
-      <h2 class="dev-h2"><span class="dev-num">5</span> Other languages (OpenTelemetry)</h2>
-      <p class="dev-text">Any app with OpenTelemetry HTTP instrumentation can report to Reqly without a Reqly SDK. Every official OTel SDK reads these variables:</p>
-      <div class="code-block">
-        <div class="code-header">environment</div>
-<div class="code-body"><span class="hl">OTEL_EXPORTER_OTLP_ENDPOINT</span>=<span class="str">http://localhost:8000/otlp</span>
-<span class="hl">OTEL_EXPORTER_OTLP_PROTOCOL</span>=<span class="str">http/protobuf</span>
-<span class="hl">OTEL_EXPORTER_OTLP_HEADERS</span>=<span class="str">x-reqly-key=demo-key</span>
-<span class="hl">OTEL_SERVICE_NAME</span>=<span class="str">checkout-api</span>
-<span class="hl">OTEL_RESOURCE_ATTRIBUTES</span>=<span class="str">service.version=&lt;git sha&gt;,deployment.environment.name=prod</span></div>
-      </div>
-      <p class="dev-text">Reqly keeps HTTP server spans and needs <code class="code-inline">http.route</code> to group requests. Details in <a href="https://github.com/tanisheesh/reqly/blob/main/docs/OTEL.md" target="_blank" rel="noopener">docs/OTEL.md</a>; a runnable Express example is in <code class="code-inline">examples/otel/express</code>.</p>
-    </section>
-
-    <!-- 6 -->
-    <section class="dev-section" id="dev-config">
-      <h2 class="dev-h2"><span class="dev-num">6</span> SDK configuration</h2>
-      <p class="dev-text">Python takes a kwarg or an env var (<strong>kwarg → env var → default</strong>). The Node SDK takes the same options in camelCase (<code class="code-inline">serviceName</code>, <code class="code-inline">consumerHeader</code>, …) and the same env vars.</p>
-      <div class="tbl-wrap">
-        <table class="cfg-table">
-          <thead><tr><th>Option</th><th>Env var</th><th>Default</th></tr></thead>
-          <tbody>
-            <tr><td>service_name</td><td>REQLY_SERVICE_NAME</td><td>script name</td></tr>
-            <tr><td>collector_url</td><td>REQLY_COLLECTOR_URL</td><td>http://localhost:8000</td></tr>
-            <tr><td>api_key</td><td>REQLY_API_KEY</td><td>None</td></tr>
-            <tr><td>sample_rate</td><td>REQLY_SAMPLE_RATE</td><td>1.0</td></tr>
-            <tr><td>flush_interval_seconds</td><td>REQLY_FLUSH_INTERVAL_SECONDS</td><td>5.0</td></tr>
-            <tr><td>max_batch_size</td><td>REQLY_MAX_BATCH_SIZE</td><td>200</td></tr>
-            <tr><td>max_queue_size</td><td>REQLY_MAX_QUEUE_SIZE</td><td>2000</td></tr>
-            <tr><td>ignore_routes</td><td>REQLY_IGNORE_ROUTES</td><td>/health,/metrics</td></tr>
-            <tr><td>release</td><td>REQLY_RELEASE</td><td>auto: GITHUB_SHA, RENDER_GIT_COMMIT, VERCEL_GIT_COMMIT_SHA, …</td></tr>
-            <tr><td>environment</td><td>REQLY_ENVIRONMENT</td><td>None</td></tr>
-            <tr><td>consumer_header</td><td>REQLY_CONSUMER_HEADER</td><td>None — e.g. X-API-Key</td></tr>
-            <tr><td>consumer_salt</td><td>REQLY_CONSUMER_SALT</td><td>salt for the HMAC of consumer ids</td></tr>
-            <tr><td>push_openapi</td><td>REQLY_PUSH_OPENAPI</td><td>False (FastAPI, Litestar)</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- 7 -->
-    <section class="dev-section" id="dev-depth">
-      <h2 class="dev-h2"><span class="dev-num">7</span> Consumers, LLM cost, SLOs, OpenAPI</h2>
-      <h3 class="dev-h3">Who is calling, and what it costs</h3>
-      <div class="code-block">
-        <div class="code-header">python</div>
-<div class="code-body"><span class="hl">reqly</span>.<span class="fn">instrument</span>(app, consumer_header=<span class="str">"X-API-Key"</span>, consumer_salt=<span class="str">"..."</span>)
-<span class="cm"># or consumer=lambda info: info.headers.get("x-tenant-id")</span>
-
-completion = client.chat.completions.<span class="fn">create</span>(model=<span class="str">"gpt-4o-mini"</span>, ...)
-<span class="hl">reqly</span>.<span class="fn">record_llm_response</span>(completion)       <span class="cm"># OpenAI / Anthropic responses</span>
-<span class="hl">reqly</span>.<span class="fn">record_llm_usage</span>(<span class="str">"gpt-4o-mini"</span>, input_tokens=<span class="pn">1200</span>, output_tokens=<span class="pn">240</span>)</div>
-      </div>
-      <p class="dev-text">Consumer ids are HMAC-SHA256-hashed in the SDK, so raw keys never reach the collector. Node has the same: <code class="code-inline">consumerHeader</code>, <code class="code-inline">recordLlmResponse</code>, <code class="code-inline">recordLlmUsage</code>.</p>
-      <h3 class="dev-h3">SLOs</h3>
-      <div class="code-block">
-        <div class="code-header">define an availability SLO</div>
-<div class="code-body">curl -X PUT http://localhost:8000/v1/slos \
-  -H <span class="str">"X-Reqly-Key: demo-key"</span> -H <span class="str">"Content-Type: application/json"</span> \
-  -d <span class="str">'{"service_name": "checkout-api", "name": "checkout availability",
-       "route": "/checkout", "objective": "availability", "target": 0.995}'</span></div>
-      </div>
-      <p class="dev-text">Use <code class="code-inline">"objective": "latency"</code> with <code class="code-inline">latency_threshold_ms</code> for a latency SLO; leave out <code class="code-inline">route</code> for a service-wide one. Burn-rate alerts go to the same channels as anomaly alerts.</p>
-      <h3 class="dev-h3">OpenAPI drift</h3>
-      <div class="code-block">
-        <div class="code-header">upload a spec (JSON or YAML)</div>
-<div class="code-body">curl -X PUT http://localhost:8000/v1/services/checkout-api/openapi \
-  -H <span class="str">"X-Reqly-Key: demo-key"</span> -H <span class="str">"Content-Type: application/yaml"</span> \
-  --data-binary @openapi.yaml</div>
-      </div>
-      <p class="dev-text">Or let FastAPI / Litestar push their own: <code class="code-inline">reqly.instrument(app, push_openapi=True)</code>. The dashboard's API surface panel then lists undocumented, unused and deprecated-but-used endpoints.</p>
-    </section>
-
-    <!-- 8 -->
-    <section class="dev-section" id="dev-teams">
-      <h2 class="dev-h2"><span class="dev-num">8</span> Projects, keys &amp; sign-in</h2>
-      <p class="dev-text">For a shared collector, turn the public dashboard off and create the first admin:</p>
-      <div class="code-block">
-        <div class="code-header">.env</div>
-<div class="code-body"><span class="hl">PUBLIC_DASHBOARD</span>=<span class="str">false</span>
-<span class="hl">REQLY_ADMIN_USERNAME</span>=<span class="str">admin</span>
-<span class="hl">REQLY_ADMIN_PASSWORD</span>=<span class="str">at-least-12-characters</span></div>
-      </div>
-      <p class="dev-text">Signed-in admins manage everything from <strong>Settings</strong> in the dashboard: projects, services, API keys (shown once), members and passwords. The same works over the API:</p>
-      <div class="code-block">
-        <div class="code-header">a project and an ingest key for it</div>
-<div class="code-body">curl -X POST http://localhost:8000/v1/projects -H <span class="str">"X-Reqly-Key: demo-key"</span> \
-  -H <span class="str">"Content-Type: application/json"</span> -d <span class="str">'{"slug": "payments", "name": "Payments team"}'</span>
-curl -X POST http://localhost:8000/v1/projects/2/keys -H <span class="str">"X-Reqly-Key: demo-key"</span> \
-  -H <span class="str">"Content-Type: application/json"</span> -d <span class="str">'{"name": "checkout prod", "scopes": ["ingest"]}'</span></div>
-      </div>
-      <p class="dev-text">Use the <code class="code-inline">rqk_…</code> key as the SDK's <code class="code-inline">api_key</code>. A new service joins the project of the first key that sends it; members only see their projects' services.</p>
-    </section>
-
-    <!-- 9 -->
-    <section class="dev-section" id="dev-deploy">
-      <h2 class="dev-h2"><span class="dev-num">9</span> Deploy to production</h2>
-      <div class="code-block">
-        <div class="code-header">prebuilt images (amd64 + arm64)</div>
-<div class="code-body">docker run -p 8000:8000 \
-  -e DATABASE_URL=<span class="str">"postgresql://reqly:...@db-host:5432/reqly?sslmode=require"</span> \
-  -e REQLY_INGEST_KEY=<span class="str">...</span> -e REQLY_READ_KEY=<span class="str">...</span> \
-  ghcr.io/tanisheesh/reqly-collector
-
-docker run -p 5173:5173 \
-  -e REQLY_COLLECTOR_URL=<span class="str">https://reqly.example.com</span> -e REQLY_READ_KEY=<span class="str">...</span> \
-  ghcr.io/tanisheesh/reqly-dashboard</div>
-      </div>
-      <p class="dev-text">The database is <code class="code-inline">timescale/timescaledb-ha:pg16</code> (it includes the Toolkit). Run one collector instance; behind a platform proxy set <code class="code-inline">FORWARDED_ALLOW_IPS</code>. Step by step, with releases and rollback, in <a href="https://github.com/tanisheesh/reqly/blob/main/docs/DEPLOY.md" target="_blank" rel="noopener">docs/DEPLOY.md</a>.</p>
-    </section>
-
-    <!-- 10 -->
-    <section class="dev-section" id="dev-structure">
-      <h2 class="dev-h2"><span class="dev-num">10</span> Project structure &amp; tests</h2>
-      <div class="code-block">
-        <div class="code-header">repo layout</div>
-<div class="code-body"><span class="hl">sdk/</span>              <span class="cm"># pip install reqly — core/ + integrations/ (fastapi, flask, django, …)</span>
-<span class="hl">sdk-node/</span>         <span class="cm"># npm install reqly-node — TypeScript, Express / Fastify / Hono</span>
-<span class="hl">collector/</span>        <span class="cm"># FastAPI backend</span>
-  app/            <span class="cm"># routers, otlp, alerts, slo, ask, openapi, consumers, llm, projects, users</span>
-  migrations/     <span class="cm"># 001_init.sql … 009_projects_keys.sql, applied on start-up</span>
-<span class="hl">dashboard/</span>        <span class="cm"># React 19 + Vite SPA</span>
-<span class="hl">bench/</span>            <span class="cm"># SDK overhead benchmarks</span>
-<span class="hl">infra/</span>            <span class="cm"># EC2 bootstrap, AWS SAM stack, deploy guide</span>
-<span class="hl">docs/</span>             <span class="cm"># PRD, architecture, decisions, setup, OTLP, ingest spec</span></div>
-      </div>
-      <div class="code-block">
-        <div class="code-header">tests</div>
-<div class="code-body"><span class="cm"># Python SDK</span>
-cd sdk &amp;&amp; pip install -e <span class="str">".[dev]"</span> &amp;&amp; pytest
-
-<span class="cm"># Node SDK</span>
-cd sdk-node &amp;&amp; npm ci &amp;&amp; npm test
-
-<span class="cm"># Collector — DB tests run when TimescaleDB is reachable</span>
-docker compose up timescaledb -d
-cd collector &amp;&amp; pip install -e <span class="str">".[dev]"</span> &amp;&amp; pytest
-
-<span class="cm"># Dashboard</span>
-cd dashboard &amp;&amp; npm ci &amp;&amp; npx tsc --noEmit</div>
-      </div>
-      <p class="dev-text">CI runs all of them on every push, Python 3.9–3.13 and Node 20–24.</p>
-    </section>
-
-    <div class="dev-links">
-      <a href="https://github.com/tanisheesh/reqly" target="_blank" rel="noopener" class="btn-primary">View on GitHub</a>
-      <a href="https://github.com/tanisheesh/reqly/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noopener" class="btn-ghost">Architecture</a>
-      <a href="https://github.com/tanisheesh/reqly/blob/main/docs/DECISIONS.md" target="_blank" rel="noopener" class="btn-ghost">Decisions</a>
-      <a href="https://github.com/tanisheesh/reqly/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener" class="btn-ghost">Contributing</a>
-    </div>
-
-  </div>
-
-  <footer>
-    <div class="container">
-      <div class="footer-inner">
-        <div class="footer-brand">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l3-8 4 16 3-10 2 2h5"/></svg>
-          <span>Reqly</span>
-          <span style="color:var(--text-3)">·</span>
-          <span style="color:var(--text-3)">GPL-3.0</span>
-        </div>
-        <div class="footer-links">
-          <a href="https://github.com/tanisheesh/reqly" target="_blank" rel="noopener">GitHub</a>
-          <a href="https://pypi.org/project/reqly/" target="_blank" rel="noopener">PyPI</a>
-          <a href="https://www.npmjs.com/package/reqly-node" target="_blank" rel="noopener">npm</a>
-          <button onclick="showView('product')">Product</button>
-        </div>
-        <div class="footer-copy">
-          Copyright <span class="year"></span> &nbsp;|&nbsp; Made with <span class="heart">♥</span> by
-          <a href="https://tanisheesh.in/" target="_blank" rel="noopener">Tanish Poddar</a>
-        </div>
-      </div>
-    </div>
-  </footer>
-
-</main><!-- /view-developers -->
 
 <script>
   /* ── year ── */
   const y = new Date().getFullYear();
   document.querySelectorAll('.year').forEach(el => { el.textContent = y; });
 
-  /* ── view switching (#developers deep-links to the guide) ── */
-  function showView(view, keepScroll) {
-    const isProduct = view === 'product';
-    document.getElementById('view-product').hidden    = !isProduct;
-    document.getElementById('view-developers').hidden =  isProduct;
-    document.getElementById('tab-product').classList.toggle('active',  isProduct);
-    document.getElementById('tab-developers').classList.toggle('active', !isProduct);
-    const hash = isProduct ? '' : '#developers';
-    if (location.hash !== hash && !(location.hash.startsWith('#dev-') && !isProduct)) {
-      history.replaceState(null, '', hash || location.pathname + location.search);
-    }
-    if (!keepScroll) window.scrollTo(0, 0);
-  }
-  if (location.hash === '#developers' || location.hash.startsWith('#dev-')) {
-    showView('developers', true);
-    const target = location.hash.startsWith('#dev-') && document.querySelector(location.hash);
-    if (target) target.scrollIntoView();
-  }
+  /* ── the developer guide moved to /docs/; keep old #developers / #dev-* links working ── */
+  const moved = {
+    '#developers': 'quickstart/', '#dev-prereq': 'quickstart/', '#dev-run': 'quickstart/',
+    '#dev-python': 'instrument/python/', '#dev-node': 'instrument/node/',
+    '#dev-otel': 'instrument/opentelemetry/', '#dev-config': 'instrument/python/#configuration',
+    '#dev-depth': 'features/consumers/', '#dev-teams': 'self-hosting/access/',
+    '#dev-deploy': 'self-hosting/deploy/', '#dev-structure': '',
+  };
+  if (location.hash in moved) location.replace('/docs/' + moved[location.hash]);
 
   /* ── code tabs ── */
   document.querySelectorAll('[data-tabs]').forEach(box => {
