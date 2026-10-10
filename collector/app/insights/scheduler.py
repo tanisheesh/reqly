@@ -99,6 +99,10 @@ def start_scheduler(weekly: bool = True, hourly_alerts: bool = True) -> AsyncIOS
     """Weekly report: Sunday 23:00 UTC (the manual trigger endpoint exists
     so a live demo doesn't have to wait for it). Hourly alert check: :15
     past every hour, once the previous hour's data is in."""
+    # APScheduler drops a run that starts more than misfire_grace_time late
+    # (default: 1 second). Everything here shares one event loop with ingest,
+    # so a busy second would silently skip a week's report or an hour's
+    # alerts; each job may start late up to its own period's worth.
     scheduler = AsyncIOScheduler(timezone="UTC")
     if weekly:
         scheduler.add_job(
@@ -108,6 +112,8 @@ def start_scheduler(weekly: bool = True, hourly_alerts: bool = True) -> AsyncIOS
             hour=23,
             minute=0,
             id="weekly_insights",
+            misfire_grace_time=6 * 3600,
+            coalesce=True,
         )
     if hourly_alerts:
         # SLO burn rates: every 5 minutes (the fast-burn short window).
@@ -118,6 +124,7 @@ def start_scheduler(weekly: bool = True, hourly_alerts: bool = True) -> AsyncIOS
             id="slo_alerts",
             max_instances=1,
             coalesce=True,
+            misfire_grace_time=4 * 60,
         )
         scheduler.add_job(
             run_hourly_alerts,
@@ -126,6 +133,7 @@ def start_scheduler(weekly: bool = True, hourly_alerts: bool = True) -> AsyncIOS
             id="hourly_alerts",
             max_instances=1,
             coalesce=True,
+            misfire_grace_time=40 * 60,
         )
     scheduler.start()
     return scheduler
