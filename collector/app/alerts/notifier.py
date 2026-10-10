@@ -60,11 +60,43 @@ def _format_slo(event: str, service_name: str, details: dict) -> str:
     ])
 
 
+def _usd(value) -> str:
+    if value is None:
+        return "—"
+    if value >= 1:
+        return f"${value:,.2f}"
+    return "$" + f"{value:.4f}".rstrip("0").rstrip(".")
+
+
+def _format_llm_cost(event: str, service_name: str, route: str, details: dict) -> str:
+    if event == RESOLVED:
+        return f"✅ *Resolved* — LLM cost on `{service_name}` `{route}` is back within its normal range."
+    icon = "💸" if event == OPENED else "🟠"
+    title = "LLM cost spike" if event == OPENED else "LLM cost still high"
+    why = "cost per request" if details.get("cause") == "unit_cost" else "request volume"
+    lines = [
+        f"{icon} *{title}* — `{service_name}` `{route}` ({details['day_of_week']} {details['hour_range']} UTC)",
+        f"• {_usd(details['observed_cost_usd'])} this hour vs {_usd(details['baseline_cost_usd'])} usual "
+        f"(+{_usd(details['extra_cost_usd'])}) · {_usd(details['observed_cost_per_1k_requests'])} vs "
+        f"{_usd(details['baseline_cost_per_1k_requests'])} per 1k requests",
+        f"• driven by {why}",
+    ]
+    for driver in (details.get("drivers") or [])[:3]:
+        lines.append(f"• {driver['text']}")
+    mix = details.get("model_mix")
+    if mix:
+        lines.append(f"• {mix['text']}")
+    return "\n".join(lines)
+
+
 def format_text(event: str, service_name: str, route: str, details: dict, dashboard_url: str | None = None) -> str:
     """One plain-text message used for Slack and Discord (both render the
     *bold* / `code` subset the same way closely enough)."""
-    if details.get("kind") == "slo":
-        text = _format_slo(event, service_name, details)
+    if details.get("kind") in ("slo", "llm_cost"):
+        if details["kind"] == "slo":
+            text = _format_slo(event, service_name, details)
+        else:
+            text = _format_llm_cost(event, service_name, route, details)
         return f"{text}\n<{dashboard_url}|Open dashboard>" if dashboard_url and event != RESOLVED else text
     if event == RESOLVED:
         return f"✅ *Resolved* — `{service_name}` `{route}` is back within its normal range."

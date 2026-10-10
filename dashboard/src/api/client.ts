@@ -154,16 +154,42 @@ export interface SloAlertDetails {
   status: SloStatus;
 }
 
+export interface LlmCostDriver {
+  factor: "requests" | "llm_share" | "tokens_per_call" | "usd_per_1m_tokens";
+  before: number;
+  after: number;
+  ratio: number | null;
+  text: string;
+}
+
+export interface LlmCostAlertDetails {
+  kind: "llm_cost";
+  route: string;
+  cause: "unit_cost" | "volume";
+  window_start: string;
+  day_of_week: string;
+  hour_range: string;
+  observed_cost_usd: number;
+  baseline_cost_usd: number;
+  extra_cost_usd: number;
+  observed_cost_per_1k_requests: number;
+  baseline_cost_per_1k_requests: number;
+  requests: number;
+  baseline_requests: number;
+  drivers: LlmCostDriver[];
+  model_mix: { model: string; share: number; usual_model: string | null; text: string } | null;
+}
+
 export interface Alert {
   id: number;
-  kind?: "anomaly" | "slo";
+  kind?: "anomaly" | "slo" | "llm_cost";
   service_name: string;
   route: string;
   opened_at: string;
   first_hour: string;
   last_hour: string;
   resolved_at: string | null;
-  details: Anomaly | SloAlertDetails;
+  details: Anomaly | SloAlertDetails | LlmCostAlertDetails;
 }
 
 export interface ReleaseStats {

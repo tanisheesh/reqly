@@ -90,14 +90,14 @@ Teams running a handful of HTTP APIs have two bad options for knowing whether th
 ### 6.5 AI
 
 - Ask Reqly answers one service's questions with nine read-only tools (stats, period comparison, breakdowns, releases, alerts, SLOs, drift, consumers, LLM cost), at most 6 tool calls, numbers in the answer verified against the tool results.
-- An eval set (18 questions over the demo scenarios) is run by hand after prompt or model changes.
+- An eval set (19 questions over the demo scenarios) is run by hand after prompt or model changes.
 
 ### 6.6 API depth
 
 - SLOs: availability or latency objectives per service or route over 1–90 days; SLI, budget remaining, burn rates (5m/30m/1h/6h); fast/slow burn alerts (Google SRE workbook rules).
 - OpenAPI drift: spec upload (OpenAPI 3 / Swagger 2, JSON or YAML) compared with 30 days of traffic.
 - Consumers: top consumers, one consumer's routes, who an incident hit, who still calls deprecated operations.
-- LLM cost: tokens and estimated cost per route, model and day from an editable price table.
+- LLM cost: tokens and estimated cost per route, model and day from an editable price table; hourly alerts when a route's cost per request or LLM traffic jumps, with the factor that rose.
 
 ### 6.7 Access control
 
@@ -143,7 +143,7 @@ Teams running a handful of HTTP APIs have two bad options for knowing whether th
 - **Docs site and a rewritten landing page** — the features outgrew the README.
 - **Helm chart** — Kubernetes deploys without hand-written manifests.
 - **Node SDK 0.2** — Koa/NestJS, a generic `http` wrapper, streamed byte counts; built when a real user asks (OTLP covers them today).
-- **LLM cost anomalies in hourly alerts** and LLM cost from OTLP GenAI spans.
+- **LLM cost from OTLP GenAI spans**, so OpenTelemetry apps get LLM cost and its alerts too.
 - **OIDC sign-in** and multi-instance collectors.
 
 ---

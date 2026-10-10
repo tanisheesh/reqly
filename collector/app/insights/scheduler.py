@@ -78,7 +78,8 @@ async def run_hourly_alerts() -> None:
         dashboard_url=settings.dashboard_url,
     )
     await hourly.run_hourly_check(
-        pool, services, channels, timedelta(hours=settings.alert_renotify_hours)
+        pool, services, channels, timedelta(hours=settings.alert_renotify_hours),
+        llm_cost_min_usd=settings.llm_cost_alert_min_usd,
     )
 
 

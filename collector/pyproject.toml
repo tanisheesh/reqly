@@ -1,6 +1,6 @@
 [project]
 name = "reqly-collector"
-version = "0.10.0"
+version = "0.11.0"
 description = "Reqly collector: ingests SDK telemetry into TimescaleDB and serves dashboard/insights queries."
 requires-python = ">=3.11"
 dependencies = [

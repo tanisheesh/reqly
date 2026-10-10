@@ -1,6 +1,6 @@
-import { Anomaly, SloAlertDetails } from "../api/client";
+import { Anomaly, LlmCostAlertDetails, SloAlertDetails } from "../api/client";
 import { useAlerts } from "../hooks/useMetrics";
-import { formatMs, formatPercent } from "../format";
+import { formatMs, formatPercent, formatUsd } from "../format";
 
 export function AlertsBanner({ serviceName }: { serviceName: string }) {
   const { data } = useAlerts(serviceName);
@@ -28,6 +28,32 @@ export function AlertsBanner({ serviceName }: { serviceName: string }) {
                 <span className="text-slate-500">
                   · {s.status.budget_remaining === null ? "—" : `${Math.max(0, s.status.budget_remaining * 100).toFixed(0)}%`} of budget left
                 </span>
+              </li>
+            );
+          }
+          if (a.kind === "llm_cost") {
+            const c = a.details as LlmCostAlertDetails;
+            return (
+              <li key={a.id} className="text-xs leading-relaxed">
+                <div className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="font-mono font-semibold text-slate-200">{a.route}</span>
+                  <span className="text-red-300">LLM cost spike</span>
+                  <span className="text-slate-400">
+                    {formatUsd(c.observed_cost_usd)} in an hour vs {formatUsd(c.baseline_cost_usd)} usual ·{" "}
+                    {formatUsd(c.observed_cost_per_1k_requests)} vs {formatUsd(c.baseline_cost_per_1k_requests)} per 1k
+                    requests
+                  </span>
+                  <span className="text-slate-600">since {new Date(a.first_hour).toLocaleString()}</span>
+                </div>
+                <div className="text-slate-400">
+                  driven by {c.cause === "unit_cost" ? "cost per request" : "request volume"}
+                </div>
+                {c.drivers.slice(0, 3).map((d) => (
+                  <div key={d.factor} className="text-amber-300/90">
+                    {d.text}
+                  </div>
+                ))}
+                {c.model_mix && <div className="text-violet-300">{c.model_mix.text.replace(/`/g, "")}</div>}
               </li>
             );
           }

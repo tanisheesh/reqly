@@ -30,3 +30,11 @@ export function formatMs(value: number | null | undefined): string {
   if (value === null || value === undefined) return "—";
   return `${value.toFixed(0)}ms`;
 }
+
+export function formatUsd(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+  if (value === 0) return "$0";
+  if (value < 0.01) return `$${value.toFixed(4)}`;
+  if (value < 100) return `$${value.toFixed(2)}`;
+  return `$${Math.round(value).toLocaleString()}`;
+}

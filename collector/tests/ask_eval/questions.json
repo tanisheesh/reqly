@@ -90,6 +90,12 @@
   },
   {
     "service": "fastapi-demo",
+    "question": "Why did our LLM bill jump today?",
+    "expect_any": ["token", "prompt"],
+    "why": "prompt-bloat scenario: /assistant/chat sends ~6x the input tokens per call for the last 6 hours (an llm_cost alert names tokens per model call as the driver)"
+  },
+  {
+    "service": "fastapi-demo",
     "question": "What is the CPU usage of the database server?",
     "expect_any": ["can't", "cannot", "can not", "not available", "don't have", "do not have", "no data", "unable", "only", "not tracked", "doesn't"],
     "why": "not in the data: must decline rather than invent"

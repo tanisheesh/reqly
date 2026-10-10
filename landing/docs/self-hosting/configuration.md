@@ -40,6 +40,7 @@ The collector warns at start-up if the keys are the defaults or if the two keys 
 | `ALERT_DISCORD_WEBHOOK_URL` | empty | |
 | `ALERT_WEBHOOK_URL` | empty | Generic JSON webhook ([payload](../features/alerts.md#channels)) |
 | `ALERT_RENOTIFY_HOURS` | `6` | Reminder interval while an alert keeps firing |
+| `LLM_COST_ALERT_MIN_USD` | `1.0` | The smallest extra LLM spend per route-hour, in USD, worth an [alert](../features/alerts.md#llm-cost-alerts). `0` turns LLM cost alerts off. The local Compose stack uses `0.4` |
 | `DASHBOARD_URL` | `http://localhost:5173` | Linked from Slack alerts |
 | `INSIGHTS_SCHEDULER_ENABLED` | `true` | `false` when the AWS Lambda runs the weekly report instead |
 | `LATE_DATA_REFRESH_SECONDS` | `60` | How often late-arriving events are materialized into the aggregates |
