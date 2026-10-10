@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 import asyncpg
 
 from ..db import queries
+from ..openapi import store as openapi_store
 from ..slo import status as slo_status
 
 RAW_RETENTION = timedelta(days=14)
@@ -333,6 +334,36 @@ async def get_slos(pool, service: str, args: dict, now: datetime) -> dict:
     return {"slos": slos}
 
 
+MAX_DRIFT_ITEMS = 10
+
+
+async def get_api_drift(pool, service: str, args: dict, now: datetime) -> dict:
+    report = await openapi_store.drift_report(pool, service, now)
+    if report is None:
+        return {"spec": None, "note": "no OpenAPI spec has been uploaded for this service"}
+
+    def trim(items, keys):
+        return [{k: _ts(v) if isinstance(v, datetime) else v for k, v in item.items() if k in keys}
+                for item in items[:MAX_DRIFT_ITEMS]]
+
+    return {
+        "spec": {"title": report["spec"]["title"], "version": report["spec"]["version"],
+                 "uploaded": _ts(report["spec"]["uploaded_at"])},
+        "window_days": report["window_days"],
+        "operations_in_spec": report["operations"],
+        "operations_with_traffic": report["documented_in_use"],
+        "coverage": _num(report["coverage"]),
+        "undocumented_share_of_requests": _num(report["undocumented_requests"] / report["total_requests"])
+        if report["total_requests"] else None,
+        "unmatched_404_requests": report["unmatched_requests"],
+        "undocumented": trim(report["undocumented"], {"method", "route", "requests", "error_rate", "last_seen"}),
+        "undocumented_count": len(report["undocumented"]),
+        "dead": trim(report["dead"], {"method", "path", "operation_id", "deprecated"}),
+        "dead_count": len(report["dead"]),
+        "deprecated_in_use": trim(report["deprecated_in_use"], {"method", "path", "requests", "last_seen"}),
+    }
+
+
 _RANGE_PROPS = {
     "start": {"type": "string", "description": "ISO 8601 UTC start (inclusive). Default: end minus 24h."},
     "end": {"type": "string", "description": "ISO 8601 UTC end (exclusive). Default: now."},
@@ -396,6 +427,13 @@ TOOL_SCHEMAS = [
         {"status": {"type": "string", "enum": ["open", "all"], "description": "Default all (recent, incl. resolved)."}},
     ),
     _schema("get_slos", "The service's SLOs with SLI, error budget remaining, burn rates and state.", {}),
+    _schema(
+        "get_api_drift",
+        "Compares the service's uploaded OpenAPI spec with the last 30 days of traffic: undocumented "
+        "endpoints (called but not in the spec), dead ones (in the spec, never called) and deprecated "
+        "endpoints still in use.",
+        {},
+    ),
 ]
 
 TOOLS = {
@@ -405,6 +443,7 @@ TOOLS = {
     "list_releases": list_releases,
     "get_alerts": get_alerts,
     "get_slos": get_slos,
+    "get_api_drift": get_api_drift,
 }
 
 
