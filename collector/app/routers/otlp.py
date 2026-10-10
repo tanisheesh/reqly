@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import zlib
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from google.protobuf.json_format import MessageToDict
@@ -22,6 +23,7 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
 )
 
 from ..auth import verify_ingest_key
+from ..db.late_data import event_time_problem
 from ..db.late_data import tracker as late_data_tracker
 from ..db.pool import get_pool
 from ..db.queries import insert_events, record_deployments, row_time
@@ -69,6 +71,10 @@ def _respond(content_type: str, rejected: int, message: str) -> Response:
     return Response(content=json.dumps(body), media_type=_JSON)
 
 
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 @router.post("/otlp/v1/traces", dependencies=[Depends(verify_ingest_key)])
 @limiter.limit(RATE_LIMIT)
 async def export_traces(request: Request) -> Response:
@@ -102,6 +108,15 @@ async def export_traces(request: Request) -> Response:
             raise HTTPException(status_code=400, detail="JSON body must be an object")
 
     result = map_resource_spans(payload)
+    now = _now()
+    accepted = []
+    for row in result.rows:
+        problem = event_time_problem(row_time(row), now)
+        if problem:
+            result.reject(problem)
+        else:
+            accepted.append(row)
+    result.rows = accepted
     if len(result.rows) > _MAX_EVENTS_PER_REQUEST:
         raise HTTPException(
             status_code=413,

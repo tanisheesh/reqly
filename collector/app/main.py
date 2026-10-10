@@ -50,7 +50,7 @@ async def lifespan(app: FastAPI):
         await close_pool()
 
 
-app = FastAPI(title="Reqly Collector", version="0.8.0", lifespan=lifespan)
+app = FastAPI(title="Reqly Collector", version="0.8.1", lifespan=lifespan)
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

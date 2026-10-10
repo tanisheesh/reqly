@@ -1,5 +1,6 @@
 import gzip
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ from app.routers import otlp as otlp_module
 
 FIXTURES = Path(__file__).parent / "fixtures" / "otlp"
 KEY = {"X-Reqly-Key": "demo-key"}
+RECORDED_AT = datetime(2026, 10, 9, 15, 0, tzinfo=timezone.utc)
 
 
 @pytest.fixture
@@ -26,6 +28,9 @@ def client(monkeypatch):
     monkeypatch.setattr(otlp_module, "get_pool", lambda: object())
     monkeypatch.setattr(otlp_module, "insert_events", fake_insert)
     monkeypatch.setattr(otlp_module, "record_deployments", fake_deployments)
+    # The fixtures are real exports with fixed timestamps; judge their age as
+    # of when they were recorded, so the tests don't expire.
+    monkeypatch.setattr(otlp_module, "_now", lambda: RECORDED_AT)
     c = TestClient(app)
     c.captured = captured
     return c
@@ -88,3 +93,33 @@ def test_gzip_bomb_is_refused(client):
     bomb = gzip.compress(b"{" + b" " * (40 * 1024 * 1024) + b"}")
     r = _post(client, bomb, "application/json", {"Content-Encoding": "gzip"})
     assert r.status_code == 413
+
+
+def _span_at(ts: datetime, span_id: str) -> dict:
+    nanos = str(int(ts.timestamp() * 1e9))
+    return {
+        "traceId": "0" * 31 + "1", "spanId": span_id, "name": "GET /a", "kind": 2,
+        "startTimeUnixNano": nanos, "endTimeUnixNano": nanos,
+        "attributes": [
+            {"key": "http.request.method", "value": {"stringValue": "GET"}},
+            {"key": "http.route", "value": {"stringValue": "/a"}},
+            {"key": "http.response.status_code", "value": {"intValue": "200"}},
+        ],
+    }
+
+
+def test_spans_too_old_or_in_the_future_are_rejected(client):
+    payload = {"resourceSpans": [{
+        "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "svc"}}]},
+        "scopeSpans": [{"spans": [
+            _span_at(RECORDED_AT - timedelta(minutes=5), "a" * 16),
+            _span_at(RECORDED_AT - timedelta(days=20), "b" * 16),
+            _span_at(RECORDED_AT + timedelta(hours=1), "c" * 16),
+        ]}],
+    }]}
+    r = _post(client, json.dumps(payload).encode(), "application/json")
+    assert r.status_code == 200
+    partial = r.json()["partialSuccess"]
+    assert partial["rejectedSpans"] == "2"
+    assert "older than 13 days" in partial["errorMessage"] and "in the future" in partial["errorMessage"]
+    assert len(client.captured) == 1
