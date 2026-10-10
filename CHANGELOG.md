@@ -8,7 +8,20 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 
 ## [Unreleased]
 
-Collector 0.11.0 · reqly-node 0.2.0
+### 🐛 Fixed
+- LLM prices: the table is checked against the providers' pages (2026-10) and covers current
+  OpenAI, Anthropic, Google and Groq models. A model only matches its own entry or a dated
+  snapshot of it, so `gpt-4o-mini`-style variants and new models are no longer priced as a
+  similar-looking model
+
+### 🎊 Improved
+- Helm: the collector waits for the bundled database instead of restarting while it starts
+
+---
+
+## [0.11.0] — 2026-10-10
+
+Collector 0.11.0 · reqly-node 0.2.0 · Helm chart 0.11.0
 
 ### ✨ Added
 - **LLM cost alerts:** each hour, a route's LLM spend is compared with the same weekday-hour
@@ -143,7 +156,8 @@ Python SDK 0.1.5
 
 ---
 
-[Unreleased]: https://github.com/tanisheesh/reqly/compare/sdk-v0.5.2...HEAD
+[Unreleased]: https://github.com/tanisheesh/reqly/compare/collector-v0.11.0...HEAD
+[0.11.0]: https://github.com/tanisheesh/reqly/tree/collector-v0.11.0
 [0.10.0]: https://github.com/tanisheesh/reqly/commit/0d3fc17
 [0.9.0]: https://github.com/tanisheesh/reqly/commit/ff10848
 [0.8.1]: https://github.com/tanisheesh/reqly/tree/collector-v0.8.1

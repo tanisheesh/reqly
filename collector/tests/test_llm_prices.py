@@ -12,18 +12,49 @@ TABLE = PriceTable({"gpt-4o": Price(2.5, 10), "gpt-4o-mini": Price(0.15, 0.6), "
 
 @pytest.mark.parametrize("model, key", [
     ("gpt-4o", "gpt-4o"),
-    ("gpt-4o-2024-08-06", "gpt-4o"),
-    ("GPT-4o-mini-2024-07-18", "gpt-4o-mini"),  # longest prefix, any case
+    ("gpt-4o-2024-08-06", "gpt-4o"),  # dated snapshot
+    ("GPT-4o-mini-2024-07-18", "gpt-4o-mini"),  # its own key, any case
     ("openai/gpt-4o-mini", "gpt-4o-mini"),  # provider prefix
     ("claude-sonnet-4-20250514", "claude-sonnet-4"),
+    ("anthropic.claude-sonnet-4-20250514-v1:0", "claude-sonnet-4"),  # Bedrock id
+    ("us.anthropic.claude-sonnet-4-20250514-v1:0", "claude-sonnet-4"),
+    ("gpt-4o-latest", "gpt-4o"),
 ])
-def test_lookup_by_longest_prefix(model, key):
+def test_lookup_matches_snapshots(model, key):
     assert TABLE.lookup(model)[0] == key
 
 
-@pytest.mark.parametrize("model", ["llama-3.3-70b", "", None, "my-gpt-4o"])
+@pytest.mark.parametrize("model", [
+    "llama-3.3-70b", "", None, "my-gpt-4o",
+    "gpt-4o-audio-preview-x",  # a different model that starts like a key
+    "claude-sonnet-4-5",       # not a claude-sonnet-4 snapshot
+    "gpt-4o.1",
+])
 def test_unknown_models_are_unpriced(model):
     assert TABLE.lookup(model) is None
+
+
+@pytest.mark.parametrize("model, key", [
+    ("gpt-5.4-mini", "gpt-5.4-mini"),
+    ("gpt-5-2025-08-07", "gpt-5"),
+    ("gpt-4o-2024-05-13", "gpt-4o-2024-05-13"),  # the pricier first gpt-4o snapshot
+    ("claude-opus-4-5-20251101", "claude-opus-4-5"),
+    ("claude-opus-4-1-20250805", "claude-opus-4-1"),
+    ("claude-sonnet-5-5", "claude-sonnet-5-5"),
+    ("anthropic.claude-opus-5-5", "claude-opus-5-5"),
+    ("gemini-2.5-flash-lite", "gemini-2.5-flash-lite"),
+    ("gemini-2.5-flash-preview-09-2025", "gemini-2.5-flash"),
+    ("openai/gpt-oss-120b", "gpt-oss-120b"),
+])
+def test_default_table_prices_current_model_ids(model, key):
+    price_table.cache_clear()
+    assert price_table().lookup(model)[0] == key
+
+
+@pytest.mark.parametrize("model", ["gpt-5.7", "gpt-5-chat-latest", "claude-sonnet-6", "gemini-4-pro"])
+def test_default_table_does_not_guess_new_models(model):
+    price_table.cache_clear()
+    assert price_table().lookup(model) is None
 
 
 def test_cost_per_million_tokens():

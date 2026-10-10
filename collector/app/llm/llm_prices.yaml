@@ -6,31 +6,88 @@
 # there override and extend these. Costs are computed when queried, so a
 # price change applies to past usage too.
 #
-# Model names match by longest prefix, case-insensitive, after dropping a
-# provider prefix ("openai/gpt-4o-2024-08-06" -> "gpt-4o"). Models with no
-# match are reported as unpriced, never guessed.
+# A model name matches a key when it is the key itself or the key plus a
+# snapshot suffix (a date like -2024-08-06 / -20250514, -latest, -preview,
+# -001), case-insensitive, after dropping a provider prefix
+# ("openai/gpt-4o-2024-08-06" -> gpt-4o, "anthropic.claude-opus-5-5" -> claude-opus-5-5).
+# "gpt-4o-mini" is its own key, not a gpt-4o snapshot; a model with no key is
+# reported as unpriced, never guessed from a similar name.
+#
+# Sources (checked 2026-10-11): developers.openai.com/api/docs/pricing,
+# platform.claude.com/docs/en/about-claude/pricing,
+# ai.google.dev/gemini-api/docs/pricing, console.groq.com/docs/models.
+# Tiered prices use the lower tier (short prompts); see the notes.
 
-as_of: "2025-10"
+as_of: "2026-10"
 
 models:
-  # OpenAI
-  gpt-5:            {input: 1.25,  output: 10.00}
-  gpt-5-mini:       {input: 0.25,  output: 2.00}
-  gpt-5-nano:       {input: 0.05,  output: 0.40}
-  gpt-4.1:          {input: 2.00,  output: 8.00}
-  gpt-4.1-mini:     {input: 0.40,  output: 1.60}
-  gpt-4.1-nano:     {input: 0.10,  output: 0.40}
-  gpt-4o:           {input: 2.50,  output: 10.00}
-  gpt-4o-mini:      {input: 0.15,  output: 0.60}
-  o3:               {input: 2.00,  output: 8.00}
-  o3-mini:          {input: 1.10,  output: 4.40}
-  o4-mini:          {input: 1.10,  output: 4.40}
+  # OpenAI (prompts up to 272K tokens)
+  gpt-6-astra:        {input: 10.00, output: 50.00}
+  gpt-6.1-sol:        {input: 2.00,  output: 10.00}
+  gpt-6-sol:          {input: 2.00,  output: 10.00}
+  gpt-6-luna:         {input: 0.10,  output: 0.50}
+  gpt-5.6-sol:        {input: 4.00,  output: 20.00}
+  gpt-5.6-terra:      {input: 2.00,  output: 12.00}
+  gpt-5.6-luna:       {input: 0.20,  output: 1.20}
+  gpt-5.5:            {input: 5.00,  output: 30.00}
+  gpt-5.5-pro:        {input: 30.00, output: 180.00}
+  gpt-5.4:            {input: 2.50,  output: 15.00}
+  gpt-5.4-mini:       {input: 0.75,  output: 4.50}
+  gpt-5.4-nano:       {input: 0.20,  output: 1.25}
+  gpt-5.4-pro:        {input: 30.00, output: 180.00}
+  gpt-5.3-codex:      {input: 1.75,  output: 14.00}
+  gpt-5.2:            {input: 1.75,  output: 14.00}
+  gpt-5.2-pro:        {input: 21.00, output: 168.00}
+  gpt-5.1:            {input: 1.25,  output: 10.00}
+  gpt-5:              {input: 1.25,  output: 10.00}
+  gpt-5-mini:         {input: 0.25,  output: 2.00}
+  gpt-5-nano:         {input: 0.05,  output: 0.40}
+  gpt-5-pro:          {input: 15.00, output: 120.00}
+  gpt-4.1:            {input: 2.00,  output: 8.00}
+  gpt-4.1-mini:       {input: 0.40,  output: 1.60}
+  gpt-4.1-nano:       {input: 0.10,  output: 0.40}
+  gpt-4o:             {input: 2.50,  output: 10.00}
+  gpt-4o-2024-05-13:  {input: 5.00,  output: 15.00}
+  gpt-4o-mini:        {input: 0.15,  output: 0.60}
+  o1:                 {input: 15.00, output: 60.00}
+  o3:                 {input: 2.00,  output: 8.00}
+  o3-pro:             {input: 20.00, output: 80.00}
+  o3-mini:            {input: 1.10,  output: 4.40}
+  o4-mini:            {input: 1.10,  output: 4.40}
+  gpt-3.5-turbo:      {input: 0.50,  output: 1.50}
+
   # Anthropic
-  claude-opus-4:    {input: 15.00, output: 75.00}
-  claude-opus-4-5:  {input: 5.00,  output: 25.00}
-  claude-sonnet-4:  {input: 3.00,  output: 15.00}
-  claude-haiku-4-5: {input: 1.00,  output: 5.00}
-  claude-3-5-haiku: {input: 0.80,  output: 4.00}
-  # Google
-  gemini-2.5-pro:   {input: 1.25,  output: 10.00}
-  gemini-2.5-flash: {input: 0.30,  output: 2.50}
+  claude-fable-5-1:   {input: 10.00, output: 50.00}
+  claude-fable-5:     {input: 10.00, output: 50.00}
+  claude-opus-5-5:    {input: 4.00,  output: 20.00}
+  claude-opus-5:      {input: 5.00,  output: 25.00}
+  claude-opus-4-8:    {input: 5.00,  output: 25.00}
+  claude-opus-4-7:    {input: 5.00,  output: 25.00}
+  claude-opus-4-6:    {input: 5.00,  output: 25.00}
+  claude-opus-4-5:    {input: 5.00,  output: 25.00}
+  claude-opus-4-1:    {input: 15.00, output: 75.00}
+  claude-opus-4:      {input: 15.00, output: 75.00}
+  claude-sonnet-5-5:  {input: 2.00,  output: 10.00}
+  claude-sonnet-5:    {input: 2.00,  output: 10.00}
+  claude-sonnet-4-6:  {input: 3.00,  output: 15.00}
+  claude-sonnet-4-5:  {input: 3.00,  output: 15.00}
+  claude-sonnet-4:    {input: 3.00,  output: 15.00}
+  claude-haiku-5-5:   {input: 0.10,  output: 0.50}   # prompts up to 100K tokens; $0.50 / $2.50 above
+  claude-haiku-4-5:   {input: 1.00,  output: 5.00}
+  claude-3-5-haiku:   {input: 0.80,  output: 4.00}
+
+  # Google (paid tier; prices through 2026-12-31, several rise on 2027-01-01)
+  gemini-3.8-flash:       {input: 0.75, output: 3.75}
+  gemini-3.6-flash:       {input: 0.75, output: 3.75}
+  gemini-3.5-flash-lite:  {input: 0.30, output: 2.50}
+  gemini-3.1-pro-preview: {input: 2.00, output: 12.00}  # prompts up to 200K tokens
+  gemini-3.1-flash-lite:  {input: 0.25, output: 1.50}
+  gemini-3-flash-preview: {input: 0.50, output: 3.00}
+  gemini-2.5-pro:         {input: 1.25, output: 10.00}  # prompts up to 200K tokens
+  gemini-2.5-flash:       {input: 0.30, output: 2.50}
+  gemini-2.5-flash-lite:  {input: 0.10, output: 0.40}
+
+  # Groq (the same open models cost differently elsewhere: override them in LLM_PRICES_FILE)
+  gpt-oss-120b:       {input: 0.15,  output: 0.60}
+  gpt-oss-20b:        {input: 0.075, output: 0.30}
+  qwen3.8-27b:        {input: 0.80,  output: 4.00}

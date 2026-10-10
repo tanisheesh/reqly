@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -24,11 +25,22 @@ class Price:
         return (input_tokens * self.input + output_tokens * self.output) / PER_TOKENS
 
 
+# What may follow a table key in a model name and still be "the same model":
+# dated snapshots (-2024-08-06, -20250514, -09-2025), -001, -latest,
+# -preview, -exp, Bedrock's -v1:0. Anything else ("-mini", "-lite", ".7")
+# is a different model.
+_SNAPSHOT_SUFFIX = re.compile(
+    r"(?:-(?:\d{4}-\d{2}-\d{2}|\d{8}|\d{2}-\d{4}|\d{3}|latest|preview|exp|v\d+(?::\d+)?))*"
+)
+# "openai/gpt-4o", "meta-llama/...", Bedrock "anthropic.claude-...", "us.anthropic.claude-..."
+_PROVIDER_PREFIX = re.compile(r"^(?:[\w.-]+/|(?:(?:us|eu|apac|global)\.)?anthropic\.)")
+
+
 class PriceTable:
     def __init__(self, prices: dict[str, Price], as_of: str | None = None) -> None:
         self.prices = {k.lower(): v for k, v in prices.items()}
         self.as_of = as_of
-        # longest first, so "gpt-4o-mini" wins over "gpt-4o"
+        # longest first, so "gpt-4o-2024-05-13" wins over "gpt-4o"
         self._keys = sorted(self.prices, key=len, reverse=True)
 
     def lookup(self, model: str | None) -> tuple[str, Price] | None:
@@ -37,11 +49,12 @@ class PriceTable:
             return None
         name = model.strip().lower()
         candidates = [name]
-        if "/" in name:  # "openai/gpt-4o", "anthropic/claude-sonnet-4"
-            candidates.append(name.rsplit("/", 1)[1])
+        bare = _PROVIDER_PREFIX.sub("", name)
+        if bare != name:
+            candidates.append(bare)
         for candidate in candidates:
             for key in self._keys:
-                if candidate.startswith(key):
+                if candidate.startswith(key) and _SNAPSHOT_SUFFIX.fullmatch(candidate[len(key):]):
                     return key, self.prices[key]
         return None
 
