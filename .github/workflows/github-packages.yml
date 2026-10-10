@@ -70,7 +70,7 @@ jobs:
           images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
           labels: |
             org.opencontainers.image.title=${{ matrix.image }}
-            org.opencontainers.image.licenses=GPL-3.0-only
+            org.opencontainers.image.licenses=AGPL-3.0-only
 
       - id: build
         uses: docker/build-push-action@v7

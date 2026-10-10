@@ -13,7 +13,7 @@
   <a href="https://pypi.org/project/reqly/"><img src="https://img.shields.io/pypi/v/reqly?color=06b6d4&style=flat-square&label=pypi" alt="PyPI version"></a>
   <a href="https://pypi.org/project/reqly/"><img src="https://img.shields.io/pypi/pyversions/reqly?color=06b6d4&style=flat-square" alt="Python versions"></a>
   <a href="https://pypi.org/project/reqly/"><img src="https://img.shields.io/pypi/dm/reqly?color=06b6d4&style=flat-square&label=downloads" alt="Downloads"></a>
-  <a href="https://github.com/tanisheesh/reqly/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-06b6d4?style=flat-square" alt="License"></a>
+  <a href="https://github.com/tanisheesh/reqly/blob/main/sdk/LICENSE"><img src="https://img.shields.io/badge/license-MIT-06b6d4?style=flat-square" alt="License: MIT"></a>
 </p>
 
 <p align="center">
@@ -157,7 +157,7 @@ helm install reqly oci://ghcr.io/tanisheesh/charts/reqly -n reqly --create-names
 [Quickstart](https://reqly.tanisheesh.in/docs/quickstart/) ·
 [Deploy to production](https://reqly.tanisheesh.in/docs/self-hosting/deploy/) ·
 [Changelog](https://github.com/tanisheesh/reqly/blob/main/sdk/CHANGELOG.md) ·
-License: [GPL-3.0](https://github.com/tanisheesh/reqly/blob/main/LICENSE)
+License: [MIT](https://github.com/tanisheesh/reqly/blob/main/sdk/LICENSE) (the collector is AGPL-3.0)
 
 ---
 

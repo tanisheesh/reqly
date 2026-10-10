@@ -8,6 +8,13 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 
 ## [Unreleased]
 
+Python SDK 0.5.4 · reqly-node 0.3.1
+
+### ♻️ Changed
+- **License split:** the SDKs (`reqly`, `reqly-node`) are now **MIT**, so they can go into any
+  app; the collector, dashboard and Helm chart are **AGPL-3.0** (were GPL-3.0). Earlier releases
+  keep the license they were published under
+
 ---
 
 ## [0.12.0] — 2026-10-11

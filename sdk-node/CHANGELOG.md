@@ -2,6 +2,12 @@
 
 All notable changes to `reqly-node`.
 
+## 0.3.1 — 2026-10-11
+
+### Changed
+- License: **MIT** (was GPL-3.0-only), so the SDK can be used in any app, open or closed.
+  The Reqly collector and dashboard are AGPL-3.0. No code changes.
+
 ## 0.3.0 — 2026-10-11
 
 ### Added

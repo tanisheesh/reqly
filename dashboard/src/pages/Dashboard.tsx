@@ -316,7 +316,7 @@ export function Dashboard({
               <ReqlyIcon size={13} />
               <span>Reqly</span>
               <span className="text-slate-800">·</span>
-              <span>GPL-3.0</span>
+              <span>AGPL-3.0</span>
             </div>
             <a
               href="https://github.com/tanisheesh/reqly"
