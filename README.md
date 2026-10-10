@@ -89,10 +89,14 @@ Build the alert and SLO evaluation for several collector instances from the star
 | [PRD](docs/PRD.md) | Product requirements — goals, user stories, non-goals |
 | [Architecture](docs/ARCHITECTURE.md) | System design, data flow, component breakdown |
 | [Decisions](docs/DECISIONS.md) | Every major technical decision and why |
-| [Setup](docs/SETUP.md) | Local dev setup, env vars, deployment |
+| [Setup](docs/SETUP.md) | Local dev setup and env vars |
+| [Deploy](docs/DEPLOY.md) | Production deployment, releases, rollback |
 | [OpenTelemetry](docs/OTEL.md) | Send traces from any language via OTLP |
 | [Ingest spec](docs/INGEST_SPEC.md) | The `/v1/ingest` contract for SDK authors |
 | [Benchmarks](bench/README.md) | SDK overhead per framework and how it's measured |
+| [Contributing](CONTRIBUTING.md) | How to propose changes |
+| [Changelog](CHANGELOG.md) | What changed in each release |
+| [Security](SECURITY.md) | How to report a vulnerability |
 
 ---
 
