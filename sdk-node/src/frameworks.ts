@@ -8,6 +8,18 @@ function toClient(clientOrOptions: ClientOrOptions): ReqlyClient {
   return clientOrOptions instanceof ReqlyClient ? clientOrOptions : new ReqlyClient(clientOrOptions);
 }
 
+// Set on a request by the first Reqly middleware that sees it. A second
+// one (registered twice, or two clients) leaves the request alone instead
+// of recording it again.
+const CLAIMED = Symbol.for("reqly.claimed");
+
+function claim(target: object): boolean {
+  const t = target as Record<symbol, unknown>;
+  if (t[CLAIMED]) return false;
+  t[CLAIMED] = true;
+  return true;
+}
+
 function elapsedMs(start: bigint): number {
   return Number(process.hrtime.bigint() - start) / 1e6;
 }
@@ -61,6 +73,7 @@ export function reqlyExpress(clientOrOptions?: ClientOrOptions) {
   const client = toClient(clientOrOptions);
 
   const middleware = (req: ExpressRequest, res: ExpressResponse, next: Next): void => {
+    if (!claim(req)) return next();
     const start = process.hrtime.bigint();
     const usage = new LlmUsage();
     // The template is captured when Express assigns req.route: at that
@@ -145,6 +158,7 @@ interface FastifyLike {
 const START = Symbol("reqly.start");
 const USAGE = Symbol("reqly.usage");
 const ERROR = Symbol("reqly.error");
+const OWNER = Symbol("reqly.owner");
 
 /**
  * Fastify plugin (4 and 5):
@@ -158,6 +172,8 @@ export function reqlyFastify(clientOrOptions?: ClientOrOptions) {
 
   const plugin = (fastify: FastifyLike, _opts: unknown, done: Done) => {
     fastify.addHook("onRequest", (req, _reply, next) => {
+      if (!claim(req)) return next();
+      req[OWNER] = plugin;
       req[START] = process.hrtime.bigint();
       const usage = new LlmUsage();
       req[USAGE] = usage;
@@ -168,6 +184,7 @@ export function reqlyFastify(clientOrOptions?: ClientOrOptions) {
       next();
     });
     fastify.addHook("onResponse", (req, reply, next) => {
+      if (req[OWNER] !== plugin) return next(); // another Reqly plugin records it
       try {
         const start = req[START] as bigint | undefined;
         if (start !== undefined) {
@@ -214,10 +231,26 @@ interface HonoContextLike {
     raw: { headers: { forEach(cb: (value: string, key: string) => void): void } };
     header(name: string): string | undefined;
     matchedRoutes?: HonoRoute[];
+    routeIndex?: number;
     routePath?: string;
   };
   res: { status: number; headers: { get(name: string): string | null } };
   error?: Error;
+}
+
+/**
+ * The route of the handler that ran. After `next()` returns, routeIndex
+ * points at the last handler Hono executed: the route handler, or -- when
+ * nothing matched -- the last middleware, recognizable as an "ALL" route
+ * with a wildcard path ("/*", "/api/*"), which means no route (404).
+ */
+function honoRoute(c: HonoContextLike): string | undefined {
+  const routes = c.req.matchedRoutes ?? [];
+  const index = typeof c.req.routeIndex === "number" ? c.req.routeIndex : routes.length - 1;
+  const route = routes[index];
+  if (!route) return undefined;
+  if (route.method === "ALL" && route.path.includes("*")) return undefined;
+  return route.path;
 }
 
 /**
@@ -231,15 +264,14 @@ export function reqlyHono(clientOrOptions?: ClientOrOptions) {
   const client = toClient(clientOrOptions);
 
   const middleware = async (c: HonoContextLike, next: () => Promise<void>): Promise<void> => {
+    if (!claim(c.req.raw)) return next();
     const start = process.hrtime.bigint();
     const usage = new LlmUsage();
     try {
       await requestStorage.run(usage, () => next());
     } finally {
       try {
-        // The last matched route that is a handler, not a middleware ("ALL").
-        const handlers = (c.req.matchedRoutes ?? []).filter((r) => r.method !== "ALL");
-        const route = handlers.length ? handlers[handlers.length - 1].path : undefined;
+        const route = honoRoute(c);
         client.record({
           method: c.req.method,
           route,

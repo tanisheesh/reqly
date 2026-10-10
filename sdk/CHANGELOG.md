@@ -2,6 +2,14 @@
 
 All notable changes to the `reqly` Python SDK.
 
+## 0.5.1 — 2026-10-10
+
+### Fixed
+- A `route_resolver` that raised (with `instrument_asgi()`) propagated the exception into the
+  app after the response was sent. It now counts as "no route" (`__unmatched__`), and recording
+  in the ASGI and Flask integrations is guarded like the rest of the SDK: nothing in it can
+  raise into a request.
+
 ## 0.5.0 — 2026-10-10
 
 ### Added
