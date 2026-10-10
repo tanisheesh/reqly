@@ -25,6 +25,9 @@ services:
       DATABASE_URL: postgresql://reqly:${POSTGRES_PASSWORD:-localdev}@timescaledb:5432/reqly
       REQLY_INGEST_KEY: ${REQLY_INGEST_KEY:-demo-key}
       REQLY_READ_KEY: ${REQLY_READ_KEY:-demo-read-key}
+      PUBLIC_DASHBOARD: ${PUBLIC_DASHBOARD:-true}
+      REQLY_ADMIN_USERNAME: ${REQLY_ADMIN_USERNAME:-admin}
+      REQLY_ADMIN_PASSWORD: ${REQLY_ADMIN_PASSWORD:-}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
       ASK_MODEL: ${ASK_MODEL:-}

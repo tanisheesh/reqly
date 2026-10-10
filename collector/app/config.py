@@ -35,6 +35,10 @@ class Settings:
     alert_webhook_url: str | None
     alert_renotify_hours: float
     dashboard_url: str | None
+    public_dashboard: bool
+    admin_username: str
+    admin_password: str | None
+    session_ttl_hours: float
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -89,6 +93,14 @@ class Settings:
             alert_webhook_url=os.environ.get("ALERT_WEBHOOK_URL") or None,
             alert_renotify_hours=float(os.environ.get("ALERT_RENOTIFY_HOURS", "6")),
             dashboard_url=os.environ.get("DASHBOARD_URL") or None,
+            # true: the read key (public in the dashboard bundle) can read
+            # everything -- a public demo. false: reading needs a signed-in
+            # user (the read key is refused).
+            public_dashboard=_env_flag("PUBLIC_DASHBOARD", True),
+            # First admin, created at start-up when there are no users yet.
+            admin_username=os.environ.get("REQLY_ADMIN_USERNAME") or "admin",
+            admin_password=os.environ.get("REQLY_ADMIN_PASSWORD") or None,
+            session_ttl_hours=float(os.environ.get("SESSION_TTL_HOURS", "168")),
         )
 
 

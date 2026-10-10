@@ -15,7 +15,8 @@ from .db.late_data import run_refresh_loop
 from .db.pool import close_pool, create_pool
 from .insights.scheduler import start_scheduler
 from .rate_limit import limiter
-from .routers import alerts, ask, ingest, insights, metrics, openapi, otlp, slos, usage
+from .users.accounts import bootstrap_admin
+from .routers import alerts, ask, auth, ingest, insights, metrics, openapi, otlp, slos, usage
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("reqly.collector")
@@ -27,6 +28,12 @@ _scheduler = None
 async def lifespan(app: FastAPI):
     pool = await create_pool()
     logger.info("Reqly collector: db pool ready")
+    await bootstrap_admin(pool, settings.admin_username, settings.admin_password)
+    if not settings.public_dashboard and not await pool.fetchval("SELECT EXISTS (SELECT 1 FROM users)"):
+        logger.warning(
+            "PUBLIC_DASHBOARD is off but there are no users: nobody can read. "
+            "Set REQLY_ADMIN_PASSWORD (or run `python -m app.users create-user`)."
+        )
     late_data_task = asyncio.create_task(
         run_refresh_loop(pool, settings.late_data_refresh_seconds)
     )
@@ -51,7 +58,7 @@ async def lifespan(app: FastAPI):
         await close_pool()
 
 
-app = FastAPI(title="Reqly Collector", version="0.8.1", lifespan=lifespan)
+app = FastAPI(title="Reqly Collector", version="0.9.0", lifespan=lifespan)
 
 app.state.limiter = limiter
 
@@ -62,10 +69,11 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "X-Reqly-Key"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Content-Type", "X-Reqly-Key", "Authorization"],
 )
 
+app.include_router(auth.router)
 app.include_router(ingest.router)
 app.include_router(otlp.router)
 app.include_router(metrics.router)

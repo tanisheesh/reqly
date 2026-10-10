@@ -196,30 +196,36 @@ Groq call has a 30 s timeout. On any exception (timeout, rate limit, provider ou
 | Method | Route | Auth | Description |
 |---|---|---|---|
 | `GET` | `/v1/health` | None | Liveness probe — returns `{"status": "ok"}` |
+| `GET` | `/v1/auth/config` | None | Whether the dashboard is public (`PUBLIC_DASHBOARD`) |
+| `POST` | `/v1/auth/login` | None (10/min per IP) | Username + password → session token (bearer) |
+| `POST` | `/v1/auth/logout` | Session | Ends the session |
+| `GET` | `/v1/auth/me` | Session | The signed-in user |
+| `POST` | `/v1/auth/password` | Session | Changes the password and signs out every session of the user |
 | `POST` | `/v1/ingest` | Ingest key | Batch ingest of request events (≤ 1 000 per call); partial-batch acceptance |
 | `POST` | `/otlp/v1/traces` | Ingest key | OTLP/HTTP trace receiver (protobuf or JSON, gzip) — HTTP server spans become request events; see [OTEL.md](OTEL.md) |
-| `GET` | `/v1/services` | Read key | List all service names with recorded traffic |
-| `GET` | `/v1/services/{service_name}/routes` | Read key | List all route templates for a service |
-| `GET` | `/v1/metrics/summary` | Read key | Latency series, error rate series, status distribution, top routes, requests/min for a service+window |
-| `GET` | `/v1/services/{service_name}/releases` | Read key | Recent releases with first/last seen, request volume, error rate and p95 (14-day raw window) |
-| `GET` | `/v1/insights/latest` | Read key | Latest weekly AI report for a service |
-| `GET` | `/v1/alerts` | Read key | Open (or recent, `status=all`) alerts — hourly anomalies and SLO burn — optionally per service |
-| `GET` | `/v1/slos` | Read key | SLOs with live status: SLI, error budget left, burn rates (5m / 30m / 1h / 6h), state |
-| `PUT` | `/v1/slos` | Ingest key | Create or update an SLO (by service + name) |
-| `DELETE` | `/v1/slos/{id}` | Ingest key | Delete an SLO |
-| `PUT` | `/v1/services/{svc}/openapi` | Ingest key | Upload the service's OpenAPI 3 / Swagger 2 spec (JSON or YAML); `?base_path=` prefixes its paths |
-| `GET` | `/v1/services/{svc}/openapi/drift` | Read key | Spec vs the last 30 days of traffic: undocumented, unused and deprecated-but-used operations |
-| `DELETE` | `/v1/services/{svc}/openapi` | Ingest key | Remove the spec |
-| `GET` | `/v1/services/{svc}/consumers` | Read key | Top consumers (`window=24h\|7d\|30d`): requests, share, error rate, p95, routes |
-| `GET` | `/v1/services/{svc}/consumers/{id}` | Read key | One consumer's routes and daily requests |
-| `GET` | `/v1/services/{svc}/llm-usage` | Read key | LLM tokens and estimated cost per route, model and day |
-| `POST` | `/v1/ask` | Read key | Ask Reqly: answers a question about one service from its data (5/min per IP, `ASK_DAILY_LIMIT` per day) |
-| `POST` | `/v1/insights/generate` | Read key | Trigger insights generation on demand (rate-limited 5/min) |
+| `GET` | `/v1/services` | Read key or session | List all service names with recorded traffic |
+| `GET` | `/v1/services/{service_name}/routes` | Read key or session | List all route templates for a service |
+| `GET` | `/v1/metrics/summary` | Read key or session | Latency series, error rate series, status distribution, top routes, requests/min for a service+window |
+| `GET` | `/v1/services/{service_name}/releases` | Read key or session | Recent releases with first/last seen, request volume, error rate and p95 (14-day raw window) |
+| `GET` | `/v1/insights/latest` | Read key or session | Latest weekly AI report for a service |
+| `GET` | `/v1/alerts` | Read key or session | Open (or recent, `status=all`) alerts — hourly anomalies and SLO burn — optionally per service |
+| `GET` | `/v1/slos` | Read key or session | SLOs with live status: SLI, error budget left, burn rates (5m / 30m / 1h / 6h), state |
+| `PUT` | `/v1/slos` | Ingest key or admin session | Create or update an SLO (by service + name) |
+| `DELETE` | `/v1/slos/{id}` | Ingest key or admin session | Delete an SLO |
+| `PUT` | `/v1/services/{svc}/openapi` | Ingest key or admin session | Upload the service's OpenAPI 3 / Swagger 2 spec (JSON or YAML); `?base_path=` prefixes its paths |
+| `GET` | `/v1/services/{svc}/openapi/drift` | Read key or session | Spec vs the last 30 days of traffic: undocumented, unused and deprecated-but-used operations |
+| `DELETE` | `/v1/services/{svc}/openapi` | Ingest key or admin session | Remove the spec |
+| `GET` | `/v1/services/{svc}/consumers` | Read key or session | Top consumers (`window=24h\|7d\|30d`): requests, share, error rate, p95, routes |
+| `GET` | `/v1/services/{svc}/consumers/{id}` | Read key or session | One consumer's routes and daily requests |
+| `GET` | `/v1/services/{svc}/llm-usage` | Read key or session | LLM tokens and estimated cost per route, model and day |
+| `POST` | `/v1/ask` | Read key or session | Ask Reqly: answers a question about one service from its data (5/min per IP, `ASK_DAILY_LIMIT` per day) |
+| `POST` | `/v1/insights/generate` | Read key or session | Trigger insights generation on demand (rate-limited 5/min) |
 
 ---
 
 ## 7. Security
 
+- **Users and sessions:** dashboard users sign in with a username and password (argon2id, hashed off the event loop; a login takes the same time whether or not the user exists). A session is a random 256-bit bearer token, stored only as its SHA-256, valid `SESSION_TTL_HOURS` (default 7 days); changing a password ends all of the user's sessions. Bearer tokens rather than cookies because the dashboard and collector are usually different sites, where browsers block third-party cookies. "Read" endpoints accept a session, or the read key while `PUBLIC_DASHBOARD` is on (a public demo); with it off the read key is refused. Changing SLOs and OpenAPI specs takes the ingest key or an admin's session. The first admin comes from `REQLY_ADMIN_PASSWORD` when there are no users; more users and password resets: `python -m app.users create-user NAME [--admin]` / `set-password NAME`.
 - **API keys:** `REQLY_INGEST_KEY` (write) and `REQLY_READ_KEY` (read) are separate keys, passed via the `X-Reqly-Key` header and compared in constant time. The read key is compiled into the dashboard bundle, so it is effectively public to dashboard viewers; it never falls back to the ingest key, and the collector warns at startup if the two are equal. Defaults: `demo-key` / `demo-read-key`, with a startup warning.
 - **Ingest validation:** Every event in a batch is validated with Pydantic before writing. `duration_ms` is clamped (0–300 000 ms). Batch size is hard-capped at 1 000 events per call, and string fields are length-capped (`service_name` 128, `route` 512, `method` 16).
 - **Rate limiting:** slowapi enforces 600 req/min per client IP on ingest; insights generation is separately limited at 5/min and returns this week's report as is if it was generated in the last 10 minutes (each generation is an LLM call on a public key). Behind a proxy, set `FORWARDED_ALLOW_IPS` so the real client IP is used.

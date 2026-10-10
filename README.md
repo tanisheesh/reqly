@@ -54,6 +54,7 @@ reqly.instrument(app, service_name="checkout-api")
 - **Error rates & status distribution** — 2xx / 3xx / 4xx / 5xx breakdown over time, top routes ranked by volume and error rate
 - **AI anomaly reports** — weekly detection against a day-of-week × hour-of-day seasonal baseline, with Groq writing the narrative. Degrades to plain-text stats if no API key is set.
 - **Ask Reqly** — ask *"why did /orders start failing?"* on the dashboard; the model answers from the collector's own data through read-only, validated query tools, shows the queries behind every answer, and flags any number it can't find in their results
+- **Sign-in** — dashboard users with argon2 passwords and expiring sessions; keep the dashboard public for a demo or require sign-in (`PUBLIC_DASHBOARD=false`)
 - **Consumers and LLM cost** — who calls each route (API keys hashed in the SDK), which clients an incident hit, and LLM tokens and spend per route
 - **OpenAPI drift** — upload your spec (or let the SDK push it) and see undocumented endpoints that get traffic, documented ones nobody calls, and deprecated ones still in use
 - **SLOs and error budgets** — availability or latency objectives per service or route, budget remaining on the dashboard, and multi-window burn-rate alerts (Google SRE workbook style)
