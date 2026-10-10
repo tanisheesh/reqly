@@ -9,20 +9,22 @@
 <h1 align="center">Reqly</h1>
 
 <p align="center">
-  <strong>Self-hostable API observability SDK for FastAPI and Flask — 2 lines of code, zero config, weekly AI anomaly reports</strong>
+  <strong>Self-hosted API monitoring that tells you what broke, when, and which deploy did it — for Python, Node.js and any OpenTelemetry stack.</strong>
 </p>
 
 <p align="center">
-  <a href="https://reqly.tanisheesh.in">
-    <img src="https://img.shields.io/badge/website-reqly.tanisheesh.in-06b6d4?style=flat-square" alt="Website">
+  <a href="https://reqly-eventflow-dashboard.onrender.com">
+    <img src="https://img.shields.io/badge/live_demo-06b6d4-06b6d4?style=flat-square" alt="Live Demo">
   </a>
-  <a href="https://pypi.org/project/reqly/">
-    <img src="https://img.shields.io/pypi/v/reqly?color=06b6d4&label=reqly&style=flat-square" alt="PyPI">
-  </a>
+  <a href="https://reqly.tanisheesh.in"><img src="https://img.shields.io/badge/website-reqly.tanisheesh.in-06b6d4?style=flat-square" alt="Website"></a>
+  <a href="https://pypi.org/project/reqly/"><img src="https://img.shields.io/pypi/v/reqly?color=06b6d4&label=pypi&style=flat-square" alt="PyPI"></a>
+  <a href="https://www.npmjs.com/package/reqly-node"><img src="https://img.shields.io/npm/v/reqly-node?color=06b6d4&label=npm&style=flat-square" alt="npm"></a>
   <img src="https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI">
   <img src="https://img.shields.io/badge/React-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React">
   <img src="https://img.shields.io/badge/TimescaleDB-FDB515?style=flat-square&logo=postgresql&logoColor=black" alt="TimescaleDB">
+  <img src="https://img.shields.io/badge/OpenTelemetry-000000?style=flat-square&logo=opentelemetry&logoColor=white" alt="OpenTelemetry">
   <img src="https://img.shields.io/badge/Groq-F55036?style=flat-square" alt="Groq">
   <img src="https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker">
   <img src="https://img.shields.io/badge/license-GPL--3.0-06b6d4?style=flat-square" alt="License">
@@ -32,40 +34,25 @@
 
 ## What is Reqly?
 
-Reqly is a self-hostable APM tool — a lightweight, honestly-scoped alternative to Datadog/New Relic for Python microservices. Add one call to your app; Reqly captures every request and surfaces real-time metrics plus a weekly AI-generated anomaly report powered by Groq (gpt-oss-120b). The entire stack — collector, TimescaleDB, dashboard — runs with `docker compose up`.
+Reqly watches every request your APIs serve and explains problems instead of just charting them: when a route starts failing it says which release was running, which host or client the errors came from, and whether you are burning your error budget — and you can ask it why in plain English. It is a lightweight, self-hosted alternative to Datadog-style APMs for teams that want their data on their own Postgres: one `docker compose up`, a one-line SDK, or plain OpenTelemetry.
 
 ```python
 import reqly
-from fastapi import FastAPI
-
-app = FastAPI()
-reqly.instrument(app, service_name="checkout-api")
-# Every route is now tracked — latency · error rate · status codes
+reqly.instrument(app, service_name="checkout-api")   # FastAPI, Flask, Django, Starlette, Litestar
 ```
 
-> **Live demo →** [reqly-eventflow-dashboard.onrender.com](https://reqly-eventflow-dashboard.onrender.com)
-> Demo instrumented app at [eventflow-g2h5.onrender.com](https://eventflow-g2h5.onrender.com) — login as `admin@eventhub.com` / `Admin@123`, then click **Metrics**.
+> **Live demo →** [reqly-eventflow-dashboard.onrender.com](https://reqly-eventflow-dashboard.onrender.com) — metrics from the
+> [EventFlow](https://eventflow-g2h5.onrender.com) demo app (log in there as `admin@eventhub.com` / `Admin@123` to make some traffic).
 
 ---
 
 ## What you get
 
-- **Latency percentiles** — p50 / p95 / p99 per route, across 1h / 6h / 24h / 7d windows with per-route drill-down
-- **Error rates & status distribution** — 2xx / 3xx / 4xx / 5xx breakdown over time, top routes ranked by volume and error rate
-- **AI anomaly reports** — weekly detection against a day-of-week × hour-of-day seasonal baseline, with Groq writing the narrative. Degrades to plain-text stats if no API key is set.
-- **Ask Reqly** — ask *"why did /orders start failing?"* on the dashboard; the model answers from the collector's own data through read-only, validated query tools, shows the queries behind every answer, and flags any number it can't find in their results
-- **Projects and API keys** — one collector for several teams: per-project keys with ingest / read / admin scopes, hashed and revocable, and users who only see their projects
-- **Sign-in** — dashboard users with argon2 passwords and expiring sessions; keep the dashboard public for a demo or require sign-in (`PUBLIC_DASHBOARD=false`)
-- **Consumers and LLM cost** — who calls each route (API keys hashed in the SDK), which clients an incident hit, and LLM tokens and spend per route
-- **OpenAPI drift** — upload your spec (or let the SDK push it) and see undocumented endpoints that get traffic, documented ones nobody calls, and deprecated ones still in use
-- **SLOs and error budgets** — availability or latency objectives per service or route, budget remaining on the dashboard, and multi-window burn-rate alerts (Google SRE workbook style)
-- **Hourly alerts with root-cause hints** — Slack / Discord / webhook alerts when a route breaks from its weekday-hour norm, deduplicated and auto-resolved, with leads like *"92% of errors came from pod-7, which served 34% of requests"* or *"new TimeoutError"*
-- **Deploy-aware** — every event carries its release (auto-detected from CI variables like `GITHUB_SHA`), so each anomaly says which release was running and how the route behaved before vs after it; deploys show up as markers on the charts and in a per-release health table
-- **Python frameworks** — FastAPI, Flask, Starlette and Litestar with one `reqly.instrument(app)` call; Django (incl. DRF and Django Ninja) via one middleware line; any other WSGI/ASGI app with `reqly.instrument_wsgi()` / `instrument_asgi()`
-- **Node.js SDK** — `reqly-node` for Express, Fastify and Hono: one middleware line, same consumers and LLM-cost tracking ([sdk-node](sdk-node/README.md))
-- **Measured overhead** — the SDKs add about 6–33 µs per request depending on the framework ([benchmark](bench/README.md), rerun in CI on every SDK change)
-- **Fail-open SDK** — fail-open (never crashes your app), non-blocking background thread, bounded 2 000-event queue, bounded cardinality (route templates, never raw paths)
-- **Any language via OpenTelemetry** — Node, Java, Go, .NET and more report to Reqly through its OTLP/HTTP endpoint with only exporter env vars, no Reqly SDK ([guide](docs/OTEL.md))
+- **Metrics that are right** — p50/p95/p99 per route and per service from mergeable percentile sketches, error rates, status codes, deploy markers and per-release health
+- **It explains what broke** — hourly alerts to Slack/Discord/webhooks against a weekday × hour baseline, with the release that was running, root-cause leads (*"92% of errors came from pod-7"*) and the clients that were hit; a weekly AI report narrates the findings
+- **Ask Reqly** — *"why did /orders start failing?"* answered from the collector's own data through read-only query tools, with every query shown and any number not found in the results flagged
+- **API-level depth** — SLOs with burn-rate alerts, OpenAPI drift (undocumented, unused and deprecated-but-used endpoints), API consumers, and LLM token cost per route
+- **Any stack, small footprint** — Python SDK, Node.js SDK (Express, Fastify, Hono) or OTLP from any language; the SDKs add ~5–33 µs per request ([benchmark](bench/README.md)) and never crash your app; projects, per-team API keys and sign-in for shared collectors
 
 ---
 
@@ -73,28 +60,31 @@ reqly.instrument(app, service_name="checkout-api")
 
 | Layer | Tech |
 |---|---|
-| SDK | Python 3.9+ · threading · httpx · pure ASGI/WSGI middleware |
-| Collector | FastAPI 0.110 · asyncpg · APScheduler · slowapi · Pydantic v2 |
-| Database | TimescaleDB (pg16) · hypertables · continuous aggregates |
-| Dashboard | React 19 · Vite 8 · TypeScript · Tailwind CSS 4 · Recharts · TanStack Query |
-| AI | Groq API · gpt-oss-120b |
-| Infra | Docker Compose (local) · EC2 t3.small + AWS Lambda (prod) |
+| SDKs | Python 3.9+ (pure ASGI/WSGI middleware, httpx) · Node.js 20+ (TypeScript, zero dependencies) · OTLP/HTTP |
+| Collector | FastAPI · asyncpg · APScheduler · Pydantic v2 · argon2 |
+| Database | TimescaleDB (pg16, Toolkit) · hypertables · continuous aggregates · UddSketch |
+| Dashboard | React 19 · Vite · TypeScript · Tailwind CSS 4 · Recharts · TanStack Query |
+| AI | Groq API · gpt-oss-120b (tool calling) · statistics-first anomaly detection |
+| Infra | Docker Compose · EC2 (TimescaleDB) · Render · GHCR images · PyPI / npm trusted publishing |
 
 ---
 
 ## Engineering Decisions
 
-**Why z-score before the LLM, not LLM-first?**
-Anomaly detection runs as a pure statistics pass — z-score over a day-of-week × hour-of-day seasonal baseline — before the LLM ever sees data. The model's job is to write a readable narrative, not decide what's anomalous. This keeps detection deterministic, auditable, and cheap; the LLM only runs when there are confirmed deviations to explain.
+**Why statistics before the LLM?**
+Anomalies come from a Poisson / z-score test against each route's weekday-hour baseline; the LLM only narrates confirmed findings. Detection stays deterministic and auditable, and nothing is sent to a model when nothing is wrong.
 
-**Why fail-open and how is it implemented?**
-Reqly runs inside your app's process. Every instrumentation path is wrapped so any internal exception is caught, logged once, and the SDK self-disables. The background flush thread is a daemon thread; all outbound HTTP calls carry strict connect + read timeouts — a slow collector never blocks a request thread.
+**Why mergeable percentile sketches instead of storing p95s?**
+Percentiles can't be averaged. A UddSketch per route-minute merges exactly across routes and time, so a service's 7-day p95 is a real p95 (within ~0.2%), not the max of per-minute p95s that overstated latency.
 
-**Why TimescaleDB over regular Postgres?**
-Reqly stores one row per request — millions of rows fast. Every dashboard query is a time-range aggregation. TimescaleDB's hypertables partition the table into day-sized chunks automatically, so a 6-hour query touches only relevant chunks. Continuous aggregates pre-compute per-minute rollups on insert, not on every page load.
+**Why fixed query tools for Ask Reqly, not text-to-SQL?**
+The read key ships in the dashboard, so generated SQL would make it a SQL console. Nine validated, read-only tools return rounded aggregates, and every number in the answer is checked against what they returned.
 
-**Why route templates instead of raw paths?**
-Raw paths like `/users/1` and `/users/99999` become distinct metric labels — cardinality explodes. Reqly captures the framework's matched route template so all user lookups collapse to `/users/{id}`. Cardinality stays O(number of routes), not O(unique URLs ever requested).
+**Why measure SDK overhead?**
+"Zero overhead" was a claim; the benchmark made it a number — and found a Node bug that sent one collector request per app request under steady traffic, plus Python work that could move off the request path (overhead halved).
+
+**What would you do differently in v2?**
+Build the alert and SLO evaluation for several collector instances from the start: the scheduler and rate limits assume one instance today, which is fine for self-hosting but caps horizontal scaling.
 
 ---
 
@@ -105,12 +95,20 @@ Raw paths like `/users/1` and `/users/99999` become distinct metric labels — c
 | [PRD](docs/PRD.md) | Product requirements — goals, user stories, non-goals |
 | [Architecture](docs/ARCHITECTURE.md) | System design, data flow, component breakdown |
 | [Decisions](docs/DECISIONS.md) | Every major technical decision and why |
+| [Setup](docs/SETUP.md) | Local dev setup, env vars, deployment |
 | [OpenTelemetry](docs/OTEL.md) | Send traces from any language via OTLP |
 | [Ingest spec](docs/INGEST_SPEC.md) | The `/v1/ingest` contract for SDK authors |
-| [Setup](docs/SETUP.md) | Local dev setup, env vars, deployment |
+| [Benchmarks](bench/README.md) | SDK overhead per framework and how it's measured |
 
 ---
 
-## Author
+<div align="center">
 
-**Tanish Poddar** — [tanisheesh.in](https://tanisheesh.in) · [LinkedIn](https://linkedin.com/in/tanisheesh) · [GitHub](https://github.com/tanisheesh)
+<h3>Tanish Poddar</h3>
+
+<a href="https://tanisheesh.in"><img src="https://img.shields.io/badge/Website-tanisheesh.in-111111?style=flat-square&logo=googlechrome&logoColor=white" alt="Website"></a>
+<a href="https://linkedin.com/in/tanisheesh"><img src="https://img.shields.io/badge/LinkedIn-tanisheesh-0A66C2?style=flat-square" alt="LinkedIn"></a>
+<a href="https://github.com/tanisheesh"><img src="https://img.shields.io/badge/GitHub-tanisheesh-181717?style=flat-square&logo=github&logoColor=white" alt="GitHub"></a>
+<a href="mailto:hey@tanisheesh.in"><img src="https://img.shields.io/badge/Email-hey%40tanisheesh.in-EA4335?style=flat-square&logo=gmail&logoColor=white" alt="Email"></a>
+
+</div>
