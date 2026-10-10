@@ -94,7 +94,7 @@ The database must be TimescaleDB with the Toolkit. The collector applies its mig
 
 | Resource | Notes |
 |---|---|
-| Collector Deployment + Service | Always **1 replica** with the `Recreate` strategy: the alert scheduler, rate limits and caches are per process, so two collectors would run every check twice. Probes on `/v1/health`; the startup probe allows a few minutes for migrations |
+| Collector Deployment + Service | Always **1 replica** with the `Recreate` strategy: the alert scheduler, rate limits and caches are per process, so two collectors would run every check twice. Probes on `/v1/health`; the startup probe allows a few minutes for migrations. With the bundled database, an init container waits until it accepts connections |
 | Dashboard Deployment + Service | Static; scale with `dashboard.replicas` |
 | TimescaleDB StatefulSet + Service | One instance with a `10Gi` PersistentVolumeClaim (`timescaledb.persistence`) |
 | Secret | Keys, the database URL and optional secrets. Generated values survive `helm upgrade` |
