@@ -20,6 +20,11 @@ def client(monkeypatch):
         captured_rows.extend(rows)
 
     monkeypatch.setattr(ingest_module, "get_pool", lambda: FakePool())
+
+    async def any_service(principal, service):
+        return True  # project ownership is covered by tests/test_projects_db.py
+
+    monkeypatch.setattr(ingest_module, "writable_service", any_service)
     monkeypatch.setattr(ingest_module, "insert_events", fake_insert_events)
 
     async def fake_record_deployments(pool, rows):

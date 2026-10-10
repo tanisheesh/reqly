@@ -76,7 +76,7 @@ def test_slo_management_needs_the_ingest_key_and_valid_input(monkeypatch):
 
     client = TestClient(app)
     body = {"service_name": "svc", "name": "p95", "objective": "latency", "target": 0.95}
-    assert client.put("/v1/slos", json=body, headers={"X-Reqly-Key": settings.read_key}).status_code == 401
+    assert client.put("/v1/slos", json=body, headers={"X-Reqly-Key": settings.read_key}).status_code == 403  # a valid key without the admin scope
     # latency SLO without a threshold
     assert client.put("/v1/slos", json=body, headers={"X-Reqly-Key": settings.ingest_key}).status_code == 422
     bad_target = {**body, "objective": "availability", "target": 1.0}
