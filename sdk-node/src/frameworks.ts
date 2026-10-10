@@ -470,3 +470,108 @@ export function reqlyNest(app: NestAppLike, clientOrOptions?: ClientOrOptions) {
   app.useGlobalInterceptors(interceptor);
   return { client };
 }
+
+// --- Plain node:http (any framework) -------------------------------------------
+
+interface NodeRequestLike {
+  method?: string;
+  url?: string;
+  headers: Record<string, unknown>;
+}
+interface NodeResponseLike {
+  statusCode: number;
+  getHeader(name: string): unknown;
+  once(event: "finish" | "close", listener: () => void): unknown;
+}
+
+export interface ReqlyHttpOptions<Req = NodeRequestLike> extends ReqlyOptions {
+  /**
+   * The route template for a request ("/users/:id"), read when the response
+   * finishes, so values your router set on the request by then are there.
+   * Without one, every request is recorded as "__unmatched__" -- never as the
+   * raw path.
+   */
+  routeResolver?: (req: Req) => string | null | undefined;
+  /** A client to share with other middleware, instead of creating one. */
+  client?: ReqlyClient;
+}
+
+/**
+ * Wraps a plain `(req, res)` handler -- node:http, or a framework without a
+ * built-in integration -- the way `instrument_wsgi` does for Python:
+ *
+ *     const handler = reqlyHttp(app, {
+ *       serviceName: "checkout-api",
+ *       routeResolver: (req) => req.matchedRoute,
+ *     });
+ *     http.createServer(handler).listen(3000);
+ *
+ * An error the handler throws (or a promise it returns rejects with) is
+ * recorded with its type and rethrown.
+ */
+export function reqlyHttp<Req extends NodeRequestLike, Res extends NodeResponseLike>(
+  handler: (req: Req, res: Res) => unknown,
+  options: ReqlyHttpOptions<Req> = {},
+) {
+  const { routeResolver, client: shared, ...clientOptions } = options;
+  const client = shared ?? new ReqlyClient(clientOptions);
+
+  const wrapped = (req: Req, res: Res): unknown => {
+    if (!claim(req)) return handler(req, res);
+    const start = process.hrtime.bigint();
+    const usage = new LlmUsage();
+    let errorType: string | undefined;
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      try {
+        let route: string | undefined;
+        try {
+          const resolved = routeResolver?.(req);
+          route = typeof resolved === "string" && resolved !== "" ? resolved : undefined;
+        } catch {
+          route = undefined; // a failing resolver means "no route", never an app error
+        }
+        const method = (req.method ?? "GET").toUpperCase();
+        client.record({
+          method,
+          route,
+          statusCode: res.statusCode,
+          durationMs: elapsedMs(start),
+          errorType,
+          requestBytes: intOrUndefined(req.headers["content-length"]),
+          responseBytes: intOrUndefined(res.getHeader("content-length")),
+          requestInfo: () => ({
+            method,
+            path: (req.url ?? "/").split("?")[0],
+            headers: lowerHeaders(req.headers),
+            raw: req,
+          }),
+          llm: usage.summary(),
+        });
+      } catch {
+        // never reaches the app
+      }
+    };
+    res.once("finish", finish);
+    res.once("close", finish); // client aborted
+    const markError = (err: unknown) => {
+      errorType = (err as Error | undefined)?.name ?? "Error";
+    };
+    try {
+      const out = requestStorage.run(usage, () => handler(req, res));
+      if (out && typeof (out as Promise<unknown>).then === "function") {
+        return (out as Promise<unknown>).then(undefined, (err: unknown) => {
+          markError(err);
+          throw err;
+        });
+      }
+      return out;
+    } catch (err) {
+      markError(err);
+      throw err;
+    }
+  };
+  return Object.assign(wrapped, { client });
+}
