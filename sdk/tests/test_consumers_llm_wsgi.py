@@ -237,3 +237,23 @@ def test_instrument_asgi(fake_collector):
     [event] = _events(app.client, batches)
     assert (event["route"], event["status_code"], event["response_bytes"]) == ("/things", 201, 7)
     app.client.shutdown()
+
+
+def test_a_failing_route_resolver_never_reaches_the_app(fake_collector):
+    url, batches = fake_collector
+
+    async def raw_asgi(scope, receive, send):
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"ok"})
+
+    def broken(scope):
+        raise KeyError("route")
+
+    app = reqly.instrument_asgi(raw_asgi, service_name="a", collector_url=url, flush_interval_seconds=999,
+                                route_resolver=broken)
+    from starlette.testclient import TestClient as ASGIClient
+
+    assert ASGIClient(app).get("/x").text == "ok"
+    [event] = _events(app.client, batches)
+    assert event["route"] == "__unmatched__"  # recorded, without a route
+    app.client.shutdown()
