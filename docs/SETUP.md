@@ -209,8 +209,8 @@ deprecated ones still in use. The local demo uploads a spec for both demo servic
 
 See [infra/DEPLOY.md](../infra/DEPLOY.md) for the full AWS production deployment:
 - EC2 t3.small running TimescaleDB in Docker (~$15/month)
-- Collector as Docker container on EC2 (or Render/Fly.io)
-- Dashboard built and deployed to Vercel / S3+CloudFront / Render
+- Collector as Docker container on EC2 (or Render/Fly.io) — prebuilt: `ghcr.io/tanisheesh/reqly-collector`
+- Dashboard built and deployed to Vercel / S3+CloudFront / Render, or the `ghcr.io/tanisheesh/reqly-dashboard` image (`REQLY_COLLECTOR_URL` / `REQLY_READ_KEY` at run time)
 - AWS SAM stack for Lambda weekly insights + EventBridge + S3 archive
 
 ---

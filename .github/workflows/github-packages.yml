@@ -1,0 +1,124 @@
+name: GitHub Packages
+
+# Publishes to GitHub Packages, which is what the repository's "Packages"
+# sidebar lists:
+# - container images ghcr.io/tanisheesh/reqly-collector and reqly-dashboard
+#   (linux/amd64 + linux/arm64), tagged with the collector version, the
+#   short commit SHA and `latest`;
+# - the Node SDK mirrored as @tanisheesh/reqly-node on npm.pkg.github.com
+#   (GitHub's npm registry only takes scoped names; `npm i reqly-node` from
+#   npmjs.com stays the documented install).
+#
+# Runs on `collector-v*` tags (images), `node-v*` tags (Node SDK), or by hand
+# (choose what to publish). Uses only the workflow's GITHUB_TOKEN.
+
+on:
+  push:
+    tags: ["collector-v*", "node-v*"]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: What to publish
+        type: choice
+        options: [all, images, node-sdk]
+        default: all
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  images:
+    name: Image ${{ matrix.image }}
+    if: >-
+      startsWith(github.ref, 'refs/tags/collector-v') ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish != 'node-sdk')
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - image: reqly-collector
+            context: collector
+            description: Reqly collector — ingest, OTLP, metrics, alerts, SLOs and Ask Reqly API
+          - image: reqly-dashboard
+            context: dashboard
+            description: Reqly dashboard — set REQLY_COLLECTOR_URL and REQLY_READ_KEY at run time
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Collector version
+        id: version
+        run: |
+          VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('collector/pyproject.toml', 'rb'))['project']['version'])")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          tags: |
+            type=raw,value=${{ steps.version.outputs.version }}
+            type=sha,format=short
+            type=raw,value=latest
+          labels: |
+            org.opencontainers.image.title=${{ matrix.image }}
+            org.opencontainers.image.description=${{ matrix.description }}
+            org.opencontainers.image.licenses=GPL-3.0-only
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Shown on the package page.
+          annotations: |
+            manifest:org.opencontainers.image.description=${{ matrix.description }}
+            index:org.opencontainers.image.description=${{ matrix.description }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  node-sdk:
+    name: Node SDK on GitHub Packages
+    if: >-
+      startsWith(github.ref, 'refs/tags/node-v') ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish != 'images')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk-node
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@${{ github.repository_owner }}"
+
+      - run: npm ci
+      - run: npm test
+
+      - name: Publish @${{ github.repository_owner }}/reqly-node
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SCOPE: ${{ github.repository_owner }}
+        run: |
+          npm pkg set name="@$SCOPE/reqly-node"
+          npm pkg set publishConfig.registry="https://npm.pkg.github.com"
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "@$SCOPE/reqly-node@$VERSION" version >/dev/null 2>&1; then
+            echo "@$SCOPE/reqly-node@$VERSION is already published; nothing to do"
+            exit 0
+          fi
+          npm publish --ignore-scripts
