@@ -233,12 +233,7 @@ the header narrows the service list.
 
 ## 7. Deploy to production
 
-The live demo runs like this; step-by-step commands are in [infra/DEPLOY.md](../infra/DEPLOY.md).
-
-1. **Database:** TimescaleDB (`timescale/timescaledb-ha:pg16`, which includes the Toolkit) on a small VM — the demo uses an EC2 t3.micro set up by `infra/ec2-userdata.sh` (Docker, swap, TLS with a self-signed certificate; it refuses to start with a placeholder password). Connect with `?sslmode=require`.
-2. **Collector:** the prebuilt image `ghcr.io/tanisheesh/reqly-collector` (or Render/Fly.io from this repo) with `DATABASE_URL`, `REQLY_INGEST_KEY`, `REQLY_READ_KEY`, `CORS_ORIGINS` and, behind a platform proxy, `FORWARDED_ALLOW_IPS=*`. Add `GROQ_API_KEY` for AI features and `REQLY_ADMIN_PASSWORD` for an admin account. Migrations run on start-up. Run one collector instance.
-3. **Dashboard:** `ghcr.io/tanisheesh/reqly-dashboard` with `REQLY_COLLECTOR_URL` / `REQLY_READ_KEY` at run time, or `npm run build` with `VITE_COLLECTOR_URL` / `VITE_READ_KEY` and any static host.
-4. **Optional:** the AWS SAM stack in `infra/sam` runs the weekly report as a Lambda (EventBridge, S3 archive); set `INSIGHTS_SCHEDULER_ENABLED=false` on the collector then.
+See [DEPLOY.md](DEPLOY.md) for how the live demo runs (Render, EC2, Vercel), production env vars, the prebuilt images, releases, rollback and monitoring.
 
 ---
 
