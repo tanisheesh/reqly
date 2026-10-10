@@ -71,6 +71,12 @@
     "expect_all": ["[0-9]"]
   },
   {
+    "service": "flask-demo",
+    "question": "Are there endpoints missing from our API docs, or deprecated ones people still call?",
+    "expect_all": ["/auth/logout", "/products"],
+    "why": "the demo spec leaves out POST /auth/logout and deprecates GET /products"
+  },
+  {
     "service": "fastapi-demo",
     "question": "What is the CPU usage of the database server?",
     "expect_any": ["can't", "cannot", "can not", "not available", "don't have", "do not have", "no data", "unable", "only", "not tracked", "doesn't"],

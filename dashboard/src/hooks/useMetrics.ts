@@ -44,6 +44,16 @@ export function useSlos(serviceName: string | null) {
   });
 }
 
+export function useApiDrift(serviceName: string | null) {
+  return useQuery({
+    queryKey: ["api-drift", serviceName],
+    queryFn: () => api.getApiDrift(serviceName!),
+    enabled: !!serviceName,
+    refetchInterval: 300_000,
+    retry: false, // 404 = no spec uploaded; older collectors have no endpoint
+  });
+}
+
 export function useAlerts(serviceName: string | null) {
   return useQuery({
     queryKey: ["alerts", serviceName],
