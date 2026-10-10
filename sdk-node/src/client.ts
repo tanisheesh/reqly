@@ -172,7 +172,10 @@ export class ReqlyClient {
       } catch {
         // network error or timeout: retry
       }
-      await new Promise((resolve) => setTimeout(resolve, 200 * 2 ** attempt).unref());
+      // Not unref'd: while a flush is in flight (e.g. `await client.shutdown()`
+      // with the collector down) the process must not exit mid-retry. The
+      // waits are short (200 + 400 ms); the flush *interval* stays unref'd.
+      if (attempt < MAX_RETRIES - 1) await new Promise((resolve) => setTimeout(resolve, 200 * 2 ** attempt));
     }
     return false;
   }
