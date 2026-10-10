@@ -8,7 +8,11 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 
 ## [Unreleased]
 
+reqly-node 0.3.0
+
 ### ✨ Added
+- Node SDK: `reqlyHttp()` for plain node:http or any framework without an integration (with a
+  `routeResolver`), and Bun support (Hono on `Bun.serve`, node:http), tested in CI
 - OpenTelemetry apps get LLM cost: GenAI spans (`gen_ai.usage.*`) are added to the HTTP request
   they ran under, so cost per route and LLM cost alerts work without a Reqly SDK
 - A cap on distinct API consumers: the first `CONSUMER_LIMIT_PER_DAY` (1,000) per service per day

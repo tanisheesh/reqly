@@ -1,6 +1,6 @@
 ---
 title: Node.js SDK
-description: Instrument Express, Fastify, Hono, Koa or NestJS with reqly-node.
+description: Instrument Express, Fastify, Hono, Koa, NestJS or any node:http handler with reqly-node.
 ---
 
 # Node.js SDK
@@ -9,7 +9,7 @@ description: Instrument Express, Fastify, Hono, Koa or NestJS with reqly-node.
 npm install reqly-node
 ```
 
-Node 20+. No runtime dependencies. ESM and CommonJS. [npm](https://www.npmjs.com/package/reqly-node) · [Changelog](https://github.com/tanisheesh/reqly/blob/main/sdk-node/CHANGELOG.md)
+Node 20+ and Bun. No runtime dependencies. ESM and CommonJS. [npm](https://www.npmjs.com/package/reqly-node) · [Changelog](https://github.com/tanisheesh/reqly/blob/main/sdk-node/CHANGELOG.md)
 
 ## Instrument your framework
 
@@ -76,6 +76,23 @@ Node 20+. No runtime dependencies. ESM and CommonJS. [npm](https://www.npmjs.com
     ```
 
     Routes include the global prefix and controller path. Nest's catch-all 404 is recorded as `__unmatched__`. A global interceptor records the type of exceptions that become 5xx; `HttpException`s below 500 (`NotFoundException`, `BadRequestException`, …) aren't counted as errors. The returned object has `client` for `shutdown()`.
+
+=== "node:http / other"
+
+    For node:http, or a framework without an integration, wrap the `(req, res)` handler and give a `routeResolver` that returns the route template. Only the router knows it, so without one every request is recorded as `__unmatched__`, never as the raw path.
+
+    ```js
+    import http from "node:http";
+    import { reqlyHttp } from "reqly-node";
+
+    const handler = reqlyHttp(app, {
+      serviceName: "checkout-api",
+      routeResolver: (req) => req.matchedRoute,  // read when the response finishes
+    });
+    http.createServer(handler).listen(3000);
+    ```
+
+    An error the handler throws, or a promise it returns rejects with, is recorded with its type and rethrown.
 
 === "CommonJS"
 
@@ -147,4 +164,8 @@ process.on("SIGTERM", async () => {
 - **Non-blocking:** events are queued in memory and sent in batches by a timer that never keeps the process alive. The queue is bounded, and the oldest events are dropped first.
 - **Retries:** 408, 429, 5xx and network errors are retried with backoff. Other 4xx responses drop the batch.
 
-Another framework? Use [OpenTelemetry](opentelemetry.md): `@opentelemetry/auto-instrumentations-node` covers most of them.
+## Runtimes
+
+- **Node.js 20+**: every integration.
+- **Bun**: Hono on `Bun.serve` and `reqlyHttp` on Bun's node:http are tested in CI.
+- **Cloudflare Workers, Deno Deploy and other edge runtimes**: not supported yet. A Worker can't keep a background flush timer between requests, so use [OpenTelemetry](opentelemetry.md) there.
