@@ -3,15 +3,9 @@ import { UsageWindow } from "../api/client";
 import { useLlmUsage } from "../hooks/useMetrics";
 import { Card } from "./Card";
 import { WindowTabs } from "./WindowTabs";
+import { formatUsd as usd } from "../format";
 
 const ROWS = 8;
-
-function usd(value: number) {
-  if (value === 0) return "$0";
-  if (value < 0.01) return `$${value.toFixed(4)}`;
-  if (value < 100) return `$${value.toFixed(2)}`;
-  return `$${Math.round(value).toLocaleString()}`;
-}
 
 function compact(n: number) {
   return n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
