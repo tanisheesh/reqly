@@ -207,8 +207,61 @@ the current `main`.
 
 ## Contributing
 
-1. Fork → branch from `main`
-2. Run tests before and after
-3. Open a PR — describe what changed and why
+1. Fork → branch from `main` (`main` is always deployable; larger work goes through a PR)
+2. Run the tests before and after; add tests with the change
+3. Keep docs, `.env.example` and examples in the same PR as the code they describe
+4. Open a PR — describe what changed and why
 
 For new framework integrations: create `sdk/reqly/integrations/<framework>.py` with `instrument_<framework>(app, client: ReqlyClient)`. See `fastapi.py` and `flask.py` for the pattern.
+
+### Definition of done
+
+A change is done when it runs in production (the live demo, or a released package), was
+tested against the real deployment and not only locally, and the docs say what changed.
+
+### Commit style
+
+```
+<emoji> [#issue] [scope:] <message in present tense, lowercase>
+```
+
+```
+✨ sdk: add consumer tracking
+🐛 #42 collector: refuse events older than the raw retention
+📚 update architecture for projects and keys
+👷 run the benchmark on sdk changes
+```
+
+| Emoji | Use for |
+|---|---|
+| ✨ | New feature |
+| 🐛 | Bug fix that affects users |
+| 🎊 | Improvement to an existing feature |
+| ♻️ | Refactor, no behaviour change |
+| 🧪 | Tests only |
+| 📚 | Docs only |
+| 👷 | CI/CD |
+| 🔨 | Build files, configs, chores |
+| 👆 | Dependency updates |
+| 🔒 | Security |
+| 📁 | Database schema |
+| 🚀 | Release |
+| 💀 | Code removal |
+| 🎨 | Formatting only |
+
+Mark breaking changes with `🚨 BREAKING CHANGE:` in the body. One unit of logic per commit;
+never commit secrets (`.env*` stays gitignored, `.env.example` has names only). No force-push
+or `git reset --hard` on `main`.
+
+---
+
+<div align="center">
+
+<h3>Tanish Poddar</h3>
+
+<a href="https://tanisheesh.in"><img src="https://img.shields.io/badge/Website-tanisheesh.in-111111?style=flat-square&logo=googlechrome&logoColor=white" alt="Website"></a>
+<a href="https://linkedin.com/in/tanisheesh"><img src="https://img.shields.io/badge/LinkedIn-tanisheesh-0A66C2?style=flat-square" alt="LinkedIn"></a>
+<a href="https://github.com/tanisheesh"><img src="https://img.shields.io/badge/GitHub-tanisheesh-181717?style=flat-square&logo=github&logoColor=white" alt="GitHub"></a>
+<a href="mailto:hey@tanisheesh.in"><img src="https://img.shields.io/badge/Email-hey%40tanisheesh.in-EA4335?style=flat-square&logo=gmail&logoColor=white" alt="Email"></a>
+
+</div>
