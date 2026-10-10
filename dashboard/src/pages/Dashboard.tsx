@@ -13,9 +13,10 @@ import { AlertsBanner } from "../components/AlertsBanner";
 import { SloPanel } from "../components/SloPanel";
 import { InsightsPanel } from "../components/InsightsPanel";
 import { AskPanel } from "../components/AskPanel";
-import { useMetricsSummary } from "../hooks/useMetrics";
+import { useMetricsSummary, useProjects } from "../hooks/useMetrics";
 import { COLLECTOR_URL, TimeWindow } from "../api/client";
 import { SessionUser } from "../api/auth";
+import { SettingsPage } from "./SettingsPage";
 
 function ReqlyIcon({ size = 18 }: { size?: number }) {
   return (
@@ -104,10 +105,12 @@ function Account({
   user,
   onSignIn,
   onSignOut,
+  onSettings,
 }: {
   user: SessionUser | null;
   onSignIn?: () => void;
   onSignOut: () => void;
+  onSettings: () => void;
 }) {
   if (user) {
     return (
@@ -115,6 +118,9 @@ function Account({
         <span className="hidden text-slate-400 sm:inline" title={user.is_admin ? "admin" : undefined}>
           {user.username}
         </span>
+        <button onClick={onSettings} className="rounded-md px-2 py-1 text-slate-500 ring-1 ring-slate-800 hover:text-slate-200">
+          Settings
+        </button>
         <button onClick={onSignOut} className="rounded-md px-2 py-1 text-slate-500 ring-1 ring-slate-800 hover:text-slate-200">
           Sign out
         </button>
@@ -141,6 +147,13 @@ export function Dashboard({
   const [serviceName, setServiceName] = useState<string | null>(null);
   const [route, setRoute] = useState<string | null>(null);
   const [timeWindow, setWindowValue] = useState<TimeWindow>("1h");
+  const [requestedView, setView] = useState<"dashboard" | "settings">("dashboard");
+  // Settings need a signed-in user; signing out there lands on the dashboard.
+  const view = user ? requestedView : "dashboard";
+  const [projectId, setProjectId] = useState<number | null>(null);
+  const { data: projectsData } = useProjects();
+  const projects = projectsData?.projects ?? [];
+  const project = projects.find((p) => p.id === projectId) ?? null;
 
   const { data: summary, isLoading } = useMetricsSummary(serviceName, route, timeWindow);
 
@@ -184,20 +197,44 @@ export function Dashboard({
 
           {/* Controls */}
           <div className="flex flex-wrap items-center justify-end gap-3">
-            <ServiceSelector
-              serviceName={serviceName}
-              route={route}
-              onServiceChange={(s) => { setServiceName(s); setRoute(null); }}
-              onRouteChange={setRoute}
-            />
-            <TimeRangePicker value={timeWindow} onChange={setWindowValue} />
-            <Account user={user} onSignIn={onSignIn} onSignOut={onSignOut} />
+            {view === "dashboard" && projects.length > 1 && (
+              <select
+                aria-label="Project"
+                value={projectId ?? ""}
+                onChange={(e) => {
+                  setProjectId(e.target.value ? Number(e.target.value) : null);
+                  setServiceName(null);
+                  setRoute(null);
+                }}
+                className="h-8 rounded-md border border-slate-700 bg-slate-900 px-2.5 text-xs font-medium text-slate-200 focus:border-cyan-600 focus:outline-none"
+              >
+                <option value="">All projects</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            )}
+            {view === "dashboard" && (
+              <>
+                <ServiceSelector
+                  serviceName={serviceName}
+                  route={route}
+                  onServiceChange={(s) => { setServiceName(s); setRoute(null); }}
+                  onRouteChange={setRoute}
+                  onlyServices={project?.services ?? null}
+                />
+                <TimeRangePicker value={timeWindow} onChange={setWindowValue} />
+              </>
+            )}
+            <Account user={user} onSignIn={onSignIn} onSignOut={onSignOut} onSettings={() => setView("settings")} />
           </div>
         </div>
       </header>
 
       {/* ── Main content ── */}
       <main className="mx-auto w-full max-w-screen-xl flex-1 px-4 py-6 sm:px-6">
+        {view === "settings" && user && <SettingsPage user={user} onBack={() => setView("dashboard")} />}
+        {view === "dashboard" && (<>
         {!serviceName && <EmptyState />}
         {serviceName && isLoading && <LoadingState />}
 
@@ -268,6 +305,7 @@ export function Dashboard({
             <InsightsPanel serviceName={serviceName} />
           </div>
         )}
+        </>)}
       </main>
 
       {/* ── Footer ── */}

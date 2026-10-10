@@ -226,6 +226,11 @@ joins the project of the first key that sends it; move an existing one with
 `PUT /v1/projects/{id}/services`. Add dashboard users to a project with
 `POST /v1/projects/{id}/members` — non-admin users only see their projects.
 
+Signed-in admins can do all of this from the dashboard: **Settings** (header) has projects,
+services, API keys (created keys are shown once, with a copy button; revoke asks to confirm),
+members, and changing your own password. With more than one project, a project switcher in
+the header narrows the service list.
+
 ## 7. Deploy to production
 
 See [infra/DEPLOY.md](../infra/DEPLOY.md) for the full AWS production deployment:
