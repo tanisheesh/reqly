@@ -1,28 +1,25 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..auth import verify_read_key
 from ..db import queries
 from ..db.pool import get_pool
-from ..insights.scheduler import run_insights_for_service
+from ..insights.scheduler import _current_week_start, run_insights_for_service
 from ..rate_limit import limiter
 
 router = APIRouter(dependencies=[Depends(verify_read_key)])
 
 _INSIGHTS_RATE_LIMIT = "5/minute"
+# The read key is public to dashboard viewers and every generation calls the
+# LLM: a report regenerated this recently is returned as it is.
+REGENERATE_COOLDOWN = timedelta(minutes=10)
 
 
-@router.get("/v1/insights/latest")
-async def latest_insight(service_name: str):
-    pool = get_pool()
-    report = await queries.get_latest_insight_report(pool, service_name)
-    if not report:
-        raise HTTPException(
-            status_code=404, detail="no insight report yet for this service"
-        )
+def _report_body(report: dict) -> dict:
     anomalies = report["anomalies_json"]
     if isinstance(anomalies, str):
         anomalies = json.loads(anomalies)
@@ -35,8 +32,27 @@ async def latest_insight(service_name: str):
     }
 
 
+@router.get("/v1/insights/latest")
+async def latest_insight(service_name: str):
+    pool = get_pool()
+    report = await queries.get_latest_insight_report(pool, service_name)
+    if not report:
+        raise HTTPException(
+            status_code=404, detail="no insight report yet for this service"
+        )
+    return _report_body(report)
+
+
 @router.post("/v1/insights/generate")
 @limiter.limit(_INSIGHTS_RATE_LIMIT)
 async def generate_insight(request: Request, service_name: str):
     """Demo-convenience endpoint: bypasses the weekly scheduler."""
+    now = datetime.now(timezone.utc)
+    latest = await queries.get_latest_insight_report(get_pool(), service_name)
+    if (
+        latest is not None
+        and latest["week_start"] == _current_week_start(now)
+        and now - latest["generated_at"] < REGENERATE_COOLDOWN
+    ):
+        return {**_report_body(latest), "cached": True}
     return await run_insights_for_service(service_name)
