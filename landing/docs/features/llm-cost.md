@@ -27,6 +27,8 @@ If your API calls language models, record the token usage during the request and
     recordLlmUsage("gpt-4o-mini", 1200, 240);
     ```
 
+Using OpenTelemetry instead of an SDK? LLM calls recorded as GenAI spans are picked up automatically: see [OpenTelemetry → LLM calls](../instrument/opentelemetry.md#llm-calls).
+
 Call it anywhere while the request is being served; it's tied to the current request (a context variable in Python, `AsyncLocalStorage` in Node). If one request calls several models, all tokens are summed and the request is attributed to the model with the most tokens.
 
 ## Prices

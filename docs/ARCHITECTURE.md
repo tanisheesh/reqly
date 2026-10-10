@@ -48,7 +48,7 @@ Middleware records each request when the response finishes: method, the framewor
 
 One FastAPI service:
 
-- **Ingest:** `POST /v1/ingest` (SDK batches, per-event validation) and `POST /otlp/v1/traces` (OTLP/HTTP; HTTP server spans become events). Both refuse events older than 13 days (unless the batch is a backfill) or in the future, and enforce which project a service belongs to.
+- **Ingest:** `POST /v1/ingest` (SDK batches, per-event validation) and `POST /otlp/v1/traces` (OTLP/HTTP; HTTP server spans become events, and GenAI spans under them add the request's LLM model and tokens). Both refuse events older than 13 days (unless the batch is a backfill) or in the future, and enforce which project a service belongs to.
 - **Reads:** metrics summary, services, routes, releases, alerts, SLOs, consumers, LLM usage, OpenAPI drift, latest report — reading from the continuous aggregates, raw events only where freshness or detail requires it.
 - **Configuration:** SLOs, OpenAPI specs, projects, API keys, members (admin).
 - **AI:** Ask Reqly and on-demand weekly reports.

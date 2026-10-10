@@ -8,6 +8,10 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 
 ## [Unreleased]
 
+### ✨ Added
+- OpenTelemetry apps get LLM cost: GenAI spans (`gen_ai.usage.*`) are added to the HTTP request
+  they ran under, so cost per route and LLM cost alerts work without a Reqly SDK
+
 ### 🐛 Fixed
 - LLM prices: the table is checked against the providers' pages (2026-10) and covers current
   OpenAI, Anthropic, Google and Groq models. A model only matches its own entry or a dated

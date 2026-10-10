@@ -141,7 +141,6 @@ Teams running a handful of HTTP APIs have two bad options for knowing whether th
 ## 10. v2 Candidates
 
 - **Node SDK** — a generic `http` wrapper and streamed byte counts; built when a real user asks (OTLP covers them today).
-- **LLM cost from OTLP GenAI spans**, so OpenTelemetry apps get LLM cost and its alerts too.
 - **OIDC sign-in** and multi-instance collectors.
 
 ---
