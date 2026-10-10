@@ -1,10 +1,16 @@
-export const COLLECTOR_URL = import.meta.env.VITE_COLLECTOR_URL ?? "http://localhost:8000";
-const READ_KEY = import.meta.env.VITE_READ_KEY ?? "demo-read-key";
+// Settings written at container start (public/config.js) win over the ones
+// baked in at build time, so one image works for any collector.
+const runtimeConfig: { collectorUrl?: string; readKey?: string } =
+  (window as unknown as { __REQLY_CONFIG__?: { collectorUrl?: string; readKey?: string } }).__REQLY_CONFIG__ ?? {};
 
-if (!import.meta.env.VITE_READ_KEY) {
+export const COLLECTOR_URL =
+  runtimeConfig.collectorUrl || import.meta.env.VITE_COLLECTOR_URL || "http://localhost:8000";
+const READ_KEY = runtimeConfig.readKey || import.meta.env.VITE_READ_KEY || "demo-read-key";
+
+if (!runtimeConfig.readKey && !import.meta.env.VITE_READ_KEY) {
   console.warn(
-    "[reqly] VITE_READ_KEY is not set — using the default 'demo-read-key'. " +
-    "Set it in .env before deploying."
+    "[reqly] No read key configured — using the default 'demo-read-key'. " +
+    "Set REQLY_READ_KEY (Docker image) or VITE_READ_KEY (build) before deploying."
   );
 }
 
