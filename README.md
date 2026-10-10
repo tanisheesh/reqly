@@ -30,8 +30,6 @@
   <img src="https://img.shields.io/badge/license-GPL--3.0-06b6d4?style=flat-square" alt="License">
 </p>
 
----
-
 ## What is Reqly?
 
 Reqly watches every request your APIs serve and explains problems instead of just charting them: when a route starts failing it says which release was running, which host or client the errors came from, and whether you are burning your error budget — and you can ask it why in plain English. It is a lightweight, self-hosted alternative to Datadog-style APMs for teams that want their data on their own Postgres: one `docker compose up`, a one-line SDK, or plain OpenTelemetry.
@@ -44,7 +42,6 @@ reqly.instrument(app, service_name="checkout-api")   # FastAPI, Flask, Django, S
 > **Live demo →** [reqly-eventflow-dashboard.onrender.com](https://reqly-eventflow-dashboard.onrender.com) — metrics from the
 > [EventFlow](https://eventflow-g2h5.onrender.com) demo app (log in there as `admin@eventhub.com` / `Admin@123` to make some traffic).
 
----
 
 ## What you get
 
@@ -54,7 +51,6 @@ reqly.instrument(app, service_name="checkout-api")   # FastAPI, Flask, Django, S
 - **API-level depth** — SLOs with burn-rate alerts, OpenAPI drift (undocumented, unused and deprecated-but-used endpoints), API consumers, and LLM token cost per route
 - **Any stack, small footprint** — Python SDK, Node.js SDK (Express, Fastify, Hono) or OTLP from any language; the SDKs add ~5–33 µs per request ([benchmark](bench/README.md)) and never crash your app; projects, per-team API keys and sign-in for shared collectors
 
----
 
 ## Stack
 
@@ -67,7 +63,6 @@ reqly.instrument(app, service_name="checkout-api")   # FastAPI, Flask, Django, S
 | AI | Groq API · gpt-oss-120b (tool calling) · statistics-first anomaly detection |
 | Infra | Docker Compose · EC2 (TimescaleDB) · Render · GHCR images · PyPI / npm trusted publishing |
 
----
 
 ## Engineering Decisions
 
@@ -86,7 +81,6 @@ The read key ships in the dashboard, so generated SQL would make it a SQL consol
 **What would you do differently in v2?**
 Build the alert and SLO evaluation for several collector instances from the start: the scheduler and rate limits assume one instance today, which is fine for self-hosting but caps horizontal scaling.
 
----
 
 ## Docs
 
