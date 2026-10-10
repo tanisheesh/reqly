@@ -70,8 +70,10 @@ const EXPRESS_ERROR = "__reqlyErrorType";
  * mount path), requests no route matched as "__unmatched__".
  */
 export function reqlyExpress(clientOrOptions?: ClientOrOptions) {
-  const client = toClient(clientOrOptions);
+  return expressMiddleware(toClient(clientOrOptions));
+}
 
+function expressMiddleware(client: ReqlyClient, isUnmatched?: (route: string, statusCode: number) => boolean) {
   const middleware = (req: ExpressRequest, res: ExpressResponse, next: Next): void => {
     if (!claim(req)) return next();
     const start = process.hrtime.bigint();
@@ -100,7 +102,8 @@ export function reqlyExpress(clientOrOptions?: ClientOrOptions) {
       done = true;
       try {
         const routePath = req.route?.path;
-        const route = matched ?? (typeof routePath === "string" ? (req.baseUrl ?? "") + routePath : undefined);
+        let route = matched ?? (typeof routePath === "string" ? (req.baseUrl ?? "") + routePath : undefined);
+        if (route !== undefined && isUnmatched?.(route, res.statusCode)) route = undefined;
         client.record({
           method: req.method,
           route: route === "" ? "/" : route,
@@ -295,4 +298,175 @@ export function reqlyHono(clientOrOptions?: ClientOrOptions) {
     }
   };
   return Object.assign(middleware, { client });
+}
+
+// --- Koa -----------------------------------------------------------------------
+
+interface KoaContextLike {
+  method: string;
+  path: string;
+  status: number;
+  headers: Record<string, unknown>;
+  req: object;
+  response: { length?: number };
+  _matchedRoute?: unknown; // set by @koa/router: the full template, prefixes included
+}
+
+function httpStatusOf(err: unknown): number {
+  const e = err as { status?: unknown; statusCode?: unknown } | undefined;
+  const status = Number(e?.status ?? e?.statusCode);
+  return Number.isInteger(status) && status >= 400 && status <= 599 ? status : 500;
+}
+
+/**
+ * Koa middleware (2 and 3). Register it first, before your routers:
+ *
+ *     app.use(reqlyKoa({ serviceName: "checkout-api" }));
+ *     app.use(router.routes());
+ *
+ * Routes are @koa/router templates ("/api/users/:id", with router prefixes);
+ * requests no route matched are "__unmatched__". A thrown error is recorded
+ * with its status (500 unless it carries one, like ctx.throw(404)) and, for
+ * 5xx, its type -- then rethrown for Koa to handle.
+ */
+export function reqlyKoa(clientOrOptions?: ClientOrOptions) {
+  const client = toClient(clientOrOptions);
+
+  const middleware = async (ctx: KoaContextLike, next: () => Promise<unknown>): Promise<void> => {
+    if (!claim(ctx.req)) {
+      await next();
+      return;
+    }
+    const start = process.hrtime.bigint();
+    const usage = new LlmUsage();
+    let statusCode: number | undefined;
+    let errorType: string | undefined;
+    try {
+      await requestStorage.run(usage, () => next());
+    } catch (err) {
+      // Koa sets the status only after the error leaves every middleware.
+      statusCode = httpStatusOf(err);
+      if (statusCode >= 500) errorType = (err as Error | undefined)?.name ?? "Error";
+      throw err;
+    } finally {
+      try {
+        const route = ctx._matchedRoute;
+        client.record({
+          method: ctx.method,
+          route: typeof route === "string" ? route : undefined,
+          statusCode: statusCode ?? ctx.status,
+          durationMs: elapsedMs(start),
+          errorType,
+          requestBytes: intOrUndefined(ctx.headers["content-length"]),
+          responseBytes: intOrUndefined(ctx.response.length),
+          requestInfo: () => ({ method: ctx.method, path: ctx.path, headers: lowerHeaders(ctx.headers), raw: ctx }),
+          llm: usage.summary(),
+        });
+      } catch {
+        // never reaches the app
+      }
+    }
+  };
+  return Object.assign(middleware, { client });
+}
+
+// --- NestJS --------------------------------------------------------------------
+
+/* Structural types so @nestjs/* and rxjs aren't dependencies. */
+interface ObservableLike {
+  constructor: new (subscribe: (subscriber: ObserverLike) => () => void) => ObservableLike;
+  subscribe(observer: ObserverLike): { unsubscribe(): void };
+  pipe(operator: (source: ObservableLike) => ObservableLike): ObservableLike;
+}
+interface ObserverLike {
+  next(value: unknown): void;
+  error(err: unknown): void;
+  complete(): void;
+}
+interface NestExecutionContextLike {
+  getType(): string;
+  switchToHttp(): { getRequest(): unknown; getResponse(): unknown };
+}
+interface NestAppLike {
+  getHttpAdapter(): { getType?(): string; getInstance(): unknown };
+  use(...args: unknown[]): unknown;
+  useGlobalInterceptors(...interceptors: unknown[]): unknown;
+}
+
+/** Nest's own 404 handler is a catch-all route ("*path", "/api*path"). */
+function isNestNotFound(route: string, statusCode: number): boolean {
+  return statusCode === 404 && /\*[A-Za-z_]*$/.test(route);
+}
+
+/** HttpException (and subclasses) carry their status; anything else is a 500. */
+function nestErrorType(err: unknown): string | undefined {
+  const e = err as { getStatus?: () => unknown; name?: string } | undefined;
+  const status = typeof e?.getStatus === "function" ? Number(e.getStatus()) : 500;
+  return status >= 500 ? (e?.name ?? "Error") : undefined;
+}
+
+/**
+ * NestJS on the Express (default) or Fastify adapter. Call it before
+ * `app.listen()`:
+ *
+ *     const app = await NestFactory.create(AppModule);
+ *     reqlyNest(app, { serviceName: "checkout-api" });
+ *     await app.listen(3000);
+ *
+ * Routes are the full templates ("/api/users/:id", with the global prefix and
+ * controller path); Nest's catch-all 404 is "__unmatched__". A global
+ * interceptor records the type of exceptions that become 5xx -- HttpExceptions
+ * below 500 (NotFoundException, BadRequestException, ...) are not errors.
+ */
+export function reqlyNest(app: NestAppLike, clientOrOptions?: ClientOrOptions) {
+  const client = toClient(clientOrOptions);
+  const adapter = app.getHttpAdapter();
+  const fastify = adapter.getType?.() === "fastify";
+
+  if (fastify) {
+    const plugin = reqlyFastify(client);
+    (adapter.getInstance() as { register(plugin: unknown): unknown }).register(plugin);
+  } else {
+    app.use(expressMiddleware(client, isNestNotFound));
+  }
+
+  const interceptor = {
+    intercept(context: NestExecutionContextLike, next: { handle(): ObservableLike }): ObservableLike {
+      const stream = next.handle();
+      if (context.getType() !== "http") return stream;
+      const http = context.switchToHttp();
+      const mark = (err: unknown) => {
+        try {
+          const type = nestErrorType(err);
+          if (type === undefined) return;
+          if (fastify) {
+            (http.getRequest() as Record<symbol, unknown>)[ERROR] = type;
+          } else {
+            const res = http.getResponse() as ExpressResponse;
+            if (res.locals) res.locals[EXPRESS_ERROR] = type;
+          }
+        } catch {
+          // never reaches the app
+        }
+      };
+      // An rxjs operator built from the stream's own Observable class, so
+      // rxjs doesn't have to be a dependency.
+      return stream.pipe(
+        (source) =>
+          new source.constructor((subscriber) => {
+            const subscription = source.subscribe({
+              next: (value) => subscriber.next(value),
+              error: (err) => {
+                mark(err);
+                subscriber.error(err);
+              },
+              complete: () => subscriber.complete(),
+            });
+            return () => subscription.unsubscribe();
+          }),
+      );
+    },
+  };
+  app.useGlobalInterceptors(interceptor);
+  return { client };
 }
