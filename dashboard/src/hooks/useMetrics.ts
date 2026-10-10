@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, TimeWindow } from "../api/client";
+import { api, TimeWindow, UsageWindow } from "../api/client";
 
 // Plain REST polling, not WebSocket/SSE: the underlying continuous
 // aggregates refresh at 1-minute / 1-hour granularity server-side, so a
@@ -41,6 +41,26 @@ export function useSlos(serviceName: string | null) {
     enabled: !!serviceName,
     refetchInterval: 60_000,
     retry: false, // collectors older than 0.5 have no /v1/slos
+  });
+}
+
+export function useConsumers(serviceName: string | null, window: UsageWindow) {
+  return useQuery({
+    queryKey: ["consumers", serviceName, window],
+    queryFn: () => api.getConsumers(serviceName!, window),
+    enabled: !!serviceName,
+    refetchInterval: 300_000,
+    retry: false, // collectors before 0.8 have no endpoint
+  });
+}
+
+export function useLlmUsage(serviceName: string | null, window: UsageWindow) {
+  return useQuery({
+    queryKey: ["llm-usage", serviceName, window],
+    queryFn: () => api.getLlmUsage(serviceName!, window),
+    enabled: !!serviceName,
+    refetchInterval: 300_000,
+    retry: false,
   });
 }
 

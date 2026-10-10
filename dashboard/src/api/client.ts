@@ -78,6 +78,13 @@ export interface Anomaly {
   window_start?: string;
   release_context?: ReleaseContext | null;
   hints?: Hint[];
+  affected_consumers?: AffectedConsumers;
+}
+
+export interface AffectedConsumers {
+  active: number;
+  affected: number;
+  top: { consumer_id: string; requests: number; errors: number }[];
 }
 
 export interface Hint {
@@ -177,7 +184,63 @@ export interface DriftReport {
   unmatched_requests: number;
   undocumented: UndocumentedRoute[];
   dead: DriftOperation[];
-  deprecated_in_use: (DriftOperation & { requests: number; last_seen: string; routes: string[] })[];
+  deprecated_in_use: (DriftOperation & {
+    requests: number;
+    last_seen: string;
+    routes: string[];
+    consumers?: { consumer_id: string; requests: number; last_seen: string }[];
+  })[];
+}
+
+export type UsageWindow = "24h" | "7d" | "30d";
+
+export interface ConsumerRow {
+  consumer_id: string;
+  requests: number;
+  share_of_requests: number | null;
+  errors: number;
+  error_rate: number | null;
+  routes: number;
+  p95_ms: number | null;
+  last_seen: string;
+}
+
+export interface ConsumersReport {
+  window: UsageWindow;
+  requests: number;
+  requests_with_consumer: number;
+  consumers: number;
+  top: ConsumerRow[];
+}
+
+export interface LlmModelUsage {
+  model: string;
+  priced_as: string | null;
+  llm_requests: number;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number | null;
+}
+
+export interface LlmRouteUsage {
+  route: string;
+  requests: number;
+  llm_requests: number;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+  cost_per_1k_requests: number;
+  tokens_per_llm_request: number;
+  models: LlmModelUsage[];
+}
+
+export interface LlmUsageReport {
+  window: UsageWindow;
+  totals: { requests: number; llm_requests: number; input_tokens: number; output_tokens: number; cost_usd: number };
+  routes: LlmRouteUsage[];
+  daily: { day: string; cost_usd: number }[];
+  unpriced_models: { model: string; tokens: number }[];
+  prices_as_of: string | null;
 }
 
 export interface AskStep {
@@ -262,6 +325,12 @@ export const api = {
 
   listSlos: (serviceName: string) =>
     getJSON<{ slos: Slo[] }>(`/v1/slos?service_name=${encodeURIComponent(serviceName)}`),
+
+  getConsumers: (serviceName: string, window: UsageWindow) =>
+    getJSON<ConsumersReport>(`/v1/services/${encodeURIComponent(serviceName)}/consumers?window=${window}`),
+
+  getLlmUsage: (serviceName: string, window: UsageWindow) =>
+    getJSON<LlmUsageReport>(`/v1/services/${encodeURIComponent(serviceName)}/llm-usage?window=${window}`),
 
   getApiDrift: (serviceName: string) =>
     getJSON<DriftReport>(`/v1/services/${encodeURIComponent(serviceName)}/openapi/drift`),
