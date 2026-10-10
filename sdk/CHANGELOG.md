@@ -2,6 +2,18 @@
 
 All notable changes to the `reqly` Python SDK.
 
+## 0.5.3 — 2026-10-11
+
+### Fixed
+- Under heavy traffic events could be dropped: the flush thread only woke every
+  `flush_interval_seconds`, so above ~400 requests/s per process the 2,000-event queue filled
+  between flushes. A full batch now ships right away (whole batches only; the remainder waits
+  for the interval).
+
+### Added
+- `REQLY_FLUSH_INTERVAL_MS` (the Node SDK's name) is read when `REQLY_FLUSH_INTERVAL_SECONDS`
+  isn't set, so one environment configures both SDKs.
+
 ## 0.5.2 — 2026-10-11
 
 ### Changed

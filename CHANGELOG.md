@@ -12,11 +12,13 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 
 ## [0.12.0] — 2026-10-11
 
-Collector 0.12.0 · reqly-node 0.3.0 · Helm chart 0.12.0
+Collector 0.12.0 · Python SDK 0.5.3 · reqly-node 0.3.0 · Helm chart 0.12.0
 
 ### ✨ Added
 - Node SDK: `reqlyHttp()` for plain node:http or any framework without an integration (with a
   `routeResolver`), and Bun support (Hono on `Bun.serve`, node:http), tested in CI
+- Node SDK: `pushOpenapi` uploads the app's spec (Fastify via @fastify/swagger, NestJS document,
+  or any spec), and streamed response bodies are measured
 - OpenTelemetry apps get LLM cost: GenAI spans (`gen_ai.usage.*`) are added to the HTTP request
   they ran under, so cost per route and LLM cost alerts work without a Reqly SDK
 - A cap on distinct API consumers: the first `CONSUMER_LIMIT_PER_DAY` (1,000) per service per day
@@ -26,6 +28,10 @@ Collector 0.12.0 · reqly-node 0.3.0 · Helm chart 0.12.0
   endpoints with traffic, unused ones, and deprecated ones still called (and by whom)
 
 ### 🐛 Fixed
+- Python SDK: heavy traffic (~400+ requests/s per process) no longer drops events between
+  flushes; a full batch ships right away
+- Node SDK: in Express and Fastify a 4xx error object no longer counts as an error; Koa includes a
+  stream body's time and size
 - LLM prices: the table is checked against the providers' pages (2026-10) and covers current
   OpenAI, Anthropic, Google and Groq models. A model only matches its own entry or a dated
   snapshot of it, so `gpt-4o-mini`-style variants and new models are no longer priced as a

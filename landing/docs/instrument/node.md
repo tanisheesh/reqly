@@ -137,7 +137,7 @@ Options passed to `reqlyExpress()` / `reqlyFastify()` / `reqlyHono()` (or to a s
 | `release` | `REQLY_RELEASE`, then `GITHUB_SHA`, `CI_COMMIT_SHA`, `RENDER_GIT_COMMIT`, `VERCEL_GIT_COMMIT_SHA`, … | auto-detected |
 | `environment` | `REQLY_ENVIRONMENT` | none |
 | `sampleRate` | `REQLY_SAMPLE_RATE` | `1` |
-| `flushIntervalMs` | `REQLY_FLUSH_INTERVAL_MS` | `5000` |
+| `flushIntervalMs` | `REQLY_FLUSH_INTERVAL_MS` (or `REQLY_FLUSH_INTERVAL_SECONDS`) | `5000`; a full batch is sent at once |
 | `maxBatchSize` | `REQLY_MAX_BATCH_SIZE` | `200` |
 | `maxQueueSize` | `REQLY_MAX_QUEUE_SIZE` | `2000` |
 | `ignoreRoutes` | `REQLY_IGNORE_ROUTES` (comma-separated) | `/health,/metrics` |
@@ -145,6 +145,7 @@ Options passed to `reqlyExpress()` / `reqlyFastify()` / `reqlyHono()` (or to a s
 | `consumer` | — | none: `(info) => string | undefined` |
 | `consumerSalt` | `REQLY_CONSUMER_SALT` | none: set it |
 | `hashConsumer` | `REQLY_HASH_CONSUMER` | `true` |
+| `pushOpenapi` | `REQLY_PUSH_OPENAPI` | `false`. See [OpenAPI drift](../features/openapi-drift.md) |
 
 ## Shutting down
 

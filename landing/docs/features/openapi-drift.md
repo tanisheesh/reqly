@@ -15,13 +15,31 @@ It also shows the spec's coverage and the share of traffic that goes to undocume
 
 ## Upload a spec
 
-=== "From the app (FastAPI, Litestar)"
+=== "From the app (Python)"
+
+    FastAPI and Litestar generate their own spec:
 
     ```python
     reqly.instrument(app, push_openapi=True)   # or REQLY_PUSH_OPENAPI=true
     ```
 
-    The SDK uploads the app's own spec on the first request.
+    The SDK uploads it on the first request.
+
+=== "From the app (Node.js)"
+
+    ```js
+    // Fastify with @fastify/swagger: picked up by itself
+    await app.register(reqlyFastify({ serviceName: "checkout-api", pushOpenapi: true }));
+
+    // NestJS: pass the document @nestjs/swagger builds
+    const document = SwaggerModule.createDocument(app, new DocumentBuilder().build());
+    reqlyNest(app, { serviceName: "checkout-api", pushOpenapi: document });
+
+    // anything else: a function returning the spec (sync or async)
+    reqlyExpress({ serviceName: "checkout-api", pushOpenapi: () => spec });
+    ```
+
+    The SDK uploads it on the first request.
 
 === "From CI (any app)"
 

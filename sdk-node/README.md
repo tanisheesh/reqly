@@ -130,7 +130,7 @@ Options passed to `reqlyExpress()` / `reqlyFastify()` / `reqlyHono()` (or a shar
 | `release` | `REQLY_RELEASE`, then `GITHUB_SHA`, `CI_COMMIT_SHA`, `RENDER_GIT_COMMIT`, `VERCEL_GIT_COMMIT_SHA`, … | auto-detected |
 | `environment` | `REQLY_ENVIRONMENT` | none |
 | `sampleRate` | `REQLY_SAMPLE_RATE` | `1` |
-| `flushIntervalMs` | `REQLY_FLUSH_INTERVAL_MS` | `5000` |
+| `flushIntervalMs` | `REQLY_FLUSH_INTERVAL_MS` (or `REQLY_FLUSH_INTERVAL_SECONDS`) | `5000` |
 | `maxBatchSize` | `REQLY_MAX_BATCH_SIZE` | `200` |
 | `maxQueueSize` | `REQLY_MAX_QUEUE_SIZE` | `2000` |
 | `ignoreRoutes` | `REQLY_IGNORE_ROUTES` (comma-separated) | `/health,/metrics` |
@@ -138,6 +138,7 @@ Options passed to `reqlyExpress()` / `reqlyFastify()` / `reqlyHono()` (or a shar
 | `consumer` | — | none: `(info) => string \| undefined` |
 | `consumerSalt` | `REQLY_CONSUMER_SALT` | none (set it) |
 | `hashConsumer` | `REQLY_HASH_CONSUMER` | `true` |
+| `pushOpenapi` | `REQLY_PUSH_OPENAPI` | `false`: the spec object, a function returning it, or `true` for @fastify/swagger |
 
 Events still queued when the process exits on its own are sent automatically; on `SIGTERM`
 or `process.exit()`, `await reqly.client.shutdown()` first.

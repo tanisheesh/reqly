@@ -138,7 +138,7 @@ Every option can be passed to `instrument()` or set as an environment variable. 
 | `release` | `REQLY_RELEASE`, then CI variables | auto-detected, else `None` |
 | `environment` | `REQLY_ENVIRONMENT` | `None` |
 | `sample_rate` | `REQLY_SAMPLE_RATE` | `1.0` |
-| `flush_interval_seconds` | `REQLY_FLUSH_INTERVAL_SECONDS` | `5.0` |
+| `flush_interval_seconds` | `REQLY_FLUSH_INTERVAL_SECONDS` (or `REQLY_FLUSH_INTERVAL_MS`) | `5.0`; a full batch is sent at once |
 | `max_batch_size` | `REQLY_MAX_BATCH_SIZE` | `200` |
 | `max_queue_size` | `REQLY_MAX_QUEUE_SIZE` | `2000` |
 | `ignore_routes` | `REQLY_IGNORE_ROUTES` (comma-separated) | `/health,/metrics` |

@@ -10,6 +10,20 @@ All notable changes to `reqly-node`.
   a resolver (or when it throws) requests are `__unmatched__`, never the raw path; errors the
   handler throws or rejects with are recorded with their type and rethrown.
 - Verified on Bun: Hono on `Bun.serve` and `reqlyHttp` on Bun's node:http, run in CI.
+- `pushOpenapi`: uploads the app's OpenAPI spec once, on the first request, for API drift: the
+  spec object (e.g. NestJS `SwaggerModule.createDocument`), a function returning it, or `true`
+  to read it from @fastify/swagger. Also `REQLY_PUSH_OPENAPI`.
+- Streamed response bodies (no Content-Length: streams, chunked, server-sent events) are
+  measured by counting what is written, in Express, Fastify, Koa, NestJS and `reqlyHttp`.
+- `stats.observed`: requests seen before sampling; retries get jitter.
+- `REQLY_FLUSH_INTERVAL_SECONDS` (the Python SDK's name) is read too.
+
+### Fixed
+- Express and Fastify counted any error as an error, so `next(createError(404))` or a 400
+  validation error raised the error rate; now, like Koa, NestJS and the Python SDK, only errors
+  that end in a 5xx are errors.
+- Koa recorded a request before Koa sent a stream body, so its time and size were missing;
+  it now records when the response finishes.
 
 ## 0.2.0 — 2026-10-10
 
