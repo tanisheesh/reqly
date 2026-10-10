@@ -145,8 +145,13 @@ jobs:
           IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
           DESCRIPTION: ${{ matrix.description }}
         run: |
-          # shown on the package page
-          docker buildx imagetools create             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON")             --annotation "index:org.opencontainers.image.description=$DESCRIPTION"             $(printf "$IMAGE@sha256:%s " *)
+          # The tag list and the digests must split into separate arguments.
+          # The annotation is the description shown on the package page.
+          # shellcheck disable=SC2046
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            --annotation "index:org.opencontainers.image.description=$DESCRIPTION" \
+            $(printf "$IMAGE@sha256:%s " *)
           docker buildx imagetools inspect "$IMAGE:${{ steps.version.outputs.version }}"
 
   chart:
