@@ -44,7 +44,7 @@ logger = logging.getLogger("reqly.insights")
 
 DATABASE_URL: str = os.environ["DATABASE_URL"]
 GROQ_API_KEY: str | None = os.environ.get("GROQ_API_KEY") or None
-GROQ_MODEL: str = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_MODEL: str = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
 S3_BUCKET: str | None = os.environ.get("S3_BUCKET") or None
 
 
@@ -78,7 +78,7 @@ def generate_report(service_name: str, week_start: str, anomalies: list[dict]) -
                 {"role": "user", "content": json.dumps(payload, indent=2)},
             ],
             temperature=0.3,
-            max_tokens=600,
+            max_tokens=2000,  # includes the model's reasoning tokens
         )
         return response.choices[0].message.content
     except Exception:

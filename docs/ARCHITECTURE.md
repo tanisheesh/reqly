@@ -17,7 +17,7 @@ enough to build it, debug it, or extend it.
 | Collector | FastAPI 0.110 · Uvicorn · asyncpg 0.29 · APScheduler 3.x · slowapi · Pydantic v2 · Mangum (Lambda adapter) |
 | Database | TimescaleDB latest-pg16 · hypertables · continuous aggregates · retention policies |
 | Dashboard | React 19 · Vite 8 · TypeScript 6 · Tailwind CSS 4 · Recharts 3 · TanStack Query 5 |
-| AI | Groq API · Llama 3.3-70b-versatile · z-score anomaly detection (Python stdlib `statistics`) |
+| AI | Groq API · gpt-oss-120b · z-score anomaly detection (Python stdlib `statistics`) |
 | Infra (local) | Docker Compose (4 services: timescaledb, collector, dashboard, load-generator) |
 | Infra (prod) | EC2 t3.small (TimescaleDB) · AWS Lambda + EventBridge (weekly insights) · S3 (report archive) · SAM |
 
@@ -72,6 +72,10 @@ At :15 past every hour the collector refreshes the last completed hour in `route
 
 An SLO is one objective for a service or route over a window (default 28 days): `availability` (share of requests without an error) or `latency` (share at or under a threshold). The window's SLI and error budget come from `api_latency_1min` (latency via `approx_percentile_rank` on the merged sketch; without the Toolkit, from raw events covering at most 14 days). Burn rates for 5m / 30m / 1h / 6h come from raw events, which are current to the second. Every 5 minutes `app/alerts/slo_alerts.py` applies the multi-window burn-rate rules from the Google SRE workbook — fast burn when the 1h **and** 5m burn rates are ≥ 14.4, slow burn when the 6h **and** 30m rates are ≥ 6, with at least 20 requests in the longer window — and keeps one open alert per SLO (`kind = 'slo'` in `alerts`), notified through the same channels as anomaly alerts and resolved after 30 minutes out of burn.
 
+### Ask Reqly
+
+`POST /v1/ask {service_name, question}` answers questions like "why was /orders slow yesterday afternoon?" with Groq tool calling (`app/ask/`). The model never writes SQL: it chooses among six read-only tools — `get_stats` (totals or per route/hour/day, from the sketch aggregate), `compare_periods`, `get_breakdown` (by host, environment, release, status code, error type or method, from raw events), `list_releases`, `get_alerts` and `get_slos` — whose arguments are validated and whose time ranges are clamped to retention. Results are rounded aggregates, never raw events. The system prompt carries the current UTC time, the dates of the last 8 days, the service's routes and its recent releases, so relative times ("last Monday") and deploys resolve without a lookup. At most 6 tool calls per question; after that the model must answer from what it has. The response includes every tool call and its result, and the dashboard shows them under the answer. Every number in the answer is then looked up in those results (as written, as a percentage, ms as seconds, a ratio as a percent change, at the written precision); the ones not found come back as `unverified_numbers` and the dashboard flags them, since models occasionally mis-copy digits. The read key is public to dashboard viewers, so the endpoint is limited to 5 questions a minute per IP and `ASK_DAILY_LIMIT` (default 200) per collector per day. An eval set over the load generator's scenarios lives in `collector/tests/ask_eval/` (run by hand; it needs a Groq key).
+
 ### AI Insights Pipeline
 
 1. APScheduler triggers weekly (or on-demand via API endpoint).
@@ -80,7 +84,7 @@ An SLO is one objective for a service or route over a window (default 28 days): 
 4. Top 5 anomalies by z-score are serialized to JSON, each with the hour it happened (`window_start`).
 4c. `hints.py` adds deterministic root-cause `hints`: errors or slow requests concentrated on one host/environment relative to its traffic share, or an error type / status code that dominates the errors and was rare in the previous week.
 4b. `deploys.py` adds a `release_context` to each anomaly from raw events + the `deployments` table: which release served that route in that hour, whether it was first seen within the week before (so the baseline ran on something else), and for a new release the previous release plus before/after error rate and p95 on that route.
-5. If `GROQ_API_KEY` is set, the structured anomaly JSON is sent to Llama 3.3-70b-versatile (temperature 0.3, max 600 tokens) with a system prompt that explicitly forbids inventing root causes. Otherwise the raw statistical findings are formatted as plain text.
+5. If `GROQ_API_KEY` is set, the structured anomaly JSON is sent to `openai/gpt-oss-120b` (temperature 0.3, at most 2 000 tokens including reasoning) with a system prompt that explicitly forbids inventing root causes. Otherwise the raw statistical findings are formatted as plain text.
 6. The result is upserted into `insight_reports`.
 
 ---
@@ -191,6 +195,7 @@ Groq call has a 30 s timeout. On any exception (timeout, rate limit, provider ou
 | `GET` | `/v1/slos` | Read key | SLOs with live status: SLI, error budget left, burn rates (5m / 30m / 1h / 6h), state |
 | `PUT` | `/v1/slos` | Ingest key | Create or update an SLO (by service + name) |
 | `DELETE` | `/v1/slos/{id}` | Ingest key | Delete an SLO |
+| `POST` | `/v1/ask` | Read key | Ask Reqly: answers a question about one service from its data (5/min per IP, `ASK_DAILY_LIMIT` per day) |
 | `POST` | `/v1/insights/generate` | Read key | Trigger insights generation on demand (rate-limited 5/min) |
 
 ---

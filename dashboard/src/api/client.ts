@@ -149,6 +149,19 @@ export interface InsightReport {
   generated_at?: string;
 }
 
+export interface AskStep {
+  tool: string;
+  arguments: Record<string, unknown>;
+  result: Record<string, unknown>;
+}
+
+export interface AskAnswer {
+  answer: string;
+  steps: AskStep[];
+  model: string;
+  unverified_numbers?: string[]; // numbers in the answer not found in any tool result
+}
+
 export class HttpError extends Error {
   constructor(
     message: string,
@@ -175,6 +188,24 @@ async function postJSON<T>(path: string): Promise<T> {
   });
   if (!response.ok) {
     throw new HttpError(`POST ${path} failed: ${response.status}`, response.status);
+  }
+  return response.json();
+}
+
+async function sendJSON<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${COLLECTOR_URL}${path}`, {
+    method: "POST",
+    headers: { ...AUTH_HEADERS, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    let detail = "";
+    try {
+      detail = (await response.json()).detail ?? "";
+    } catch {
+      // not JSON
+    }
+    throw new HttpError(typeof detail === "string" && detail ? detail : `POST ${path} failed: ${response.status}`, response.status);
   }
   return response.json();
 }
@@ -208,6 +239,9 @@ export const api = {
     getJSON<InsightReport>(
       `/v1/insights/latest?service_name=${encodeURIComponent(serviceName)}`
     ),
+
+  ask: (serviceName: string, question: string) =>
+    sendJSON<AskAnswer>("/v1/ask", { service_name: serviceName, question }),
 
   generateInsight: (serviceName: string) =>
     postJSON<InsightReport>(

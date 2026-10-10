@@ -76,6 +76,14 @@ the way it is. Every entry answers a question an interviewer might ask.
 
 **Tradeoff:** Needs the Toolkit (`timescaledb-ha` image or Timescale Cloud). The migration detects it and the collector falls back to the old views without it, so plain `timescale/timescaledb` installs keep working.
 
+## Decision — Ask Reqly uses fixed query tools, not text-to-SQL
+
+**Problem:** Natural-language questions need data the model can't see. Letting it write SQL is the most flexible option, but a read key that ships in the dashboard bundle would then be a SQL console, and generated SQL over percentile sketches and hypertables is easy to get subtly wrong (averaging percentiles, scanning 14 days of raw events).
+
+**Decision:** Six fixed tools with validated arguments over the same aggregates the dashboard uses, returning rounded numbers. The answer comes with the list of calls and their results, so every number can be checked.
+
+**Tradeoff:** Questions outside the tools ("which consumer sent the most traffic?") get "can't answer from the available data" until a tool exists for them. Each question costs a few LLM calls, so it is rate-limited per IP and capped per day.
+
 ---
 
 ## What I'd do differently in v2

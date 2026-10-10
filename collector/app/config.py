@@ -21,6 +21,8 @@ class Settings:
     read_key: str
     groq_api_key: str | None
     groq_model: str
+    ask_model: str
+    ask_daily_limit: int
     cors_origins: list[str]
     db_pool_min_size: int
     db_pool_max_size: int
@@ -65,7 +67,12 @@ class Settings:
             ingest_key=ingest_key,
             read_key=read_key,
             groq_api_key=os.environ.get("GROQ_API_KEY") or None,
-            groq_model=os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile"),
+            groq_model=os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b"),
+            # Ask Reqly needs reliable tool calling; defaults to the report model.
+            ask_model=os.environ.get("ASK_MODEL") or os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b"),
+            # The read key ships in the dashboard bundle, so anyone who can open
+            # the dashboard can ask. This caps the Groq spend per day; 0 turns Ask off.
+            ask_daily_limit=int(os.environ.get("ASK_DAILY_LIMIT", "200")),
             cors_origins=cors_origins,
             db_pool_min_size=int(os.environ.get("DB_POOL_MIN_SIZE", "2")),
             db_pool_max_size=int(os.environ.get("DB_POOL_MAX_SIZE", "10")),

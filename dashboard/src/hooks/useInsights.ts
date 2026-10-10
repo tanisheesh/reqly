@@ -10,6 +10,12 @@ export function useLatestInsight(serviceName: string | null) {
   });
 }
 
+export function useAsk(serviceName: string | null) {
+  return useMutation({
+    mutationFn: (question: string) => api.ask(serviceName!, question),
+  });
+}
+
 export function useGenerateInsight(serviceName: string | null) {
   const queryClient = useQueryClient();
   return useMutation({

@@ -36,12 +36,11 @@ Parameters:
 
   GroqModel:
     Type: String
-    Default: llama-3.3-70b-versatile
+    Default: openai/gpt-oss-120b
     Description: >
-      Groq model ID. llama-3.3-70b-versatile is used deliberately over
-      smaller/faster models because this runs once a week as a batch job —
-      Groq's famous low-latency inference does not matter here; report
-      quality does.
+      Groq model ID. The largest model Groq serves is used deliberately
+      because this runs once a week as a batch job -- Groq's low-latency
+      inference does not matter here; report quality does.
 
   Environment:
     Type: String
@@ -104,7 +103,7 @@ Resources:
       Description: >
         Weekly AI insights: pulls 8 weeks of route_errors_1hour data,
         runs z-score anomaly detection (day-of-week x hour-of-day baseline),
-        hands findings to Groq (Llama 3.3-70b), stores result in TimescaleDB
+        hands findings to Groq (gpt-oss-120b), stores result in TimescaleDB
         and archives to S3.
       Policies:
         - S3WritePolicy:
