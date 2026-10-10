@@ -1,11 +1,6 @@
 # Reqly — Architecture
 
-<!--
-Companion to PRD.md.
-PRD says WHAT the system does. This says HOW.
-Audience: an engineer who needs to understand the system well
-enough to build it, debug it, or extend it.
--->
+Companion to [PRD.md](PRD.md): the PRD says what Reqly does, this says how.
 
 ---
 
@@ -13,13 +8,14 @@ enough to build it, debug it, or extend it.
 
 | Layer | Tech |
 |---|---|
-| SDK | Python 3.9+ · threading · httpx 0.27 · pure ASGI middleware (FastAPI) · WSGI hooks (Flask) |
-| Collector | FastAPI 0.110 · Uvicorn · asyncpg 0.29 · APScheduler 3.x · slowapi · Pydantic v2 · Mangum (Lambda adapter) |
-| Database | TimescaleDB latest-pg16 · hypertables · continuous aggregates · retention policies |
-| Dashboard | React 19 · Vite 8 · TypeScript 6 · Tailwind CSS 4 · Recharts 3 · TanStack Query 5 |
-| AI | Groq API · gpt-oss-120b · z-score anomaly detection (Python stdlib `statistics`) |
-| Infra (local) | Docker Compose (4 services: timescaledb, collector, dashboard, load-generator) |
-| Infra (prod) | EC2 t3.small (TimescaleDB) · AWS Lambda + EventBridge (weekly insights) · S3 (report archive) · SAM |
+| Python SDK | Python 3.9+ · pure ASGI middleware (FastAPI, Starlette, Litestar) · Flask hooks · Django middleware · generic WSGI/ASGI wrappers · httpx · one background flush thread |
+| Node.js SDK | TypeScript, Node 20+, no runtime dependencies · Express / Fastify / Hono middleware · `AsyncLocalStorage` · `fetch` |
+| Collector | FastAPI · Uvicorn · asyncpg · APScheduler 3 · slowapi · Pydantic v2 · argon2-cffi · opentelemetry-proto · httpx |
+| Database | TimescaleDB on PostgreSQL 16 (`timescale/timescaledb-ha`, with the Toolkit) · hypertables · continuous aggregates · UddSketch · retention policies |
+| Dashboard | React 19 · Vite · TypeScript · Tailwind CSS 4 · Recharts · TanStack Query |
+| AI | Groq API · `openai/gpt-oss-120b` (reports and tool calling) · statistics-first detection (Poisson tail / z-score) |
+| Infra (local) | Docker Compose: timescaledb, collector, dashboard, load-generator |
+| Infra (live demo) | TimescaleDB on an EC2 t3.micro (TLS) · collector and dashboard on Render · GHCR images · PyPI and npm trusted publishing |
 
 ---
 
@@ -27,42 +23,45 @@ enough to build it, debug it, or extend it.
 
 ```
 reqly/
-  sdk/                Python package (pip install reqly) — ASGI/WSGI middleware, buffer, shipper
-  collector/          FastAPI service — ingest, metrics queries, insights scheduler
-  collector/migrations/  001_init.sql — schema applied by the collector on startup
-  dashboard/          React SPA — charts, KPI tiles, insights panel
-  load_generator/     Synthetic traffic generator for demo/backfill
-  demo/               Flask EventFlow app — the live demo target instrumented by the SDK
-  infra/              AWS SAM template, EC2 user-data script, deployment docs
+  sdk/                   Python SDK (PyPI: reqly)
+  sdk-node/              Node.js SDK (npm: reqly-node)
+  collector/app/         FastAPI collector
+    routers/             ingest, otlp, metrics, alerts, slos, insights, ask, openapi, usage, projects, auth
+    db/                  pool + migrations runner, queries, late-data refresher
+    insights/ alerts/    detection, release context, hints, weekly report, hourly + SLO alerts, notifier
+    ask/                 Ask Reqly agent, tools, number verification
+    slo/ openapi/ consumers/ llm/ projects/ users/   feature modules
+  collector/migrations/  001-009 SQL, applied on start-up (tracked in schema_migrations)
+  dashboard/             React SPA
+  load_generator/        demo traffic with deliberate incidents (bad deploy, bad pod, Monday spike)
+  bench/                 SDK overhead benchmarks
+  demo/                  EventFlow, the instrumented demo app
+  infra/                 EC2 user-data, optional AWS SAM stack for the weekly report, deploy guide
 ```
 
-### SDK (`sdk/reqly/`)
+### SDKs (`sdk/`, `sdk-node/`)
 
-Auto-instruments FastAPI (pure ASGI middleware wrapping `send`) and Flask (before/after request hooks). The SDK is strictly non-blocking: `record_request()` puts an event onto an in-memory `deque(maxlen=2000)` (dropping oldest on backpressure) and returns immediately. A single daemon background thread flushes batches of up to 200 events every 5 seconds via `httpx.Client` with strict per-phase timeouts (connect 1s, read 2s, write 2s). On any internal failure the SDK logs once at WARNING and self-disables — it never raises into the host application. Route normalization uses the framework's matched template (`/users/{id}`) so cardinality is O(routes), not O(URLs); unmatched paths collapse to `__unmatched__`.
+Middleware records each request when the response finishes: method, the framework's matched route template (never the raw path; no match → `__unmatched__`), status, duration, error type, sizes, an optional consumer id (from a header or a function, HMAC-hashed with the app's salt) and LLM tokens recorded during the request (`record_llm_usage`). The event goes into a bounded in-memory queue (oldest dropped when full) and the request returns; a background flusher sends batches to `/v1/ingest` with short timeouts and retries on 408/429/5xx (the collector dedups on `event_id`). Anything that fails inside the SDK is logged and never raised into the app. Release and environment are sent once per batch, the release auto-detected from CI variables (`GITHUB_SHA`, `RENDER_GIT_COMMIT`, ...). Per-request overhead is measured in [bench/](../bench/README.md).
 
 ### Collector (`collector/app/`)
 
-FastAPI service with three routers:
+One FastAPI service:
 
-- **Ingest** (`POST /v1/ingest`) — receives SDK batches, validates each event independently (partial-batch acceptance: one bad event drops only itself), authenticates via `X-Reqly-Key`, rate-limited at 600 req/min via slowapi, writes to TimescaleDB with asyncpg.
-- **Metrics** (`GET /v1/metrics/summary`, `/v1/services`, `/v1/services/{name}/routes`) — reads from continuous aggregates using concurrent `asyncio.gather` for the five sub-queries. All reads require `X-Reqly-Key` (read key, separate from ingest key in production).
-- **Insights** (`GET /v1/insights/latest`, `POST /v1/insights/generate`) — serves the latest weekly report, or triggers one on demand for demos.
+- **Ingest:** `POST /v1/ingest` (SDK batches, per-event validation) and `POST /otlp/v1/traces` (OTLP/HTTP; HTTP server spans become events). Both refuse events older than 13 days (unless the batch is a backfill) or in the future, and enforce which project a service belongs to.
+- **Reads:** metrics summary, services, routes, releases, alerts, SLOs, consumers, LLM usage, OpenAPI drift, latest report — reading from the continuous aggregates, raw events only where freshness or detail requires it.
+- **Configuration:** SLOs, OpenAPI specs, projects, API keys, members (admin).
+- **AI:** Ask Reqly and on-demand weekly reports.
+- **Auth:** sign-in, sessions, password changes.
 
-On startup the collector creates an asyncpg connection pool, starts a late-data refresher (events older than the aggregates' 1h policy look-back — backfills, SDK retries — are materialized explicitly via `refresh_continuous_aggregate`, in 7-day slices), and starts an APScheduler job that runs the insights pipeline weekly (overrideable on demand). On shutdown it drains the scheduler and closes the pool.
+On start it creates the asyncpg pool, applies pending migrations, creates the first admin if configured, and starts two background loops: the late-data refresher (materializes events older than the aggregates' look-back, e.g. backfills, in 7-day slices) and APScheduler (weekly report, hourly anomaly check at :15, SLO check every 5 minutes).
 
 ### TimescaleDB
 
-Raw events stored in a `request_events` hypertable (1-day chunks, composite PK `(time, event_id)`, 14-day retention). Three continuous aggregates pre-compute rollups on insert:
-
-- `route_latency_1min` — p50/p95/p99/avg per minute (90-day retention)
-- `route_errors_1hour` — error count, error rate, p95 per hour (180-day retention)
-- `route_status_distribution_1hour` — status code counts per hour (180-day retention)
-
-A separate plain `insight_reports` table stores one row per service per week (not a hypertable — TimescaleDB features add nothing for low-cardinality weekly data).
+`request_events` is a hypertable (1-day chunks, 14-day retention). Continuous aggregates roll it up: `api_latency_1min` (UddSketch per minute, service, environment, route and method — the main source of latency and error charts; 90 days), the older `route_latency_1min`, `route_errors_1hour` and `route_status_distribution_1hour` (also the fallback when the Toolkit is absent), and `consumer_usage_1hour` / `llm_usage_1hour` (90 days). Configuration and state live in plain tables (see §4).
 
 ### Dashboard (`dashboard/src/`)
 
-Single-page React app built with Vite. State is TanStack Query — metrics are polled every 30 s by default. Components: `ServiceSelector`, `TimeRangePicker`, `LatencyChart` (Recharts LineChart with p50/p95/p99 series), `ErrorRateChart`, `StatusDistributionChart` (pie), `TopRoutesTable`, `InsightsPanel`. KPI tiles show live requests/min, p95, and error rate. The dashboard is a static SPA — the Vite build is deployed to any static host; it calls the collector directly from the browser.
+A static React SPA that calls the collector from the browser with a session token (signed-in users) or the read key (public dashboard). TanStack Query polls every 30–60 s. Panels for SLOs, consumers, LLM cost, API surface and alerts only appear when their data exists. The prebuilt image reads `REQLY_COLLECTOR_URL` / `REQLY_READ_KEY` at start-up, so one image works for any collector.
 
 ### Hourly alerts
 
@@ -90,76 +89,61 @@ A service's spec (`api_specs`, one per service, uploaded with the ingest key or 
 
 ### AI Insights Pipeline
 
-1. APScheduler triggers weekly (or on-demand via API endpoint).
+1. APScheduler triggers weekly, Sunday 23:00 UTC (or on demand: `POST /v1/insights/generate`, cached for 10 minutes).
 2. Pulls 8 weeks of hourly aggregates from `route_errors_1hour`.
-3. `anomaly_detection.py` computes a day-of-week × hour-of-day seasonal baseline from the older 7 weeks, compares the most recent 7 days, and flags (route, dow, hour) cells whose error count or p95 rose significantly. Error rates use an exact Poisson tail test on the request/error counts; p95 is only tested on hours with ≥ 100 requests. A cell is flagged at z > 4.0 (≈ Bonferroni for ~1,700 cells per run) and only if the shift is material (≥ 2pp of errors or ≥ 50% p95). Requires ≥ 3 baseline samples.
-4. Top 5 anomalies by z-score are serialized to JSON, each with the hour it happened (`window_start`).
-4c. `hints.py` adds deterministic root-cause `hints`: errors or slow requests concentrated on one host/environment relative to its traffic share, or an error type / status code that dominates the errors and was rare in the previous week.
-4b. `deploys.py` adds a `release_context` to each anomaly from raw events + the `deployments` table: which release served that route in that hour, whether it was first seen within the week before (so the baseline ran on something else), and for a new release the previous release plus before/after error rate and p95 on that route.
-5. If `GROQ_API_KEY` is set, the structured anomaly JSON is sent to `openai/gpt-oss-120b` (temperature 0.3, at most 2 000 tokens including reasoning) with a system prompt that explicitly forbids inventing root causes. Otherwise the raw statistical findings are formatted as plain text.
-6. The result is upserted into `insight_reports`.
+3. `anomaly_detection.py` builds a day-of-week × hour-of-day baseline from the older 7 weeks and compares the most recent 7 days. Error rates use an exact Poisson tail test on the request/error counts; p95 is only tested on hours with ≥ 100 requests. A cell is flagged at z > 4.0 (≈ Bonferroni for ~1,700 cells per run) and only if the shift is material (≥ 2pp of errors or ≥ 50% p95), with ≥ 3 baseline samples.
+4. The top 5 anomalies by z-score are kept, each with the hour it happened (`window_start`).
+5. `deploys.py` adds `release_context`: which release served that route in that hour, whether it was first seen within the week before, and for a new release the previous one plus before/after error rate and p95.
+6. `hints.py` adds deterministic root-cause `hints`: errors or slow requests concentrated on one host/environment relative to its traffic share, or an error type / status code that dominates and was rare the week before.
+7. `consumers/queries.py` adds `affected_consumers`: how many of the consumers active on that route in that hour got errors, and the top ones.
+8. With `GROQ_API_KEY` set, the anomaly JSON goes to `openai/gpt-oss-120b` (temperature 0.3, at most 2 000 tokens including reasoning) with a system prompt that forbids inventing root causes; otherwise the findings are formatted as plain text.
+9. The result is upserted into `insight_reports`.
 
 ---
 
 ## 3. Data Flow
 
 ```
-[Your App (FastAPI/Flask)]
-    │ ASGI/WSGI middleware wraps every request
-    │ route template + status + duration_ms captured in finalizer
-    └─► [SDK EventBuffer (deque, maxlen=2000)]
-            │ background daemon thread flushes every 5 s
-            └─► POST /v1/ingest  (X-Reqly-Key, batch ≤ 200 events)
-                    │
-            [Collector — FastAPI]
-                    │ partial-batch validation (Pydantic EventIn)
-                    └─► asyncpg INSERT INTO request_events
-                                │
-                        [TimescaleDB hypertable]
-                                │ continuous aggregate policies run on insert
-                                ├─► route_latency_1min (every 1 min)
-                                ├─► route_errors_1hour (every 1 hour)
-                                └─► route_status_distribution_1hour (every 1 hour)
+[App + Reqly SDK] --batch every 5 s--> POST /v1/ingest ---+
+[App + OTel SDK]  --OTLP/HTTP-------> POST /otlp/v1/traces +--> validate, age check, project check
+                                                                --> INSERT request_events (+ deployments)
+                                                                        |
+                         continuous aggregates (policies + late-data refresher)
+                         api_latency_1min, route_*_1hour, consumer/llm_usage_1hour
+                                                                        |
+[Dashboard] --GET /v1/metrics/summary, /consumers, /llm-usage, ...------+--> charts, tables, panels
+[Dashboard] --POST /v1/ask--> Groq tool calls --> read-only queries --> answer + verified numbers
 
-[Browser Dashboard]
-    │ TanStack Query polls every 30 s
-    └─► GET /v1/metrics/summary?service_name=...&window=1h
-            │ asyncio.gather (5 concurrent queries against continuous aggregates)
-            └─► JSON response → Recharts / KPI tiles
-
-[APScheduler — weekly]
-    └─► GET 8 weeks route_errors_1hour
-            │ z-score anomaly detection (stdlib statistics)
-            └─► POST Groq API (structured anomaly JSON)
-                    └─► UPSERT insight_reports
-                            └─► GET /v1/insights/latest → InsightsPanel
+[Scheduler] :15 hourly   --> last hour vs 8 weekday-hours --> alerts table --> Slack / Discord / webhook
+            every 5 min  --> SLO burn rates               --> alerts table --> same channels
+            Sunday 23:00 --> week vs baseline --> Groq narrative --> insight_reports
 ```
 
-1. Every HTTP request in the instrumented app is captured by the SDK middleware after the response sends.
-2. Events are buffered in-process and shipped in batches to the collector every 5 seconds.
-3. The collector validates each event independently, writes accepted rows to the `request_events` hypertable.
-4. TimescaleDB continuous aggregate policies roll up the raw events into per-minute and per-hour materialized views.
-5. The dashboard polls `GET /v1/metrics/summary`, which reads from the pre-computed aggregates — no full-table scans.
-6. Weekly, the insights pipeline reads 8 weeks of hourly data, runs z-score detection, and calls Groq to write a narrative report stored in `insight_reports`.
-7. The dashboard's `InsightsPanel` renders the latest report on demand.
+1. The SDK (or an OpenTelemetry exporter) sends request events; the collector validates each, refuses ones too old or too new, and checks that the key may write that service.
+2. Accepted events go into `request_events`; release/environment pairs update `deployments`.
+3. Aggregate policies roll the events up within a minute; older stragglers are refreshed by the late-data loop.
+4. The dashboard reads the aggregates for charts and panels; Ask Reqly reads them through its tools.
+5. The scheduler turns anomalies and SLO burn into alerts and notifications, and writes the weekly report.
 
 ---
 
 ## 4. Database Schema
 
-**Latency percentiles (migration 003).** With the TimescaleDB Toolkit installed (`timescaledb-ha` image, Timescale Cloud), `api_latency_1min` stores a `uddsketch(1000, 0.005)` per minute, service, environment, route and method. Sketches merge, so service-level and multi-hour p50/p95/p99 are real percentiles of all requests (within ~0.2%) instead of the max of per-route percentiles, long windows are re-bucketed (6h → 5 min, 24h → 15 min, 7d → 1 h), and error rates come from the same 1-minute aggregate instead of the hourly one that lags by up to two hours. Without the Toolkit the migration is a no-op and the collector keeps using the `percentile_cont` views.
+- `request_events` — hypertable: `event_id`, `time`, `service_name`, `method`, `route`, `status_code`, `duration_ms`, `is_error`, `error_type`, `host`, and (schema v2) `release`, `environment`, `consumer_id`, `request_bytes`, `response_bytes`, `llm_model`, `llm_input_tokens`, `llm_output_tokens`. PK `(time, event_id)`, 14-day retention.
+- `api_latency_1min` — continuous aggregate (with the Toolkit): `uddsketch(1000, 0.005)` of duration plus request and error counts per minute, service, environment, route, method. 90 days.
+- `route_latency_1min`, `route_errors_1hour`, `route_status_distribution_1hour` — the original aggregates (90 / 180 / 180 days); `route_errors_1hour` feeds the anomaly detector.
+- `consumer_usage_1hour`, `llm_usage_1hour` — hourly rollups by consumer / by LLM model (90 days).
+- `deployments` — first and last seen per service, environment and release.
+- `insight_reports` — one weekly report per service (`anomalies_json`, `report_text`).
+- `alerts` — `kind` (`anomaly` or `slo`), service, route, first/last hour, resolved time, details JSON; at most one open alert per service, route and kind.
+- `slos` — objective (`availability` / `latency`), target, threshold, window per service or route.
+- `api_specs` — one OpenAPI spec (JSONB) and base path per service.
+- `users`, `sessions` — argon2id password hashes; SHA-256 of session tokens with expiry.
+- `projects`, `project_services`, `api_keys`, `project_members` — service ownership, hashed keys with scopes, membership.
 
-The ingest contract (fields, limits, retry semantics) is specified in [INGEST_SPEC.md](INGEST_SPEC.md). Schema v2 (migration `002_event_v2.sql`) adds optional `release`, `environment`, `consumer_id`, byte counts and LLM token columns to `request_events`, plus a `deployments` table (first/last seen per service, environment and release) that ingest maintains for deploy-aware insights.
+The ingest contract is specified in [INGEST_SPEC.md](INGEST_SPEC.md).
 
-- `request_events` — hypertable; `event_id UUID`, `time TIMESTAMPTZ`, `service_name TEXT`, `method TEXT`, `route TEXT`, `status_code SMALLINT`, `duration_ms DOUBLE PRECISION`, `is_error BOOLEAN`, `error_type TEXT`, `host TEXT`. Partitioned daily. 14-day retention.
-- `route_latency_1min` — continuous aggregate; `bucket`, `service_name`, `route`, `request_count`, `p50_ms`, `p95_ms`, `p99_ms`, `avg_ms`. 90-day retention.
-- `route_errors_1hour` — continuous aggregate; `bucket`, `service_name`, `route`, `request_count`, `error_count`, `error_rate`, `p95_ms`. 180-day retention.
-- `route_status_distribution_1hour` — continuous aggregate; `bucket`, `service_name`, `route`, `status_code`, `count`. 180-day retention.
-- `insight_reports` — plain table (not hypertable); `id UUID`, `service_name TEXT`, `week_start DATE`, `anomalies_json JSONB`, `report_text TEXT`, `generated_at TIMESTAMPTZ`. Unique on `(service_name, week_start)`.
-
-**Indexes:**
-- `idx_request_events_service_route_time` on `request_events(service_name, route, time DESC)` — serves per-route metric queries
-- `idx_request_events_errors` on `request_events(service_name, time DESC) WHERE is_error` — partial index for error-only scans
+**Indexes:** `request_events(service_name, route, time DESC)` for per-route queries; a partial index on `request_events(service_name, time DESC) WHERE is_error` for error scans; unique `alerts(service_name, route, kind) WHERE resolved_at IS NULL` for alert dedup; unique `api_keys(key_hash)` for key lookups.
 
 ---
 
@@ -167,7 +151,9 @@ The ingest contract (fields, limits, retry semantics) is specified in [INGEST_SP
 
 ### Input
 
-Structured JSON of pre-computed anomaly objects — never raw events or diffs. Each anomaly includes: `route`, `day_of_week`, `hour_range`, `observed_error_rate`, `baseline_error_rate`, `observed_p95_ms`, `baseline_p95_ms`, `z_score`.
+**Weekly report:** structured JSON of pre-computed anomalies — never raw events. Each anomaly has `route`, `day_of_week`, `hour_range`, `observed_error_rate`, `baseline_error_rate`, `observed_p95_ms`, `baseline_p95_ms`, `z_score`, plus `release_context`, `hints` and `affected_consumers` when available.
+
+**Ask Reqly:** the user's question, a system prompt with the current UTC time, the dates of the last 8 days, the service's routes and recent releases, and the results of the tool calls the model makes (rounded aggregates only). See [Ask Reqly](#ask-reqly) for the tools, limits and number verification.
 
 ### System prompt strategy
 
@@ -239,8 +225,8 @@ Groq call has a 30 s timeout. On any exception (timeout, rate limit, provider ou
 - **Request size:** every request body is counted as it arrives and refused with 413 above 16 MB (`app/body_limit.py`), chunked bodies included — Starlette would otherwise buffer a body whole before any handler sees it.
 - **Event age:** ingest and OTLP refuse events older than 13 days (unless the batch is an explicit `backfill`) or more than 15 minutes in the future. Raw events are kept 14 days and aggregates 90–180, so materializing a straggler older than the raw data would replace days of aggregate history with it.
 - **Collector secrets:** `GROQ_API_KEY`, `DATABASE_URL` are env vars only — never committed. `.env.example` ships with empty values.
-- **CORS:** Configured via `CORS_ORIGINS` env var — defaults to `*` for local dev, should be restricted in production.
-- **No PII:** The SDK captures only method, route template, status code, duration, and error type — no request bodies, no query params, no user identifiers by default.
+- **CORS:** `CORS_ORIGINS` lists the dashboard origins allowed to call the collector (unset: none; the docker-compose file sets `*` for local use). Allowed headers: `Content-Type`, `X-Reqly-Key`, `Authorization`.
+- **No PII:** The SDKs capture method, route template, status, duration, error type, sizes, release and environment — never request bodies, query strings or headers. Consumer ids are optional and HMAC-SHA256-hashed with the app's salt inside the SDK, so API keys never reach the collector.
 
 ---
 
@@ -260,23 +246,35 @@ Groq call has a 30 s timeout. On any exception (timeout, rate limit, provider ou
 
 ## 9. Deployment
 
-**Local (Docker Compose):**
-1. `docker compose up -d` starts all 4 services (timescaledb → collector → dashboard → load-generator).
-2. The collector applies `collector/migrations/*.sql` on startup, tracking applied files in `schema_migrations`.
-3. Load generator backfills synthetic history on first run, then generates live traffic at ~2 RPS.
+**Local:** `docker compose up -d` starts TimescaleDB, the collector, the dashboard and the load generator. The collector applies `collector/migrations/*.sql` on start-up; the load generator backfills weeks of history (as an explicit backfill), then sends live traffic.
 
-**Production (AWS):**
-1. EC2 t3.small runs TimescaleDB in Docker (user-data script); the collector applies the schema on first start.
-2. Collector deployed as Docker container on EC2 (or Render/Fly.io) with env vars set.
-3. Dashboard built (`npm run build`) and deployed to any static host (Vercel, S3+CloudFront, Render).
-4. AWS SAM stack deploys `reqly-weekly-insights` Lambda (set `INSIGHTS_SCHEDULER_ENABLED=false` on the collector so the job doesn't run twice) + EventBridge (Sunday 23:00 UTC) + S3 archive for report JSON. Estimated cost: ~$17/month (EC2 t3.small + EBS 20 GB; Lambda/S3 on free tier).
+**Live demo:**
+1. TimescaleDB (`timescaledb-ha`, Toolkit, TLS) in Docker on an EC2 t3.micro, set up by `infra/ec2-userdata.sh`.
+2. The collector on Render, `DATABASE_URL` with `sslmode=require`, `FORWARDED_ALLOW_IPS=*` so rate limits see real client IPs, `GROQ_API_KEY` for AI features, `PUBLIC_DASHBOARD` on.
+3. The dashboard on Render, built with `VITE_COLLECTOR_URL` and `VITE_READ_KEY`.
+4. Releases: PyPI (`sdk-v*` tags) and npm (`node-v*` tags) via trusted publishing; container images on GHCR (`collector-v*` tags).
+
+**Optional:** an AWS SAM stack (`infra/sam`) can run the weekly report as a Lambda with EventBridge and an S3 archive; set `INSIGHTS_SCHEDULER_ENABLED=false` on the collector then. Step-by-step in [infra/DEPLOY.md](../infra/DEPLOY.md).
 
 ---
 
 ## 10. Explicit Scope Cuts
 
-- **Distributed tracing (spans/traces)** — Reqly captures request-level metrics only, not inter-service traces. OpenTelemetry integration is a v2 candidate.
-- **Alerting / PagerDuty integration** — the insights report surfaces anomalies but does not fire alerts. Would require webhook config and a notification layer.
-- **Multi-tenant / per-user isolation** — single shared collector; service_name is the only isolation boundary. Per-tenant key management deferred to v2.
-- **Real-time streaming (WebSockets/SSE)** — dashboard polls every 30 s. Real-time push would require a WebSocket server or SSE endpoint on the collector.
-- **Non-Python SDKs** — only FastAPI and Flask (Python). Node.js, Go, etc. are v2 candidates.
+- **Trace views** — OTLP spans are reduced to request events; no span waterfall.
+- **Request bodies, query strings, headers** — never captured.
+- **Multiple collector instances** — scheduler, rate limits and caches are per process; run one collector.
+- **OIDC / SSO** — username + password sign-in only.
+- **Real-time push** — the dashboard polls; no WebSockets or SSE.
+
+---
+
+<div align="center">
+
+<h3>Tanish Poddar</h3>
+
+<a href="https://tanisheesh.in"><img src="https://img.shields.io/badge/Website-tanisheesh.in-111111?style=flat-square&logo=googlechrome&logoColor=white" alt="Website"></a>
+<a href="https://linkedin.com/in/tanisheesh"><img src="https://img.shields.io/badge/LinkedIn-tanisheesh-0A66C2?style=flat-square" alt="LinkedIn"></a>
+<a href="https://github.com/tanisheesh"><img src="https://img.shields.io/badge/GitHub-tanisheesh-181717?style=flat-square&logo=github&logoColor=white" alt="GitHub"></a>
+<a href="mailto:hey@tanisheesh.in"><img src="https://img.shields.io/badge/Email-hey%40tanisheesh.in-EA4335?style=flat-square&logo=gmail&logoColor=white" alt="Email"></a>
+
+</div>
