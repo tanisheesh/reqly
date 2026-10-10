@@ -1,0 +1,61 @@
+# ╔══════════════════════════════════════════════════════════════════════╗
+# ║  TANISH'S SETUP TOOLKIT · tanisheesh.in                              ║
+# ║  Editor settings. Goes to: <repo>/.editorconfig                      ║
+# ║  Works as-is. VS Code needs the "EditorConfig" extension; JetBrains  ║
+# ║  and most other editors support it natively.                         ║
+# ╚══════════════════════════════════════════════════════════════════════╝
+
+root = true
+
+# Defaults for every file
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Python: PEP 8
+[*.{py,pyi}]
+indent_size = 4
+max_line_length = 100
+
+# Go uses tabs (gofmt)
+[*.go]
+indent_style = tab
+indent_size = 4
+
+# Rust / Java / Kotlin / C#
+[*.{rs,java,kt,cs}]
+indent_size = 4
+
+# Makefiles require tabs
+[{Makefile,*.mk}]
+indent_style = tab
+
+# Markdown: trailing double-space is a line break, so keep it
+[*.md]
+trim_trailing_whitespace = false
+
+# Windows scripts expect CRLF
+[*.{bat,cmd}]
+end_of_line = crlf
+
+# PowerShell
+[*.{ps1,psm1,psd1}]
+indent_size = 4
+
+# Lockfiles and generated files: never touch
+[{package-lock.json,pnpm-lock.yaml,yarn.lock,bun.lock,poetry.lock,uv.lock,*.min.*}]
+indent_size = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+
+# ──────────────────────────────────────────────────────────────────────────
+#  Tanish Poddar
+#  Website   https://tanisheesh.in
+#  LinkedIn  https://linkedin.com/in/tanisheesh
+#  GitHub    https://github.com/tanisheesh
+#  Email     hey@tanisheesh.in
+# ──────────────────────────────────────────────────────────────────────────
