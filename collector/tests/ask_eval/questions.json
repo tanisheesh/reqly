@@ -1,0 +1,85 @@
+[
+  {
+    "service": "flask-demo",
+    "question": "Why are POST /orders requests failing so much?",
+    "expect_all": ["v2", "3[0-9](\\.[0-9]+)?\\s?%"],
+    "why": "release v2 (36h ago) raised /orders errors to ~35%"
+  },
+  {
+    "service": "flask-demo",
+    "question": "Did the latest release make anything worse?",
+    "expect_all": ["v2", "/orders"]
+  },
+  {
+    "service": "flask-demo",
+    "question": "When was v2 deployed?",
+    "expect_all": ["{deploy_date}"]
+  },
+  {
+    "service": "flask-demo",
+    "question": "How much slower is /orders since v2 compared to before?",
+    "expect_all": ["/orders", "ms"],
+    "why": "p95 x2.5 after the deploy"
+  },
+  {
+    "service": "flask-demo",
+    "question": "Are we meeting our SLOs?",
+    "expect_all": ["orders availability"],
+    "expect_any": ["burn", "budget", "not meeting", "missing", "below"]
+  },
+  {
+    "service": "fastapi-demo",
+    "question": "Was there a problem on /products/{id} in the last two days? What caused it?",
+    "expect_all": ["pod-3"]
+  },
+  {
+    "service": "fastapi-demo",
+    "question": "Which host had the most errors on /products/{id} yesterday and the day before?",
+    "expect_all": ["pod-3"]
+  },
+  {
+    "service": "fastapi-demo",
+    "question": "What happened to /auth/login last Monday morning?",
+    "expect_all": ["/auth/login"],
+    "expect_any": ["4[0-9](\\.[0-9]+)?\\s?%", "08:00", "8 ?am", "08:"],
+    "why": "Monday 08:00-09:00 UTC at 45% errors, only in the last 7 days"
+  },
+  {
+    "service": "fastapi-demo",
+    "question": "Which route is the slowest over the last week?",
+    "expect_all": ["/orders"],
+    "why": "POST /orders has the highest p95 (~1900ms)"
+  },
+  {
+    "service": "fastapi-demo",
+    "question": "Is the error rate this week higher or lower than last week?",
+    "expect_all": ["%"]
+  },
+  {
+    "service": "fastapi-demo",
+    "question": "Which release is fastapi-demo running?",
+    "expect_all": ["2026\\.10\\.0"]
+  },
+  {
+    "service": "fastapi-demo",
+    "question": "What was the p95 latency of /health over the last 7 days?",
+    "expect_all": ["/health", "ms"]
+  },
+  {
+    "service": "flask-demo",
+    "question": "How many requests did /orders get in the last 24 hours, and how many failed?",
+    "expect_all": ["[0-9]"]
+  },
+  {
+    "service": "fastapi-demo",
+    "question": "What is the CPU usage of the database server?",
+    "expect_any": ["can't", "cannot", "can not", "not available", "don't have", "do not have", "no data", "unable", "only", "not tracked", "doesn't"],
+    "why": "not in the data: must decline rather than invent"
+  },
+  {
+    "service": "flask-demo",
+    "question": "What were the error rates in March 2025?",
+    "expect_any": ["can't", "cannot", "not available", "don't have", "do not have", "no data", "unable", "retention", "only goes back", "outside"],
+    "why": "outside retention"
+  }
+]

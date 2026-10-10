@@ -32,7 +32,7 @@
 
 ## What is Reqly?
 
-Reqly is a self-hostable APM tool — a lightweight, honestly-scoped alternative to Datadog/New Relic for Python microservices. Add one call to your app; Reqly captures every request and surfaces real-time metrics plus a weekly AI-generated anomaly report powered by Groq (Llama 3.3-70b). The entire stack — collector, TimescaleDB, dashboard — runs with `docker compose up`.
+Reqly is a self-hostable APM tool — a lightweight, honestly-scoped alternative to Datadog/New Relic for Python microservices. Add one call to your app; Reqly captures every request and surfaces real-time metrics plus a weekly AI-generated anomaly report powered by Groq (gpt-oss-120b). The entire stack — collector, TimescaleDB, dashboard — runs with `docker compose up`.
 
 ```python
 import reqly
@@ -53,6 +53,7 @@ reqly.instrument(app, service_name="checkout-api")
 - **Latency percentiles** — p50 / p95 / p99 per route, across 1h / 6h / 24h / 7d windows with per-route drill-down
 - **Error rates & status distribution** — 2xx / 3xx / 4xx / 5xx breakdown over time, top routes ranked by volume and error rate
 - **AI anomaly reports** — weekly detection against a day-of-week × hour-of-day seasonal baseline, with Groq writing the narrative. Degrades to plain-text stats if no API key is set.
+- **Ask Reqly** — ask *"why did /orders start failing?"* on the dashboard; the model answers from the collector's own data through read-only, validated query tools, shows the queries behind every answer, and flags any number it can't find in their results
 - **SLOs and error budgets** — availability or latency objectives per service or route, budget remaining on the dashboard, and multi-window burn-rate alerts (Google SRE workbook style)
 - **Hourly alerts with root-cause hints** — Slack / Discord / webhook alerts when a route breaks from its weekday-hour norm, deduplicated and auto-resolved, with leads like *"92% of errors came from pod-7, which served 34% of requests"* or *"new TimeoutError"*
 - **Deploy-aware** — every event carries its release (auto-detected from CI variables like `GITHUB_SHA`), so each anomaly says which release was running and how the route behaved before vs after it; deploys show up as markers on the charts and in a per-release health table
@@ -70,7 +71,7 @@ reqly.instrument(app, service_name="checkout-api")
 | Collector | FastAPI 0.110 · asyncpg · APScheduler · slowapi · Pydantic v2 |
 | Database | TimescaleDB (pg16) · hypertables · continuous aggregates |
 | Dashboard | React 19 · Vite 8 · TypeScript · Tailwind CSS 4 · Recharts · TanStack Query |
-| AI | Groq API · Llama 3.3-70b-versatile |
+| AI | Groq API · gpt-oss-120b |
 | Infra | Docker Compose (local) · EC2 t3.small + AWS Lambda (prod) |
 
 ---
