@@ -17,6 +17,7 @@
     <img src="https://img.shields.io/badge/live_demo-06b6d4-06b6d4?style=flat-square" alt="Live Demo">
   </a>
   <a href="https://reqly.tanisheesh.in"><img src="https://img.shields.io/badge/website-reqly.tanisheesh.in-06b6d4?style=flat-square" alt="Website"></a>
+  <a href="https://reqly.tanisheesh.in/docs/"><img src="https://img.shields.io/badge/docs-reqly.tanisheesh.in%2Fdocs-06b6d4?style=flat-square" alt="Docs"></a>
   <a href="https://pypi.org/project/reqly/"><img src="https://img.shields.io/pypi/v/reqly?color=06b6d4&label=pypi&style=flat-square" alt="PyPI"></a>
   <a href="https://www.npmjs.com/package/reqly-node"><img src="https://img.shields.io/npm/v/reqly-node?color=06b6d4&label=npm&style=flat-square" alt="npm"></a>
   <img src="https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python">
@@ -83,6 +84,8 @@ Build the alert and SLO evaluation for several collector instances from the star
 
 
 ## Docs
+
+Using Reqly? Start with the **[documentation site](https://reqly.tanisheesh.in/docs/)**: quickstart, SDK guides, features, self-hosting and the HTTP API. The documents below are about how Reqly is built.
 
 | Document | Description |
 |---|---|

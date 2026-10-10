@@ -14,7 +14,7 @@ For local development, see [SETUP.md](SETUP.md). Command-by-command AWS steps (E
 | Dashboard | Render | React SPA built with `VITE_COLLECTOR_URL` / `VITE_READ_KEY` |
 | Database | AWS EC2 t3.micro | `timescale/timescaledb-ha:pg16` in Docker (includes the Toolkit), TLS with a self-signed certificate, set up by `infra/ec2-userdata.sh` |
 | Weekly report (optional) | AWS Lambda + EventBridge + S3 | `infra/sam`. The demo runs the report inside the collector instead |
-| Website | Vercel | Static `landing/index.html`. The project's root directory is `landing/`, so nothing else in the repo is served |
+| Website and docs | Vercel | `landing/build.sh` puts `landing/index.html` at `/` and builds the MkDocs site from `landing/docs/` into `/docs/`. The project's root directory is `landing/`, so nothing else in the repo is served |
 | Packages | PyPI, npm, GHCR | `reqly`, `reqly-node`, `ghcr.io/tanisheesh/reqly-collector`, `reqly-dashboard` (see section 6) |
 | DNS | GoDaddy | `reqly.tanisheesh.in` → CNAME to Vercel |
 
@@ -79,7 +79,7 @@ Images are built for linux/amd64 and arm64. Pin a version instead of `latest`.
 
 1. [vercel.com/new](https://vercel.com/new) → import `tanisheesh/reqly`
 2. Framework preset: **Other** · Root directory: `landing`
-3. Deploy. `landing/vercel.json` sets static output, security headers, and skips builds for commits that don't touch `landing/`
+3. Deploy. `landing/vercel.json` runs `build.sh` (landing page plus the MkDocs docs site, output in `public/`), sets security headers, and skips builds for commits that don't touch `landing/`
 
 ---
 
@@ -139,7 +139,7 @@ Add the release to the root [CHANGELOG.md](../CHANGELOG.md) as well.
 - [ ] The dashboard loads, lists services and shows charts for the last hour
 - [ ] Making traffic on [EventFlow](https://eventflow-g2h5.onrender.com) shows up on the dashboard within a minute or two
 - [ ] With `GROQ_API_KEY` set, Ask Reqly answers a question
-- [ ] [reqly.tanisheesh.in](https://reqly.tanisheesh.in) loads with no console errors
+- [ ] [reqly.tanisheesh.in](https://reqly.tanisheesh.in) and [/docs/](https://reqly.tanisheesh.in/docs/) load with no console errors
 
 ---
 

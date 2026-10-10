@@ -35,7 +35,7 @@ Dashboard on http://localhost:5173, collector API docs on http://localhost:8000/
 | `collector/migrations/` | Schema, applied in order on start-up | SQL |
 | `dashboard/` | Web UI | React 19, Vite, TypeScript |
 | `bench/` | SDK overhead benchmarks | Python, Node |
-| `landing/` | reqly.tanisheesh.in | static HTML |
+| `landing/` | reqly.tanisheesh.in and the docs site (`landing/docs/`, served at `/docs/`) | HTML, MkDocs Material |
 | `infra/` | EC2 bootstrap, optional AWS Lambda | shell, SAM |
 
 ---
@@ -121,7 +121,7 @@ Breaking changes add a line `🚨 BREAKING CHANGE: <what breaks>` in the commit 
 - Python: snake_case, type hints on public functions. TypeScript: camelCase, strict mode.
 - The SDKs must never raise into the host app, and must never capture request bodies, query strings or headers.
 - No secrets in code. `.env*` stays gitignored; add new variables to `.env.example` (names only) and to `docs/SETUP.md`.
-- Update docs when behaviour, setup or env vars change: in the same PR as the code they describe.
+- Update docs when behaviour, setup or env vars change: in the same PR as the code they describe. User-facing docs live in `landing/docs/` (preview with `cd landing && pip install -r requirements-docs.txt && mkdocs serve`); design docs in `docs/`.
 
 ---
 
