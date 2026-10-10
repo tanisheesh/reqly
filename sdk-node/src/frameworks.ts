@@ -129,8 +129,10 @@ function expressMiddleware(client: ReqlyClient, isUnmatched?: (route: string, st
     requestStorage.run(usage, () => next());
   };
 
+  // Like the other integrations, only an error that becomes a 5xx is an
+  // error: next(createError(404)) or a thrown 400 is the app answering.
   const errorHandler = (err: unknown, _req: ExpressRequest, res: ExpressResponse, next: Next): void => {
-    if (res.locals) res.locals[EXPRESS_ERROR] = (err as Error | undefined)?.name ?? "Error";
+    if (res.locals && httpStatusOf(err) >= 500) res.locals[EXPRESS_ERROR] = (err as Error | undefined)?.name ?? "Error";
     next(err);
   };
 

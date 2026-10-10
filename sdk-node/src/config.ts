@@ -89,7 +89,12 @@ export function resolveConfig(options: ReqlyOptions = {}): ResolvedConfig {
     release: release?.slice(0, 128),
     environment: (options.environment ?? env("REQLY_ENVIRONMENT"))?.slice(0, 32),
     sampleRate: Math.min(1, Math.max(0, sampleRate)),
-    flushIntervalMs: options.flushIntervalMs ?? envNumber("REQLY_FLUSH_INTERVAL_MS") ?? 5000,
+    // REQLY_FLUSH_INTERVAL_SECONDS is the Python SDK's name; accepted too, so
+    // one environment configures both SDKs.
+    flushIntervalMs:
+      options.flushIntervalMs ??
+      envNumber("REQLY_FLUSH_INTERVAL_MS") ??
+      (envNumber("REQLY_FLUSH_INTERVAL_SECONDS") !== undefined ? envNumber("REQLY_FLUSH_INTERVAL_SECONDS")! * 1000 : 5000),
     maxBatchSize: options.maxBatchSize ?? envNumber("REQLY_MAX_BATCH_SIZE") ?? 200,
     maxQueueSize: options.maxQueueSize ?? envNumber("REQLY_MAX_QUEUE_SIZE") ?? 2000,
     ignoreRoutes: new Set(

@@ -75,7 +75,12 @@ export class ReqlyClient {
   private disabled = false;
   // The same few API keys / tenants call over and over: hash each once.
   private readonly hashedConsumers = new Map<string, string>();
-  readonly stats = { recorded: 0, shipped: 0, dropped: 0, failedBatches: 0 };
+  /**
+   * observed: requests seen (before sampling and ignored routes); recorded:
+   * the ones queued; shipped / dropped: events sent / lost; failedBatches:
+   * batches given up after retries.
+   */
+  readonly stats = { observed: 0, recorded: 0, shipped: 0, dropped: 0, failedBatches: 0 };
 
   constructor(options: ReqlyOptions = {}) {
     this.config = resolveConfig(options);
@@ -99,6 +104,7 @@ export class ReqlyClient {
   record(request: RecordedRequest): void {
     if (this.disabled) return;
     try {
+      this.stats.observed += 1;
       const route = request.route || UNMATCHED_ROUTE;
       if (this.config.ignoreRoutes.has(route)) return;
       if (this.config.sampleRate < 1 && Math.random() >= this.config.sampleRate) return;
@@ -212,7 +218,10 @@ export class ReqlyClient {
       // Not unref'd: while a flush is in flight (e.g. `await client.shutdown()`
       // with the collector down) the process must not exit mid-retry. The
       // waits are short (200 + 400 ms); the flush *interval* stays unref'd.
-      if (attempt < MAX_RETRIES - 1) await new Promise((resolve) => setTimeout(resolve, 200 * 2 ** attempt));
+      // Jitter, so many processes don't retry against a restarting collector in lockstep.
+      if (attempt < MAX_RETRIES - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 200 * 2 ** attempt + Math.random() * 100));
+      }
     }
     return false;
   }
