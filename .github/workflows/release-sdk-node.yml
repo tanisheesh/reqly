@@ -1,0 +1,94 @@
+name: Release Node SDK
+
+# Publishes the Node.js SDK (sdk-node/) to npm as `reqly-node` when a tag
+# like `node-v0.1.1` is pushed, with npm Trusted Publishing (OIDC) and
+# provenance: no npm token is stored. npmjs.com must list this repo and
+# workflow as a trusted publisher for reqly-node -- see CONTRIBUTING.md.
+# (npm only allows that for a package that exists, so 0.1.0 is published
+# by hand once.)
+#
+# Manual runs (workflow_dispatch) do every check and pack the package but
+# never publish.
+
+on:
+  push:
+    tags: ["node-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Check, test and publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # GitHub release
+      id-token: write # npm Trusted Publishing + provenance
+    defaults:
+      run:
+        working-directory: sdk-node
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Trusted publishing needs npm 11.5+
+        run: npm install -g npm@^11.5.1
+
+      - name: Read package version
+        id: version
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Tag must match the package version
+        if: github.event_name == 'push'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [ "${GITHUB_REF_NAME#node-v}" != "$VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match sdk-node/package.json version $VERSION"
+            exit 1
+          fi
+
+      - name: Changelog must have an entry for this version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if ! grep -q "^## $VERSION " CHANGELOG.md; then
+            echo "::error::sdk-node/CHANGELOG.md has no '## $VERSION ...' section"
+            exit 1
+          fi
+
+      - name: Version must not already be on npm
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if npm view "reqly-node@$VERSION" version >/dev/null 2>&1; then
+            echo "::error::reqly-node $VERSION is already on npm; bump sdk-node/package.json"
+            exit 1
+          fi
+
+      - run: npm ci
+      - run: npm test
+      - run: npm pack
+
+      - name: Publish
+        if: github.event_name == 'push'
+        run: npm publish --provenance --access public
+
+      - name: GitHub release with the changelog section as notes
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          awk -v v="$VERSION" '
+            /^## / { if (found) exit; if (index($0, "## " v " ") == 1) { found = 1; next } }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          gh release create "$GITHUB_REF_NAME" reqly-node-*.tgz \
+            --title "reqly-node $VERSION" \
+            --notes-file notes.md
