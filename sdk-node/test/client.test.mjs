@@ -131,3 +131,31 @@ test("queued events are sent when the process exits on its own", async () => {
   assert.deepEqual(collector.events().map((e) => e.route), ["/bye"]);
   await collector.close();
 });
+
+test("events that arrive while a flush is sending wait for the next batch", async () => {
+  const collector = await fakeCollector();
+  const client = new ReqlyClient(options(collector.url, { maxBatchSize: 5 }));
+  for (let i = 0; i < 5; i++) client.record(request({ route: `/a${i}` })); // reaches the batch size: flush starts
+  // requests keep arriving while the batch is in flight
+  for (let i = 0; i < 4; i++) {
+    await new Promise((r) => setImmediate(r));
+    client.record(request({ route: `/b${i}` }));
+  }
+  await new Promise((r) => setTimeout(r, 200));
+  assert.equal(collector.batches.length, 1); // not one HTTP call per late event
+  assert.equal(collector.batches[0].events.length, 5);
+  await client.shutdown(); // the 4 late ones go in one more batch
+  assert.deepEqual(collector.batches.map((b) => b.events.length), [5, 4]);
+  await collector.close();
+});
+
+test("shutdown during an in-flight flush still sends everything", async () => {
+  const collector = await fakeCollector();
+  const client = new ReqlyClient(options(collector.url, { maxBatchSize: 10 }));
+  for (let i = 0; i < 10; i++) client.record(request()); // batch size reached: a flush is now in flight
+  for (let i = 0; i < 25; i++) client.record(request()); // queued behind it
+  await client.shutdown();
+  assert.equal(collector.events().length, 35);
+  assert.equal(client.stats.shipped, 35);
+  await collector.close();
+});

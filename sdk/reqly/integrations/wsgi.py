@@ -20,22 +20,28 @@ from typing import Callable, Optional
 
 from ..core.capture import normalize_route
 from ..core.client import ReqlyClient
-from ..core.request_context import RequestInfo, begin_request, end_request
+from ..core.request_context import LazyHeaders, RequestInfo, begin_request, end_request
 
 logger = logging.getLogger("reqly")
 
 WSGIRouteResolver = Callable[[dict], Optional[str]]
 
 
+def _environ_key(name: str) -> str:
+    key = name.upper().replace("-", "_")
+    return key if key in ("CONTENT_TYPE", "CONTENT_LENGTH") else "HTTP_" + key
+
+
+def _environ_headers(environ: dict):
+    for key, value in environ.items():
+        if key.startswith("HTTP_"):
+            yield key[5:].replace("_", "-").lower(), value
+        elif key in ("CONTENT_TYPE", "CONTENT_LENGTH") and value:
+            yield key.replace("_", "-").lower(), value
+
+
 def wsgi_request_info(environ: dict) -> RequestInfo:
-    headers = {
-        key[5:].replace("_", "-").lower(): value
-        for key, value in environ.items()
-        if key.startswith("HTTP_")
-    }
-    for key in ("CONTENT_TYPE", "CONTENT_LENGTH"):
-        if environ.get(key):
-            headers[key.replace("_", "-").lower()] = environ[key]
+    headers = LazyHeaders(lambda name: environ.get(_environ_key(name)) or None, lambda: _environ_headers(environ))
     return RequestInfo(
         method=environ.get("REQUEST_METHOD", "GET"),
         path=environ.get("PATH_INFO", "/"),

@@ -1,6 +1,6 @@
 {
   "name": "reqly-node",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Reqly SDK for Node.js: per-route latency, errors, consumers and LLM cost for Express, Fastify and Hono, sent to a self-hosted Reqly collector.",
   "license": "GPL-3.0-only",
   "author": "Tanish Poddar",

@@ -1,0 +1,59 @@
+name: SDK overhead benchmark
+
+# How much time each SDK adds to a request (bench/python_overhead.py and
+# sdk-node/scripts/bench.mjs). Results go to the run's summary and as JSON
+# artifacts. Shared runners are noisy: compare the "added" columns, which
+# come from alternating baseline/instrumented rounds on the same machine.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["sdk/**", "sdk-node/**", "bench/**", ".github/workflows/bench.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e "./sdk[dev]"
+      - name: Benchmark
+        run: |
+          python bench/python_overhead.py --requests 30000 --rounds 10 --json python-overhead.json | tee out.md
+          { echo "## Python SDK"; echo; cat out.md; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-overhead
+          path: python-overhead.json
+
+  node:
+    name: Node SDK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk-node
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: sdk-node/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - name: Benchmark
+        run: |
+          node scripts/bench.mjs --requests 30000 --rounds 10 --json node-overhead.json | tee out.md
+          { echo "## Node SDK"; echo; cat out.md; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: node-overhead
+          path: sdk-node/node-overhead.json

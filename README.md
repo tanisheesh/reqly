@@ -63,7 +63,8 @@ reqly.instrument(app, service_name="checkout-api")
 - **Deploy-aware** — every event carries its release (auto-detected from CI variables like `GITHUB_SHA`), so each anomaly says which release was running and how the route behaved before vs after it; deploys show up as markers on the charts and in a per-release health table
 - **Python frameworks** — FastAPI, Flask, Starlette and Litestar with one `reqly.instrument(app)` call; Django (incl. DRF and Django Ninja) via one middleware line; any other WSGI/ASGI app with `reqly.instrument_wsgi()` / `instrument_asgi()`
 - **Node.js SDK** — `reqly-node` for Express, Fastify and Hono: one middleware line, same consumers and LLM-cost tracking ([sdk-node](sdk-node/README.md))
-- **Zero-overhead SDK** — fail-open (never crashes your app), non-blocking background thread, bounded 2 000-event queue, bounded cardinality (route templates, never raw paths)
+- **Measured overhead** — the SDKs add about 6–33 µs per request depending on the framework ([benchmark](bench/README.md), rerun in CI on every SDK change)
+- **Fail-open SDK** — fail-open (never crashes your app), non-blocking background thread, bounded 2 000-event queue, bounded cardinality (route templates, never raw paths)
 - **Any language via OpenTelemetry** — Node, Java, Go, .NET and more report to Reqly through its OTLP/HTTP endpoint with only exporter env vars, no Reqly SDK ([guide](docs/OTEL.md))
 
 ---
