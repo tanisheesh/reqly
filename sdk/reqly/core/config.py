@@ -86,6 +86,7 @@ class Config:
     capture_request_body: bool = False
     release: str | None = None
     environment: str | None = None
+    push_openapi: bool = False
     sdk_version: str = field(default_factory=_get_sdk_version)
 
     @classmethod
@@ -102,6 +103,7 @@ class Config:
         capture_request_body: bool | None,
         release: str | None = None,
         environment: str | None = None,
+        push_openapi: bool | None = None,
     ) -> "Config":
         import sys as _sys
 
@@ -160,5 +162,10 @@ class Config:
                     :_MAX_ENVIRONMENT_LEN
                 ]
                 or None
+            ),
+            push_openapi=(
+                push_openapi
+                if push_openapi is not None
+                else _env_bool("REQLY_PUSH_OPENAPI", False)
             ),
         )

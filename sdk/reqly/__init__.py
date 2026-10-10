@@ -38,6 +38,19 @@ def _detect_framework(app) -> str:
     )
 
 
+def _enable_openapi_push(app, framework: str, client: ReqlyClient) -> None:
+    if framework == "fastapi":
+        client.enable_openapi_push(app.openapi)
+    elif framework == "litestar":
+        client.enable_openapi_push(lambda: app.openapi_schema.to_schema())
+    else:
+        logger.warning(
+            "reqly: push_openapi needs an app that generates its own spec (FastAPI, Litestar); "
+            "for %s, upload the spec with PUT /v1/services/<service>/openapi instead",
+            framework,
+        )
+
+
 def instrument(
     app,
     *,
@@ -52,6 +65,7 @@ def instrument(
     capture_request_body: bool | None = None,
     release: str | None = None,
     environment: str | None = None,
+    push_openapi: bool | None = None,
 ) -> ReqlyClient | None:
     """Instrument a FastAPI, Starlette, Litestar or Flask app with one line.
     (Django: add ``reqly.integrations.django.ReqlyMiddleware`` to MIDDLEWARE.)
@@ -59,6 +73,11 @@ def instrument(
     Config resolution order for any omitted argument: explicit kwarg >
     environment variable (REQLY_*) > default. See core.config.Config
     for the full list of environment variables.
+
+    ``push_openapi=True`` (or REQLY_PUSH_OPENAPI=true) uploads the app's
+    OpenAPI spec (FastAPI, Litestar) to the collector on the first request,
+    so the dashboard can show undocumented, unused and deprecated-but-used
+    endpoints.
 
     This function itself is guarded: a failure to detect the framework or
     initialize the client is logged and the app is returned uninstrumented
@@ -87,8 +106,11 @@ def instrument(
             capture_request_body=capture_request_body,
             release=release,
             environment=environment,
+            push_openapi=push_openapi,
         )
         client = ReqlyClient(config)
+        if config.push_openapi:
+            _enable_openapi_push(app, framework, client)
 
         if config.capture_request_body:
             logger.warning(
