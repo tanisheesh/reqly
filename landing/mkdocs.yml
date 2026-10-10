@@ -103,6 +103,7 @@ nav:
       - Configuration: self-hosting/configuration.md
       - Projects, keys & sign-in: self-hosting/access.md
       - Deploy to production: self-hosting/deploy.md
+      - Kubernetes (Helm): self-hosting/kubernetes.md
   - Reference:
       - HTTP API: reference/http-api.md
       - Ingest spec: reference/ingest-spec.md

@@ -43,7 +43,7 @@ Reqly only needs traces. If your setup also exports metrics or logs, point those
     NODE_OPTIONS="--require @opentelemetry/auto-instrumentations-node/register" node app.js
     ```
 
-    A runnable example is in [`examples/otel/express`](https://github.com/tanisheesh/reqly/tree/main/examples/otel/express). For Express, Fastify and Hono there is also the native [Node SDK](node.md): one middleware line, plus consumer and LLM-cost tracking that OTLP doesn't carry.
+    A runnable example is in [`examples/otel/express`](https://github.com/tanisheesh/reqly/tree/main/examples/otel/express). For Express, Fastify, Hono, Koa and NestJS there is also the native [Node SDK](node.md): one middleware line, plus consumer and LLM-cost tracking that OTLP doesn't carry.
 
 === "Python"
 

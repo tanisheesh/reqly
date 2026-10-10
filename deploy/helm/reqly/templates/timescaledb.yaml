@@ -1,0 +1,93 @@
+{{- if .Values.timescaledb.enabled }}
+{{- $secret := include "reqly.secretName" . }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "reqly.timescaledbHost" . }}
+  labels:
+    {{- include "reqly.labels" (dict "ctx" $ "component" "timescaledb") | nindent 4 }}
+spec:
+  serviceName: {{ include "reqly.timescaledbHost" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "reqly.selectorLabels" (dict "ctx" $ "component" "timescaledb") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "reqly.selectorLabels" (dict "ctx" $ "component" "timescaledb") | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # the -ha image runs as postgres (uid 1000) with its data under /home/postgres/pgdata
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: timescaledb
+          image: "{{ .Values.timescaledb.image.repository }}:{{ .Values.timescaledb.image.tag }}"
+          imagePullPolicy: {{ .Values.timescaledb.image.pullPolicy }}
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: {{ .Values.timescaledb.database | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.timescaledb.user | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: postgres-password } }
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U {{ .Values.timescaledb.user }} -d {{ .Values.timescaledb.database }}"]
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U {{ .Values.timescaledb.user }} -d {{ .Values.timescaledb.database }}"]
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          volumeMounts:
+            - name: data
+              mountPath: /home/postgres/pgdata
+          resources:
+            {{- toYaml .Values.timescaledb.resources | nindent 12 }}
+      {{- with .Values.timescaledb.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.timescaledb.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.timescaledb.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with .Values.timescaledb.persistence.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.timescaledb.persistence.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "reqly.timescaledbHost" . }}
+  labels:
+    {{- include "reqly.labels" (dict "ctx" $ "component" "timescaledb") | nindent 4 }}
+spec:
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+  selector:
+    {{- include "reqly.selectorLabels" (dict "ctx" $ "component" "timescaledb") | nindent 4 }}
+{{- end }}

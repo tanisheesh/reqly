@@ -79,6 +79,19 @@ jobs:
           REQLY_INGEST_KEY: "test-key"
           REQLY_READ_KEY: "test-read-key"
 
+  helm:
+    name: Helm chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v4
+      - name: Lint and render
+        run: |
+          helm lint deploy/helm/reqly
+          helm template ci deploy/helm/reqly > /dev/null
+          helm template ci deploy/helm/reqly --set ingress.enabled=true --set secrets.groqApiKey=x > /dev/null
+          helm template ci deploy/helm/reqly --set timescaledb.enabled=false             --set externalDatabaseUrl=postgresql://u:p@db:5432/reqly --set dashboard.enabled=false > /dev/null
+
   dashboard:
     name: Dashboard build
     runs-on: ubuntu-latest

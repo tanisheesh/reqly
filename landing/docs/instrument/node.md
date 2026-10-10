@@ -1,6 +1,6 @@
 ---
 title: Node.js SDK
-description: Instrument Express, Fastify or Hono with reqly-node.
+description: Instrument Express, Fastify, Hono, Koa or NestJS with reqly-node.
 ---
 
 # Node.js SDK
@@ -49,6 +49,33 @@ Node 20+. No runtime dependencies. ESM and CommonJS. [npm](https://www.npmjs.com
     const app = new Hono();
     app.use(reqlyHono({ serviceName: "checkout-api" }));
     ```
+
+=== "Koa 2 / 3"
+
+    ```js
+    import Koa from "koa";
+    import Router from "@koa/router";
+    import { reqlyKoa } from "reqly-node";
+
+    const app = new Koa();
+    app.use(reqlyKoa({ serviceName: "checkout-api" }));  // first, before your routers
+    app.use(router.routes()).use(router.allowedMethods());
+    ```
+
+    Routes are @koa/router templates, router prefixes included (`/api/users/:id`). A thrown error is recorded with its status (500, unless it carries one like `ctx.throw(404)`) and, for 5xx, its type; then it's rethrown for Koa to handle.
+
+=== "NestJS"
+
+    ```js
+    import { NestFactory } from "@nestjs/core";
+    import { reqlyNest } from "reqly-node";
+
+    const app = await NestFactory.create(AppModule);   // Express or Fastify adapter
+    reqlyNest(app, { serviceName: "checkout-api" });   // before app.listen()
+    await app.listen(3000);
+    ```
+
+    Routes include the global prefix and controller path. Nest's catch-all 404 is recorded as `__unmatched__`. A global interceptor records the type of exceptions that become 5xx; `HttpException`s below 500 (`NotFoundException`, `BadRequestException`, …) aren't counted as errors. The returned object has `client` for `shutdown()`.
 
 === "CommonJS"
 
@@ -120,4 +147,4 @@ process.on("SIGTERM", async () => {
 - **Non-blocking:** events are queued in memory and sent in batches by a timer that never keeps the process alive. The queue is bounded, and the oldest events are dropped first.
 - **Retries:** 408, 429, 5xx and network errors are retried with backoff. Other 4xx responses drop the batch.
 
-Koa, NestJS or another framework? Use [OpenTelemetry](opentelemetry.md); `@opentelemetry/auto-instrumentations-node` covers them.
+Another framework? Use [OpenTelemetry](opentelemetry.md): `@opentelemetry/auto-instrumentations-node` covers most of them.

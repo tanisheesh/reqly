@@ -69,7 +69,7 @@ The local stack accepts the ingest key `demo-key`.
     }));
     ```
 
-    Fastify and Hono: see [Node.js](instrument/node.md).
+    Fastify, Hono, Koa and NestJS: see [Node.js](instrument/node.md).
 
 === "OpenTelemetry"
 

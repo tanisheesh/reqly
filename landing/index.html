@@ -525,7 +525,7 @@
         <div>
           <div class="hero-badge">
             <span class="hero-badge-dot"></span>
-            Python SDK 0.5 · Node SDK 0.1 · Open source
+            Python SDK 0.5 · Node SDK 0.2 · Open source
           </div>
           <h1>API monitoring that tells you <em>what broke</em> — and which deploy did it</h1>
           <p class="hero-sub">
@@ -664,7 +664,8 @@ app = <span class="fn">FastAPI</span>()   <span class="cm"># or Flask, Starlette
 app.<span class="fn">use</span>(<span class="fn">reqlyExpress</span>({ serviceName: <span class="str">"checkout-api"</span> }));
 
 <span class="cm">// Fastify: app.register(reqlyFastify({ ... }))</span>
-<span class="cm">// Hono:    app.use(reqlyHono({ ... }))</span></div>
+<span class="cm">// Hono:    app.use(reqlyHono({ ... }))</span>
+<span class="cm">// Koa:     app.use(reqlyKoa({ ... }))   NestJS: reqlyNest(app, { ... })</span></div>
 <div class="card-code" data-panel="otel" hidden><span class="cm"># any OpenTelemetry SDK — exporter settings only</span>
 <span class="hl">OTEL_EXPORTER_OTLP_ENDPOINT</span>=<span class="str">https://reqly.example.com/otlp</span>
 <span class="hl">OTEL_EXPORTER_OTLP_HEADERS</span>=<span class="str">x-reqly-key=rqk_...</span>

@@ -4,7 +4,7 @@ Node.js SDK for [Reqly](https://github.com/tanisheesh/reqly), a self-hosted API
 observability tool: per-route p50/p95/p99 latency, error rates, deploy-aware alerts,
 SLOs, API consumers and LLM cost, sent to a Reqly collector you run.
 
-Express, Fastify and Hono in one line. No runtime dependencies; Node 20+.
+Express, Fastify, Hono, Koa and NestJS in one line. No runtime dependencies; Node 20+.
 
 ```bash
 npm install reqly-node
@@ -48,6 +48,31 @@ import { reqlyHono } from "reqly-node";
 const app = new Hono();
 app.use(reqlyHono({ serviceName: "checkout-api" }));
 ```
+
+**Koa** (2 and 3, with @koa/router)
+
+```js
+import Koa from "koa";
+import { reqlyKoa } from "reqly-node";
+
+const app = new Koa();
+app.use(reqlyKoa({ serviceName: "checkout-api" })); // first, before your routers
+app.use(router.routes());
+```
+
+**NestJS** (Express or Fastify adapter)
+
+```js
+import { NestFactory } from "@nestjs/core";
+import { reqlyNest } from "reqly-node";
+
+const app = await NestFactory.create(AppModule);
+reqlyNest(app, { serviceName: "checkout-api" }); // before app.listen()
+await app.listen(3000);
+```
+
+Nest routes include the global prefix and controller path; exceptions that become 5xx are
+recorded with their type, `HttpException`s below 500 (`NotFoundException`, …) are not errors.
 
 Routes are recorded as templates (`/api/users/:id`, including router mount paths),
 never as raw paths; requests no route matched are recorded as `__unmatched__`. CommonJS

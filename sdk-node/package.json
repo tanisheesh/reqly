@@ -1,7 +1,7 @@
 {
   "name": "reqly-node",
-  "version": "0.1.2",
-  "description": "Reqly SDK for Node.js: per-route latency, errors, consumers and LLM cost for Express, Fastify and Hono, sent to a self-hosted Reqly collector.",
+  "version": "0.2.0",
+  "description": "Reqly SDK for Node.js: per-route latency, errors, consumers and LLM cost for Express, Fastify, Hono, Koa and NestJS, sent to a self-hosted Reqly collector.",
   "license": "GPL-3.0-only",
   "author": "Tanish Poddar",
   "homepage": "https://reqly.tanisheesh.in/docs/instrument/node/",
@@ -16,6 +16,8 @@
     "express",
     "fastify",
     "hono",
+    "koa",
+    "nestjs",
     "latency",
     "monitoring",
     "reqly"
@@ -51,6 +53,11 @@
     "prepublishOnly": "npm test"
   },
   "devDependencies": {
+    "@koa/router": "^15.7.0",
+    "@nestjs/common": "^12.1.2",
+    "@nestjs/core": "^12.1.2",
+    "@nestjs/platform-express": "^12.1.2",
+    "@nestjs/platform-fastify": "^12.1.2",
     "@types/express": "^5.0.0",
     "@types/node": "^26.6.4",
     "express": "^5.1.0",
@@ -58,6 +65,9 @@
     "fastify": "^5.2.0",
     "fastify4": "npm:fastify@^4.29.1",
     "hono": "^4.7.0",
+    "koa": "^3.2.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
     "typescript": "^5.8.0"
   }
 }

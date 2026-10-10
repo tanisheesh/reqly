@@ -14,13 +14,13 @@ Teams running a handful of HTTP APIs have two bad options for knowing whether th
 
 ## 2. Goals
 
-1. One-line instrumentation for Python (FastAPI, Flask, Django, Starlette, Litestar, any WSGI/ASGI app) and Node.js (Express, Fastify, Hono); any other language through OpenTelemetry (OTLP/HTTP) with exporter settings only.
+1. One-line instrumentation for Python (FastAPI, Flask, Django, Starlette, Litestar, any WSGI/ASGI app) and Node.js (Express, Fastify, Hono, Koa, NestJS); any other language through OpenTelemetry (OTLP/HTTP) with exporter settings only.
 2. Correct latency percentiles at every level (route, service, 1h to 7d) and error rates that are current to the minute.
 3. Explanations, not just charts: every alert carries the release that was running, root-cause leads (host, environment, error type, status code) and the API consumers it hit.
 4. Hourly anomaly alerts against a weekday × hour baseline, deduplicated and auto-resolved, delivered to Slack, Discord or a webhook; a weekly AI-written report.
 5. Questions in plain English (Ask Reqly) answered only from the collector's own data, with the queries behind every answer visible.
 6. API-level views: SLOs and error budgets, OpenAPI drift, consumers, LLM cost per route.
-7. Self-hostable with `docker compose up`; a shared collector can serve several teams with projects, scoped API keys and sign-in.
+7. Self-hostable with `docker compose up` or a Helm chart; a shared collector can serve several teams with projects, scoped API keys and sign-in.
 8. The SDKs are fail-open and their per-request overhead is measured and published.
 
 ---
@@ -140,9 +140,7 @@ Teams running a handful of HTTP APIs have two bad options for knowing whether th
 
 ## 10. v2 Candidates
 
-- **Docs site and a rewritten landing page** — the features outgrew the README.
-- **Helm chart** — Kubernetes deploys without hand-written manifests.
-- **Node SDK 0.2** — Koa/NestJS, a generic `http` wrapper, streamed byte counts; built when a real user asks (OTLP covers them today).
+- **Node SDK** — a generic `http` wrapper and streamed byte counts; built when a real user asks (OTLP covers them today).
 - **LLM cost from OTLP GenAI spans**, so OpenTelemetry apps get LLM cost and its alerts too.
 - **OIDC sign-in** and multi-instance collectors.
 
