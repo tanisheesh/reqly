@@ -10,7 +10,7 @@ repo_url: https://github.com/tanisheesh/reqly
 repo_name: tanisheesh/reqly
 edit_uri: edit/main/landing/docs/
 copyright: >-
-  <span class="reqly-author">Copyright &copy; 2026 <strong>Tanish Poddar</strong> · GPL-3.0</span>
+  <span class="reqly-author">Copyright &copy; 2026 <strong>Tanish Poddar</strong> · AGPL-3.0, SDKs MIT</span>
   <span class="reqly-badges">
   <a href="https://tanisheesh.in"><img src="https://img.shields.io/badge/Website-tanisheesh.in-111111?style=flat-square&logo=googlechrome&logoColor=white" alt="Website"></a>
   <a href="https://linkedin.com/in/tanisheesh"><img src="https://img.shields.io/badge/LinkedIn-tanisheesh-0A66C2?style=flat-square" alt="LinkedIn"></a>

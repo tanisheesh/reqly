@@ -80,5 +80,5 @@ Reqly watches every request your APIs serve and explains problems instead of jus
 ## Try it
 
 - **Live dashboard:** [reqly-eventflow-dashboard.onrender.com](https://reqly-eventflow-dashboard.onrender.com). It shows real traffic from [EventFlow](https://eventflow-g2h5.onrender.com), a Flask app instrumented with Reqly.
-- **Source:** [github.com/tanisheesh/reqly](https://github.com/tanisheesh/reqly) (GPL-3.0)
+- **Source:** [github.com/tanisheesh/reqly](https://github.com/tanisheesh/reqly). The server is AGPL-3.0, the SDKs MIT
 - **Design docs:** [PRD](https://github.com/tanisheesh/reqly/blob/main/docs/PRD.md) · [Architecture](https://github.com/tanisheesh/reqly/blob/main/docs/ARCHITECTURE.md) · [Decisions](https://github.com/tanisheesh/reqly/blob/main/docs/DECISIONS.md)

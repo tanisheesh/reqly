@@ -14,7 +14,7 @@
   <a href="https://www.npmjs.com/package/reqly-node"><img src="https://img.shields.io/npm/dm/reqly-node?color=06b6d4&style=flat-square&label=downloads" alt="Downloads"></a>
   <img src="https://img.shields.io/badge/node-%E2%89%A520-06b6d4?style=flat-square" alt="Node 20+">
   <img src="https://img.shields.io/badge/dependencies-0-06b6d4?style=flat-square" alt="Zero dependencies">
-  <a href="https://github.com/tanisheesh/reqly/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-06b6d4?style=flat-square" alt="License"></a>
+  <a href="https://github.com/tanisheesh/reqly/blob/main/sdk-node/LICENSE"><img src="https://img.shields.io/badge/license-MIT-06b6d4?style=flat-square" alt="License: MIT"></a>
 </p>
 
 <p align="center">
@@ -180,7 +180,7 @@ helm install reqly oci://ghcr.io/tanisheesh/charts/reqly -n reqly --create-names
 [Quickstart](https://reqly.tanisheesh.in/docs/quickstart/) ·
 [Deploy to production](https://reqly.tanisheesh.in/docs/self-hosting/deploy/) ·
 [Changelog](https://github.com/tanisheesh/reqly/blob/main/sdk-node/CHANGELOG.md) ·
-License: [GPL-3.0](https://github.com/tanisheesh/reqly/blob/main/LICENSE)
+License: [MIT](https://github.com/tanisheesh/reqly/blob/main/sdk-node/LICENSE) (the collector is AGPL-3.0)
 
 ---
 

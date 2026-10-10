@@ -28,7 +28,7 @@
   <img src="https://img.shields.io/badge/OpenTelemetry-000000?style=flat-square&logo=opentelemetry&logoColor=white" alt="OpenTelemetry">
   <img src="https://img.shields.io/badge/Groq-F55036?style=flat-square" alt="Groq">
   <img src="https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker">
-  <img src="https://img.shields.io/badge/license-GPL--3.0-06b6d4?style=flat-square" alt="License">
+  <a href="#license"><img src="https://img.shields.io/badge/license-AGPL--3.0_%C2%B7_SDKs_MIT-06b6d4?style=flat-square" alt="License: AGPL-3.0, SDKs MIT"></a>
 </p>
 
 ## What is Reqly?
@@ -98,6 +98,19 @@ Using Reqly? Start with the **[documentation site](https://reqly.tanisheesh.in/d
 | [Contributing](CONTRIBUTING.md) | How to propose changes |
 | [Changelog](CHANGELOG.md) | What changed in each release |
 | [Security](SECURITY.md) | How to report a vulnerability |
+
+
+## License
+
+| Part | License |
+|---|---|
+| Collector, dashboard, Helm chart and everything else in this repository | [AGPL-3.0](LICENSE) |
+| Python SDK ([`sdk/`](sdk), `pip install reqly`) | [MIT](sdk/LICENSE) |
+| Node.js SDK ([`sdk-node/`](sdk-node), `npm install reqly-node`) | [MIT](sdk-node/LICENSE) |
+
+The SDKs run inside your app, so they're MIT: use them in any project, open or closed. The
+server is AGPL-3.0: run, modify and self-host it freely; if you offer a modified version as a
+service, share its source.
 
 ---
 
