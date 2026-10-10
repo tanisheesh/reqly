@@ -9,7 +9,7 @@
 
 - Docker + Docker Compose (tested with Compose v2.x)
 - Python 3.9+ (only needed if you want to run the SDK or collector outside Docker)
-- Node.js 20+ (only needed if you want to develop the dashboard outside Docker)
+- Node.js 20+ (only needed to develop the dashboard or the Node SDK outside Docker)
 
 ---
 
@@ -233,11 +233,12 @@ the header narrows the service list.
 
 ## 7. Deploy to production
 
-See [infra/DEPLOY.md](../infra/DEPLOY.md) for the full AWS production deployment:
-- EC2 t3.small running TimescaleDB in Docker (~$15/month)
-- Collector as Docker container on EC2 (or Render/Fly.io) — prebuilt: `ghcr.io/tanisheesh/reqly-collector`
-- Dashboard built and deployed to Vercel / S3+CloudFront / Render, or the `ghcr.io/tanisheesh/reqly-dashboard` image (`REQLY_COLLECTOR_URL` / `REQLY_READ_KEY` at run time)
-- AWS SAM stack for Lambda weekly insights + EventBridge + S3 archive
+The live demo runs like this; step-by-step commands are in [infra/DEPLOY.md](../infra/DEPLOY.md).
+
+1. **Database:** TimescaleDB (`timescale/timescaledb-ha:pg16`, which includes the Toolkit) on a small VM — the demo uses an EC2 t3.micro set up by `infra/ec2-userdata.sh` (Docker, swap, TLS with a self-signed certificate; it refuses to start with a placeholder password). Connect with `?sslmode=require`.
+2. **Collector:** the prebuilt image `ghcr.io/tanisheesh/reqly-collector` (or Render/Fly.io from this repo) with `DATABASE_URL`, `REQLY_INGEST_KEY`, `REQLY_READ_KEY`, `CORS_ORIGINS` and, behind a platform proxy, `FORWARDED_ALLOW_IPS=*`. Add `GROQ_API_KEY` for AI features and `REQLY_ADMIN_PASSWORD` for an admin account. Migrations run on start-up. Run one collector instance.
+3. **Dashboard:** `ghcr.io/tanisheesh/reqly-dashboard` with `REQLY_COLLECTOR_URL` / `REQLY_READ_KEY` at run time, or `npm run build` with `VITE_COLLECTOR_URL` / `VITE_READ_KEY` and any static host.
+4. **Optional:** the AWS SAM stack in `infra/sam` runs the weekly report as a Lambda (EventBridge, S3 archive); set `INSIGHTS_SCHEDULER_ENABLED=false` on the collector then.
 
 ---
 
@@ -251,3 +252,16 @@ The database image moved to `timescale/timescaledb-ha:pg16`, which runs as a dif
 - `GROQ_API_KEY` is required for AI-written insights. Without it the insights panel shows plain-text statistical findings — fully functional, just not LLM-narrated.
 - The continuous aggregate `end_offset` is 1 minute, so the most recent ~1 minute of data may not appear in dashboard queries (it's in the raw table but not yet in the aggregate). This is expected TimescaleDB behavior.
 - On first start, the load generator backfills weeks of history. The collector materializes it into the aggregates in the background (about a minute per few weeks of demo data), so the 7d chart and AI insights fill in shortly after the backfill finishes. Re-running the backfill doesn't duplicate data — events are deterministic and deduplicated.
+
+---
+
+<div align="center">
+
+<h3>Tanish Poddar</h3>
+
+<a href="https://tanisheesh.in"><img src="https://img.shields.io/badge/Website-tanisheesh.in-111111?style=flat-square&logo=googlechrome&logoColor=white" alt="Website"></a>
+<a href="https://linkedin.com/in/tanisheesh"><img src="https://img.shields.io/badge/LinkedIn-tanisheesh-0A66C2?style=flat-square" alt="LinkedIn"></a>
+<a href="https://github.com/tanisheesh"><img src="https://img.shields.io/badge/GitHub-tanisheesh-181717?style=flat-square&logo=github&logoColor=white" alt="GitHub"></a>
+<a href="mailto:hey@tanisheesh.in"><img src="https://img.shields.io/badge/Email-hey%40tanisheesh.in-EA4335?style=flat-square&logo=gmail&logoColor=white" alt="Email"></a>
+
+</div>
