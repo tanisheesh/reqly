@@ -26,10 +26,68 @@ its before/after numbers as a likely lead, still phrased as a hypothesis.
 coming from one host, or a new error type). Use them as leads, still phrased as hypotheses.
 - If the anomalies list is empty, state plainly that no significant anomalies were found \
 this week. Do not invent a problem to seem useful.
+- If "api_drift" is present, add one bullet about the API surface: how much traffic went to \
+undocumented endpoints, documented endpoints nobody called, and deprecated endpoints still \
+being called (and by which consumers). Report only the numbers given.
 """
 
+DRIFT_TOP = 5
 
-def fallback_report(service_name: str, week_start: str, anomalies: list[dict]) -> str:
+
+def summarize_drift(drift: dict | None) -> dict | None:
+    """The part of an OpenAPI drift report worth a line in the weekly report:
+    counts plus the top few items of each list. None without a spec, or when
+    the spec and the traffic agree."""
+    if not drift:
+        return None
+    total = drift.get("total_requests") or 0
+    summary = {
+        "window_days": drift.get("window_days"),
+        "coverage": drift.get("coverage"),
+        "undocumented_traffic_share": round(drift.get("undocumented_requests", 0) / total, 4) if total else 0.0,
+        "undocumented_count": len(drift.get("undocumented") or []),
+        "unused_count": len(drift.get("dead") or []),
+        "deprecated_in_use_count": len(drift.get("deprecated_in_use") or []),
+        "top_undocumented": [
+            {"method": d["method"], "route": d["route"], "requests": d["requests"]}
+            for d in (drift.get("undocumented") or [])[:DRIFT_TOP]
+        ],
+        "top_unused": [
+            {"method": d["method"], "path": d["path"]} for d in (drift.get("dead") or [])[:DRIFT_TOP]
+        ],
+        "deprecated_in_use": [
+            {
+                "method": d["method"],
+                "path": d["path"],
+                "requests": d["requests"],
+                "consumers": [c["consumer_id"] for c in (d.get("consumers") or [])[:3]],
+            }
+            for d in (drift.get("deprecated_in_use") or [])[:DRIFT_TOP]
+        ],
+    }
+    if not (summary["undocumented_count"] or summary["unused_count"] or summary["deprecated_in_use_count"]):
+        return None
+    return summary
+
+
+def drift_lines(drift: dict) -> list[str]:
+    """Plain-text lines for a summarize_drift() result."""
+    lines = [
+        f"- API surface (last {drift['window_days']} days): "
+        f"{drift['undocumented_count']} undocumented endpoint(s) with traffic "
+        f"({drift['undocumented_traffic_share']:.1%} of requests), "
+        f"{drift['unused_count']} documented endpoint(s) never called, "
+        f"{drift['deprecated_in_use_count']} deprecated endpoint(s) still called"
+    ]
+    for d in drift["top_undocumented"][:3]:
+        lines.append(f"  - undocumented: `{d['method']} {d['route']}` ({d['requests']} requests)")
+    for d in drift["deprecated_in_use"][:3]:
+        who = f" by {', '.join(f'`{c}`' for c in d['consumers'])}" if d["consumers"] else ""
+        lines.append(f"  - deprecated but called: `{d['method']} {d['path']}` ({d['requests']} requests{who})")
+    return lines
+
+
+def fallback_report(service_name: str, week_start: str, anomalies: list[dict], drift: dict | None = None) -> str:
     """Used when no LLM key is configured, or the LLM call fails -- keeps the
     panel useful (the real statistical findings are still shown) instead of
     erroring out the whole insights feature.
@@ -56,4 +114,8 @@ def fallback_report(service_name: str, week_start: str, anomalies: list[dict]) -
         for hint in a.get("hints") or []:
             line += f"; {hint['text']}"
         lines.append(line)
+    if not anomalies:
+        lines.append("- No significant anomalies this week.")
+    if drift:
+        lines.extend(drift_lines(drift))
     return "\n".join(lines)

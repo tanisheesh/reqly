@@ -89,7 +89,7 @@ LLM cost alerts follow the same lifecycle as anomaly alerts: one open alert per 
 
 ## Weekly report
 
-Every **Sunday at 23:00 UTC**, the collector compares the last 7 days with the 7 weeks before, using the same tests. It keeps the top 5 anomalies with their release context, hints and affected consumers.
+Every **Sunday at 23:00 UTC**, the collector compares the last 7 days with the 7 weeks before, using the same tests. It keeps the top 5 anomalies with their release context, hints and affected consumers. If the service has an [OpenAPI spec](openapi-drift.md), the report also gets a line about the API surface: undocumented endpoints that got traffic, documented ones nobody called, and deprecated ones still being called, with the clients calling them.
 
 With `GROQ_API_KEY` set, `openai/gpt-oss-120b` writes a short report from those findings. The model only sees the structured anomaly list, never raw events, and is told not to invent causes the data doesn't support. Without a key, or if the call fails, the findings are formatted as plain text.
 
@@ -102,4 +102,4 @@ curl -X POST "http://localhost:8000/v1/insights/generate?service_name=checkout-a
 
 On-demand generation is limited to 5 per minute. A report generated in the last 10 minutes is returned as is, so the button can't run up LLM cost.
 
-The weekly job can also run as an AWS Lambda ([`infra/sam`](https://github.com/tanisheesh/reqly/tree/main/infra/sam)). Set `INSIGHTS_SCHEDULER_ENABLED=false` on the collector then, so it doesn't run twice.
+The weekly job can also run as an AWS Lambda ([`infra/sam`](https://github.com/tanisheesh/reqly/tree/main/infra/sam)). Set `INSIGHTS_SCHEDULER_ENABLED=false` on the collector then, so it doesn't run twice. The Lambda's report has the anomalies but not the API surface line.

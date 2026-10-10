@@ -41,4 +41,4 @@ Paths are compared by shape, so every framework's parameter syntax lines up: `{u
 
 HEAD and OPTIONS requests, and `__unmatched__` 404s, are left out of the undocumented list.
 
-[Ask Reqly](ask-reqly.md) can query the drift report too (`get_api_drift`).
+[Ask Reqly](ask-reqly.md) can query the drift report too (`get_api_drift`), and the [weekly report](alerts.md#weekly-report) sums it up in one line.

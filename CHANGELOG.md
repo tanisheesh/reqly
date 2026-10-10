@@ -14,6 +14,8 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 - A cap on distinct API consumers: the first `CONSUMER_LIMIT_PER_DAY` (1,000) per service per day
   keep their id, later new ones are stored as `__other__`, so a misconfigured consumer id
   can't flood the data
+- The weekly report has an API surface line when the service has an OpenAPI spec: undocumented
+  endpoints with traffic, unused ones, and deprecated ones still called (and by whom)
 
 ### 🐛 Fixed
 - LLM prices: the table is checked against the providers' pages (2026-10) and covers current
