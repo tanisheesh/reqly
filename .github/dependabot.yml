@@ -34,7 +34,7 @@ updates:
     schedule: { interval: "weekly", day: "monday", time: "06:00", timezone: "Asia/Kolkata" }
     versioning-strategy: "increase-if-necessary"
     open-pull-requests-limit: 10
-    commit-message: { prefix: "👆", include: "scope" }
+    commit-message: { prefix: "👆" }
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
@@ -43,7 +43,7 @@ updates:
     directory: "/collector"
     schedule: { interval: "weekly", day: "monday", time: "06:00", timezone: "Asia/Kolkata" }
     open-pull-requests-limit: 10
-    commit-message: { prefix: "👆", include: "scope" }
+    commit-message: { prefix: "👆" }
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
@@ -51,7 +51,7 @@ updates:
   - package-ecosystem: "pip"            # optional weekly-report Lambda
     directory: "/infra/sam/insights_lambda"
     schedule: { interval: "weekly", day: "monday", time: "06:00", timezone: "Asia/Kolkata" }
-    commit-message: { prefix: "👆", include: "scope" }
+    commit-message: { prefix: "👆" }
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
@@ -62,7 +62,7 @@ updates:
     schedule: { interval: "weekly", day: "monday", time: "06:00", timezone: "Asia/Kolkata" }
     versioning-strategy: "increase-if-necessary"
     open-pull-requests-limit: 10
-    commit-message: { prefix: "👆", include: "scope" }
+    commit-message: { prefix: "👆" }
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
@@ -71,7 +71,7 @@ updates:
     directory: "/dashboard"
     schedule: { interval: "weekly", day: "monday", time: "06:00", timezone: "Asia/Kolkata" }
     open-pull-requests-limit: 10
-    commit-message: { prefix: "👆", include: "scope" }
+    commit-message: { prefix: "👆" }
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
@@ -80,7 +80,7 @@ updates:
   - package-ecosystem: "docker"
     directories: ["/collector", "/dashboard", "/load_generator"]
     schedule: { interval: "weekly", day: "monday", time: "06:00", timezone: "Asia/Kolkata" }
-    commit-message: { prefix: "👆", include: "scope" }
+    commit-message: { prefix: "👆" }
     # CI doesn't build the images, so only take patch-level base image updates
     # automatically; move to a new Python / Node line by hand.
     ignore:
