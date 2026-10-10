@@ -1,7 +1,7 @@
 {
   "name": "reqly-node",
-  "version": "0.2.0",
-  "description": "Reqly SDK for Node.js: per-route latency, errors, consumers and LLM cost for Express, Fastify, Hono, Koa and NestJS, sent to a self-hosted Reqly collector.",
+  "version": "0.3.0",
+  "description": "Reqly SDK for Node.js: per-route latency, errors, consumers and LLM cost for Express, Fastify, Hono, Koa, NestJS and plain node:http, sent to a self-hosted Reqly collector.",
   "license": "GPL-3.0-only",
   "author": "Tanish Poddar",
   "homepage": "https://reqly.tanisheesh.in/docs/instrument/node/",
@@ -53,6 +53,7 @@
     "prepublishOnly": "npm test"
   },
   "devDependencies": {
+    "@fastify/swagger": "^9.9.2",
     "@koa/router": "^15.7.0",
     "@nestjs/common": "^12.1.2",
     "@nestjs/core": "^12.1.2",

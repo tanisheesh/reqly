@@ -27,13 +27,15 @@ If your API calls language models, record the token usage during the request and
     recordLlmUsage("gpt-4o-mini", 1200, 240);
     ```
 
+Using OpenTelemetry instead of an SDK? LLM calls recorded as GenAI spans are picked up automatically: see [OpenTelemetry → LLM calls](../instrument/opentelemetry.md#llm-calls).
+
 Call it anywhere while the request is being served; it's tied to the current request (a context variable in Python, `AsyncLocalStorage` in Node). If one request calls several models, all tokens are summed and the request is attributed to the model with the most tokens.
 
 ## Prices
 
 Cost is computed **when you query it** from a price table, in USD per 1 million input and output tokens. Editing a price applies to past usage too.
 
-The built-in table, [`llm_prices.yaml`](https://github.com/tanisheesh/reqly/blob/main/collector/app/llm/llm_prices.yaml), has list prices for OpenAI, Anthropic and Google models as published in October 2025. Prices change and contracts differ, so check them before relying on the numbers. To override or add models, point `LLM_PRICES_FILE` at your own YAML file in the same format:
+The built-in table, [`llm_prices.yaml`](https://github.com/tanisheesh/reqly/blob/main/collector/app/llm/llm_prices.yaml), has list prices for OpenAI, Anthropic, Google and Groq models, checked against the providers' pricing pages in October 2026. Prices change and contracts differ, so check the ones you use. To override or add models, point `LLM_PRICES_FILE` at your own YAML file in the same format:
 
 ```yaml
 models:
@@ -41,7 +43,7 @@ models:
   my-finetune:   {input: 0.30, output: 1.20}
 ```
 
-Model names match by the longest prefix, case-insensitive, after dropping a provider prefix: `openai/gpt-4o-2024-08-06` matches `gpt-4o`. Models with no match are listed as **unpriced**, never guessed.
+A model name matches a table entry when it is that entry or a dated snapshot of it, case-insensitive, after dropping a provider prefix: `openai/gpt-4o-2024-08-06` and `anthropic.claude-opus-5-5` match `gpt-4o` and `claude-opus-5-5`. A different model that merely starts the same way (`gpt-4o-mini`, `gemini-2.5-flash-lite`, a future `gpt-5.7`) needs its own entry. Models with no match are listed as **unpriced**, never guessed.
 
 ## Alerts
 

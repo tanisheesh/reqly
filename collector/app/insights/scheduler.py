@@ -13,6 +13,8 @@ from .deploys import add_release_context
 from ..consumers.queries import add_affected_consumers
 from .hints import add_hints
 from .groq_client import generate_report
+from .report import summarize_drift
+from ..openapi.store import drift_report
 
 logger = logging.getLogger("reqly.collector")
 
@@ -42,7 +44,13 @@ async def run_insights_for_service(service_name: str) -> dict:
             logger.exception("%s failed for service=%s", enrich.__name__, service_name)
     week_start = _current_week_start()
 
-    report_text = await generate_report(service_name, week_start.isoformat(), anomalies_dicts)
+    drift = None
+    try:
+        drift = summarize_drift(await drift_report(pool, service_name))
+    except Exception:
+        logger.exception("API drift summary failed for service=%s", service_name)
+
+    report_text = await generate_report(service_name, week_start.isoformat(), anomalies_dicts, drift)
 
     await queries.save_insight_report(
         pool, service_name, week_start, json.dumps(anomalies_dicts), report_text

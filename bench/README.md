@@ -59,3 +59,16 @@ reqly-node 0.1.2:
   thread, consumer ids are hashed once per distinct value (cached), and request headers are
   read lazily — one lookup for the consumer header instead of copying all of them. Python
   overhead dropped by about half (FastAPI +34 → +13 µs, Flask +63 → +33 µs).
+
+---
+
+<div align="center">
+
+<h3>Tanish Poddar</h3>
+
+<a href="https://tanisheesh.in"><img src="https://img.shields.io/badge/Website-tanisheesh.in-111111?style=flat-square&logo=googlechrome&logoColor=white" alt="Website"></a>
+<a href="https://linkedin.com/in/tanisheesh"><img src="https://img.shields.io/badge/LinkedIn-tanisheesh-0A66C2?style=flat-square" alt="LinkedIn"></a>
+<a href="https://github.com/tanisheesh"><img src="https://img.shields.io/badge/GitHub-tanisheesh-181717?style=flat-square&logo=github&logoColor=white" alt="GitHub"></a>
+<a href="mailto:hey@tanisheesh.in"><img src="https://img.shields.io/badge/Email-hey%40tanisheesh.in-EA4335?style=flat-square&logo=gmail&logoColor=white" alt="Email"></a>
+
+</div>

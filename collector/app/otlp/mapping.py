@@ -4,6 +4,11 @@ Reqly is API-level, not a tracing backend: only SERVER spans that describe
 an HTTP request become events. Client/internal/producer/consumer spans and
 non-HTTP server spans (gRPC, messaging) are skipped by design.
 
+LLM calls recorded with the OpenTelemetry GenAI conventions (client spans
+with gen_ai.usage.input_tokens / output_tokens) are attributed to the HTTP
+server span they ran under -- the nearest ancestor in the same export -- the
+way the SDKs' record_llm_usage() attributes them to the current request.
+
 Works on the OTLP/JSON shape (camelCase keys). Protobuf payloads are
 converted to the same shape with MessageToDict first, so there is a single
 mapping path. Handles both the stable HTTP semantic conventions
@@ -110,9 +115,85 @@ def _truncate(value, limit: int) -> str | None:
     return str(value)[:limit]
 
 
+_MAX_TOKENS = 10_000_000
+_MAX_ANCESTRY = 64
+
+
+def _is_http_server(span: dict, attrs: dict) -> bool:
+    return span.get("kind") in _SPAN_KIND_SERVER and (
+        _first(attrs, "http.request.method", "http.method") is not None
+        or _first(attrs, "http.response.status_code", "http.status_code") is not None
+    )
+
+
+def _genai_usage(attrs: dict) -> tuple[str, int, int] | None:
+    """(model, input tokens, output tokens) of a GenAI span, or None."""
+    tokens_in = _first(attrs, "gen_ai.usage.input_tokens", "gen_ai.usage.prompt_tokens")
+    tokens_out = _first(attrs, "gen_ai.usage.output_tokens", "gen_ai.usage.completion_tokens")
+    if tokens_in is None and tokens_out is None:
+        return None
+    model = _first(attrs, "gen_ai.response.model", "gen_ai.request.model")
+    if model is None:
+        return None
+    try:
+        tokens_in, tokens_out = int(tokens_in or 0), int(tokens_out or 0)
+    except (TypeError, ValueError):
+        return None
+    if not (0 <= tokens_in <= _MAX_TOKENS and 0 <= tokens_out <= _MAX_TOKENS):
+        return None
+    return _truncate(model, _MAX_SHORT_TEXT_LEN), tokens_in, tokens_out
+
+
+def _llm_usage_by_server_span(payload: dict) -> dict[tuple[str, str], dict]:
+    """GenAI usage summed onto the HTTP server span each LLM call ran under:
+    {(trace, span): {"llm_model", "llm_input_tokens", "llm_output_tokens"}}.
+    Like the SDKs, all tokens are summed and the request is attributed to the
+    model with the most tokens."""
+    parents: dict[tuple[str, str], str] = {}
+    servers: set[tuple[str, str]] = set()
+    calls: list[tuple[tuple[str, str], tuple[str, int, int]]] = []
+    for resource_spans in payload.get("resourceSpans") or []:
+        for scope_spans in resource_spans.get("scopeSpans") or []:
+            for span in scope_spans.get("spans") or []:
+                trace = _hex_id(span.get("traceId"))
+                key = (trace, _hex_id(span.get("spanId")))
+                parents[key] = _hex_id(span.get("parentSpanId"))
+                attrs = _attributes(span.get("attributes"))
+                if _is_http_server(span, attrs):
+                    servers.add(key)
+                usage = _genai_usage(attrs)
+                if usage is not None:
+                    calls.append((key, usage))
+
+    per_server: dict[tuple[str, str], dict[str, list[int]]] = {}
+    for key, (model, tokens_in, tokens_out) in calls:
+        node, steps = key, 0
+        while node not in servers and steps < _MAX_ANCESTRY:
+            parent = parents.get(node)
+            if not parent:
+                break
+            node, steps = (node[0], parent), steps + 1
+        if node not in servers:
+            continue  # its request isn't in this export (or there is none)
+        totals = per_server.setdefault(node, {}).setdefault(model, [0, 0])
+        totals[0] += tokens_in
+        totals[1] += tokens_out
+
+    out = {}
+    for server, models in per_server.items():
+        top = max(models, key=lambda m: sum(models[m]))
+        out[server] = {
+            "llm_model": top,
+            "llm_input_tokens": min(sum(t[0] for t in models.values()), _MAX_TOKENS),
+            "llm_output_tokens": min(sum(t[1] for t in models.values()), _MAX_TOKENS),
+        }
+    return out
+
+
 def map_resource_spans(payload: dict) -> MappingResult:
     """payload: an ExportTraceServiceRequest in OTLP/JSON shape."""
     result = MappingResult()
+    llm_usage = _llm_usage_by_server_span(payload)
     for resource_spans in payload.get("resourceSpans") or []:
         resource = _attributes((resource_spans.get("resource") or {}).get("attributes"))
         service_name = _truncate(
@@ -130,11 +211,11 @@ def map_resource_spans(payload: dict) -> MappingResult:
 
         for scope_spans in resource_spans.get("scopeSpans") or []:
             for span in scope_spans.get("spans") or []:
-                _map_span(span, service_name, release, environment, host, result)
+                _map_span(span, service_name, release, environment, host, result, llm_usage)
     return result
 
 
-def _map_span(span, service_name, release, environment, host, result: MappingResult) -> None:
+def _map_span(span, service_name, release, environment, host, result: MappingResult, llm_usage=None) -> None:
     if span.get("kind") not in _SPAN_KIND_SERVER:
         result.skipped += 1
         return
@@ -214,6 +295,7 @@ def _map_span(span, service_name, release, environment, host, result: MappingRes
             environment=environment,
             request_bytes=_byte_count(attrs, "http.request.body.size", "http.request_content_length"),
             response_bytes=_byte_count(attrs, "http.response.body.size", "http.response_content_length"),
+            **(llm_usage or {}).get((_hex_id(span.get("traceId")), _hex_id(span.get("spanId"))), {}),
         )
     )
 

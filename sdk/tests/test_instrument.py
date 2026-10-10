@@ -30,3 +30,20 @@ def test_instrument_twice_returns_same_client_and_adds_one_middleware(fake_colle
 def test_ignore_routes_env_is_whitespace_tolerant(monkeypatch):
     monkeypatch.setenv("REQLY_IGNORE_ROUTES", "/health, /metrics ,,/ready")
     assert _resolve().ignore_routes == ["/health", "/metrics", "/ready"]
+
+
+def test_flush_interval_from_either_sdks_env_var(monkeypatch):
+    from reqly.core.config import Config
+
+    def resolve():
+        return Config.resolve(service_name="s", collector_url=None, api_key=None, sample_rate=None,
+                              flush_interval_seconds=None, max_batch_size=None, max_queue_size=None,
+                              ignore_routes=None, capture_request_body=None).flush_interval_seconds
+
+    monkeypatch.delenv("REQLY_FLUSH_INTERVAL_SECONDS", raising=False)
+    monkeypatch.delenv("REQLY_FLUSH_INTERVAL_MS", raising=False)
+    assert resolve() == 5.0
+    monkeypatch.setenv("REQLY_FLUSH_INTERVAL_MS", "2500")  # the Node SDK's name
+    assert resolve() == 2.5
+    monkeypatch.setenv("REQLY_FLUSH_INTERVAL_SECONDS", "1")  # Python's own name wins
+    assert resolve() == 1.0

@@ -51,6 +51,7 @@ cp .env.example .env
 | `PUBLIC_DASHBOARD` | `true` | `true`: anyone with the dashboard can read (public demo). `false`: sign-in required |
 | `REQLY_ADMIN_USERNAME` / `REQLY_ADMIN_PASSWORD` | `admin` / *(empty)* | First admin, created at start-up when there are no users (password 12+ characters) |
 | `SESSION_TTL_HOURS` | `168` | How long a sign-in lasts |
+| `CONSUMER_LIMIT_PER_DAY` | `1000` | Distinct API consumers kept per service per UTC day; later new ones are stored as `__other__`; `0` turns the cap off |
 | `LLM_PRICES_FILE` | *(empty)* | YAML price table that overrides/extends `collector/app/llm/llm_prices.yaml` (USD per 1M tokens) |
 | `ASK_DAILY_LIMIT` | `200` | Ask Reqly questions per day per collector (the read key is public to dashboard viewers); `0` turns Ask off |
 | `CORS_ORIGINS` | `*` | Comma-separated list of allowed origins; restrict in production |
@@ -132,7 +133,7 @@ The database image moved to `timescale/timescaledb-ha:pg16`, which runs as a dif
 
 ## Known local-only limitations
 
-- The load generator is a Docker service, not a real app — it generates synthetic traffic patterns. To see AI insights from real traffic, instrument your own app or run the [EventFlow demo](../demo/README.md).
+- The load generator is a Docker service, not a real app — it generates synthetic traffic patterns. To see AI insights from real traffic, instrument your own app or run the [EventFlow demo](https://github.com/tanisheesh/EventFlow).
 - `GROQ_API_KEY` is required for AI-written insights. Without it the insights panel shows plain-text statistical findings — fully functional, just not LLM-narrated.
 - The continuous aggregate `end_offset` is 1 minute, so the most recent ~1 minute of data may not appear in dashboard queries (it's in the raw table but not yet in the aggregate). This is expected TimescaleDB behavior.
 - On first start, the load generator backfills weeks of history. The collector materializes it into the aggregates in the background (about a minute per few weeks of demo data), so the 7d chart and AI insights fill in shortly after the backfill finishes. Re-running the backfill doesn't duplicate data — events are deterministic and deduplicated.

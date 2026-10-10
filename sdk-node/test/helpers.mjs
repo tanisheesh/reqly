@@ -5,11 +5,17 @@ import { createHmac } from "node:crypto";
 export async function fakeCollector(statuses = []) {
   const batches = [];
   const requests = [];
+  const specs = []; // OpenAPI uploads: { url, spec }
   const server = createServer((req, res) => {
     let body = "";
     req.on("data", (chunk) => (body += chunk));
     req.on("end", () => {
       requests.push({ url: req.url, headers: req.headers });
+      if (req.method === "PUT" && req.url.endsWith("/openapi")) {
+        specs.push({ url: req.url, spec: JSON.parse(body) });
+        res.writeHead(200, { "Content-Type": "application/json" });
+        return res.end("{}");
+      }
       const status = statuses.length ? statuses.shift() : 202;
       if (status < 400) batches.push(JSON.parse(body));
       res.writeHead(status, { "Content-Type": "application/json" });
@@ -22,6 +28,7 @@ export async function fakeCollector(statuses = []) {
     url,
     batches,
     requests,
+    specs,
     events: () => batches.flatMap((b) => b.events),
     close: () => new Promise((resolve) => server.close(resolve)),
   };

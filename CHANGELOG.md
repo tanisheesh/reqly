@@ -8,7 +8,43 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 
 ## [Unreleased]
 
-Collector 0.11.0 · reqly-node 0.2.0
+---
+
+## [0.12.0] — 2026-10-11
+
+Collector 0.12.0 · Python SDK 0.5.3 · reqly-node 0.3.0 · Helm chart 0.12.0
+
+### ✨ Added
+- Node SDK: `reqlyHttp()` for plain node:http or any framework without an integration (with a
+  `routeResolver`), and Bun support (Hono on `Bun.serve`, node:http), tested in CI
+- Node SDK: `pushOpenapi` uploads the app's spec (Fastify via @fastify/swagger, NestJS document,
+  or any spec), and streamed response bodies are measured
+- OpenTelemetry apps get LLM cost: GenAI spans (`gen_ai.usage.*`) are added to the HTTP request
+  they ran under, so cost per route and LLM cost alerts work without a Reqly SDK
+- A cap on distinct API consumers: the first `CONSUMER_LIMIT_PER_DAY` (1,000) per service per day
+  keep their id, later new ones are stored as `__other__`, so a misconfigured consumer id
+  can't flood the data
+- The weekly report has an API surface line when the service has an OpenAPI spec: undocumented
+  endpoints with traffic, unused ones, and deprecated ones still called (and by whom)
+
+### 🐛 Fixed
+- Python SDK: heavy traffic (~400+ requests/s per process) no longer drops events between
+  flushes; a full batch ships right away
+- Node SDK: in Express and Fastify a 4xx error object no longer counts as an error; Koa includes a
+  stream body's time and size
+- LLM prices: the table is checked against the providers' pages (2026-10) and covers current
+  OpenAI, Anthropic, Google and Groq models. A model only matches its own entry or a dated
+  snapshot of it, so `gpt-4o-mini`-style variants and new models are no longer priced as a
+  similar-looking model
+
+### 🎊 Improved
+- Helm: the collector waits for the bundled database instead of restarting while it starts
+
+---
+
+## [0.11.0] — 2026-10-10
+
+Collector 0.11.0 · reqly-node 0.2.0 · Helm chart 0.11.0
 
 ### ✨ Added
 - **LLM cost alerts:** each hour, a route's LLM spend is compared with the same weekday-hour
@@ -143,7 +179,9 @@ Python SDK 0.1.5
 
 ---
 
-[Unreleased]: https://github.com/tanisheesh/reqly/compare/sdk-v0.5.2...HEAD
+[Unreleased]: https://github.com/tanisheesh/reqly/compare/collector-v0.12.0...HEAD
+[0.12.0]: https://github.com/tanisheesh/reqly/tree/collector-v0.12.0
+[0.11.0]: https://github.com/tanisheesh/reqly/tree/collector-v0.11.0
 [0.10.0]: https://github.com/tanisheesh/reqly/commit/0d3fc17
 [0.9.0]: https://github.com/tanisheesh/reqly/commit/ff10848
 [0.8.1]: https://github.com/tanisheesh/reqly/tree/collector-v0.8.1

@@ -43,14 +43,16 @@ test("express: route templates with mount paths, 404s, errors, consumers and LLM
   api.get("/boom", () => {
     throw new TypeError("bad input");
   });
+  api.get("/missing", (req, res, next) => next(Object.assign(new Error("no such thing"), { status: 404 })));
   app.use("/api", api);
   app.use(reqly.errorHandler);
-  app.use((err, req, res, next) => res.status(500).send("error")); // eslint-disable-line no-unused-vars
+  app.use((err, req, res, next) => res.status(err.status ?? 500).send("error")); // eslint-disable-line no-unused-vars
 
   const { base, close } = await listen(app);
   await fetch(`${base}/api/users/7`, { headers: { "X-API-Key": "key_live_1" } });
   await fetch(`${base}/api/chat`, { method: "POST" });
   await fetch(`${base}/api/boom`);
+  await fetch(`${base}/api/missing`);
   await fetch(`${base}/nope`);
   await close();
   await reqly.client.flush();
@@ -60,8 +62,10 @@ test("express: route templates with mount paths, 404s, errors, consumers and LLM
     ["GET", "/api/users/:id", 200, false],
     ["POST", "/api/chat", 201, false],
     ["GET", "/api/boom", 500, true],
+    ["GET", "/api/missing", 404, false], // a 4xx error object is the app answering, not an error
     ["GET", "__unmatched__", 404, false],
   ]);
+  assert.equal(events[3].error_type, null);
   assert.equal(events[0].consumer_id, hmac16("key_live_1", "s3cret"));
   assert.equal(events[1].consumer_id, null);
   assert.deepEqual([events[1].llm_model, events[1].llm_input_tokens, events[1].llm_output_tokens], ["gpt-4o-mini", 150, 25]);

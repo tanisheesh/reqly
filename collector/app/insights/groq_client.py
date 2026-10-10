@@ -10,31 +10,36 @@ from .report import SYSTEM_PROMPT, fallback_report
 logger = logging.getLogger("reqly.collector")
 
 
-async def generate_report(service_name: str, week_start: str, anomalies: list[dict]) -> str:
-    if not anomalies:
+async def generate_report(
+    service_name: str, week_start: str, anomalies: list[dict], drift: dict | None = None
+) -> str:
+    """drift: a summarize_drift() result, or None (no spec, or nothing to say)."""
+    if not anomalies and not drift:
         return (
             f"No significant anomalies were found for **{service_name}** "
             f"for the week of {week_start}."
         )
 
     if not settings.groq_api_key:
-        return fallback_report(service_name, week_start, anomalies)
+        return fallback_report(service_name, week_start, anomalies, drift)
 
     try:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
-            None, _call_groq_sync, service_name, week_start, anomalies
+            None, _call_groq_sync, service_name, week_start, anomalies, drift
         )
     except Exception:
         logger.exception("groq report generation failed, falling back to raw summary")
-        return fallback_report(service_name, week_start, anomalies)
+        return fallback_report(service_name, week_start, anomalies, drift)
 
 
-def _call_groq_sync(service_name: str, week_start: str, anomalies: list[dict]) -> str:
+def _call_groq_sync(service_name: str, week_start: str, anomalies: list[dict], drift: dict | None = None) -> str:
     from groq import Groq
 
     client = Groq(api_key=settings.groq_api_key, timeout=30.0)
     payload = {"service_name": service_name, "week_of": week_start, "anomalies": anomalies}
+    if drift:
+        payload["api_drift"] = drift
     response = client.chat.completions.create(
         model=settings.groq_model,
         messages=[

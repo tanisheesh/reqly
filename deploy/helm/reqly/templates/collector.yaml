@@ -32,6 +32,22 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
+      {{- if .Values.timescaledb.enabled }}
+      # Wait for the bundled database, so a first install doesn't crash-loop
+      # the collector while TimescaleDB initializes. Same image as the
+      # database, so nothing extra is pulled.
+      initContainers:
+        - name: wait-for-db
+          image: "{{ .Values.timescaledb.image.repository }}:{{ .Values.timescaledb.image.tag }}"
+          imagePullPolicy: {{ .Values.timescaledb.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - until pg_isready -h {{ include "reqly.timescaledbHost" . }} -p 5432 -U {{ .Values.timescaledb.user }} -d {{ .Values.timescaledb.database }}; do echo "waiting for the database"; sleep 2; done
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { memory: 64Mi }
+      {{- end }}
       containers:
         - name: collector
           image: {{ include "reqly.image" (dict "image" .Values.collector.image "ctx" $) }}

@@ -139,7 +139,12 @@ class Config:
             flush_interval_seconds=(
                 flush_interval_seconds
                 if flush_interval_seconds is not None
-                else _env_float("REQLY_FLUSH_INTERVAL_SECONDS", 5.0)
+                # REQLY_FLUSH_INTERVAL_MS is the Node SDK's name; accepted
+                # too, so one environment configures both SDKs.
+                else _env_float(
+                    "REQLY_FLUSH_INTERVAL_SECONDS",
+                    _env_float("REQLY_FLUSH_INTERVAL_MS", 5000.0) / 1000,
+                )
             ),
             max_batch_size=(
                 max_batch_size

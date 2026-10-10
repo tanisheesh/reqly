@@ -1,13 +1,27 @@
-# reqly
+<p align="center">
+  <a href="https://reqly.tanisheesh.in"><img src="https://reqly.tanisheesh.in/docs/assets/logo.svg" width="64" height="64" alt="Reqly"></a>
+</p>
 
-**Self-hosted API monitoring for FastAPI, Flask, Django, Starlette and Litestar — two lines of code.**
-Latency percentiles, error rates and release tracking for every route, shipped to your own
-[Reqly](https://github.com/tanisheesh/reqly) collector — which turns them into deploy-aware
-hourly alerts and weekly AI anomaly reports.
+<h1 align="center">reqly</h1>
 
-[![PyPI](https://img.shields.io/pypi/v/reqly?color=06b6d4&label=reqly)](https://pypi.org/project/reqly/)
-[![Python](https://img.shields.io/pypi/pyversions/reqly?color=06b6d4)](https://pypi.org/project/reqly/)
-[![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0-06b6d4)](https://github.com/tanisheesh/reqly/blob/main/LICENSE)
+<p align="center">
+  <strong>API monitoring for Python that tells you what broke, when, and which deploy did it.</strong><br>
+  FastAPI · Flask · Django · Starlette · Litestar · any WSGI/ASGI app, in one line.
+</p>
+
+<p align="center">
+  <a href="https://pypi.org/project/reqly/"><img src="https://img.shields.io/pypi/v/reqly?color=06b6d4&style=flat-square&label=pypi" alt="PyPI version"></a>
+  <a href="https://pypi.org/project/reqly/"><img src="https://img.shields.io/pypi/pyversions/reqly?color=06b6d4&style=flat-square" alt="Python versions"></a>
+  <a href="https://pypi.org/project/reqly/"><img src="https://img.shields.io/pypi/dm/reqly?color=06b6d4&style=flat-square&label=downloads" alt="Downloads"></a>
+  <a href="https://github.com/tanisheesh/reqly/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-06b6d4?style=flat-square" alt="License"></a>
+</p>
+
+<p align="center">
+  <a href="https://reqly.tanisheesh.in/docs/instrument/python/"><strong>Documentation</strong></a> ·
+  <a href="https://reqly.tanisheesh.in/docs/quickstart/">Quickstart</a> ·
+  <a href="https://reqly-eventflow-dashboard.onrender.com">Live demo</a> ·
+  <a href="https://github.com/tanisheesh/reqly">GitHub</a>
+</p>
 
 ---
 
@@ -17,110 +31,68 @@ hourly alerts and weekly AI anomaly reports.
 pip install reqly
 ```
 
-## Usage
-
-**FastAPI**
-
 ```python
 import reqly
 from fastapi import FastAPI
 
 app = FastAPI()
-reqly.instrument(
-    app,
-    service_name="checkout-api",
-    collector_url="https://reqly.example.com",
-    api_key="your-ingest-key",
-)
-# Every route is now tracked: latency, errors, status codes, release
+reqly.instrument(app, service_name="checkout-api",
+                 collector_url="https://reqly.example.com", api_key="your-ingest-key")
 ```
 
-**Flask**
-
-```python
-import reqly
-from flask import Flask
-
-app = Flask(__name__)
-reqly.instrument(app, service_name="checkout-api")  # settings from REQLY_* env vars
-```
-
-**Starlette / Litestar** — same call:
-
-```python
-reqly.instrument(app, service_name="checkout-api")
-```
-
-**Django** (also Django REST Framework and Django Ninja) — Django has no app object, so add
-the middleware first in `MIDDLEWARE`:
-
-```python
-# settings.py
-MIDDLEWARE = [
-    "reqly.integrations.django.ReqlyMiddleware",
-    # ...
-]
-REQLY = {"service_name": "checkout-api", "api_key": "your-ingest-key"}  # optional
-```
-
-**Any other WSGI or ASGI app** (Bottle, Pyramid, Falcon, CherryPy, a bare ASGI app) — wrap it
-and serve the result. A `route_resolver` returns the route template, because only the framework
-knows it; without one every request is recorded as `__unmatched__`, never as a raw path:
-
-```python
-app = reqly.instrument_wsgi(
-    app, service_name="checkout-api",
-    route_resolver=lambda environ: environ["bottle.route"].rule,  # Bottle
-)
-# Pyramid: environ["bfg.routes.route"].pattern; ASGI: reqly.instrument_asgi(app, route_resolver=...)
-```
-
-**Who is calling** — tag each request with its API consumer. The id is hashed (HMAC-SHA256
-with your secret salt) before it leaves the app:
-
-```python
-reqly.instrument(app, consumer_header="X-API-Key", consumer_salt=os.environ["REQLY_CONSUMER_SALT"])
-# or any logic: consumer=lambda info: info.headers.get("x-tenant-id")
-```
-
-**LLM cost per route** — record token usage where you call a model; the collector prices it:
-
-```python
-completion = client.chat.completions.create(model="gpt-4o-mini", messages=messages)
-reqly.record_llm_response(completion)   # OpenAI / Anthropic responses, or:
-reqly.record_llm_usage("gpt-4o-mini", input_tokens=1200, output_tokens=240)
-```
-
-`instrument()` detects the framework by itself — no decorators, no middleware to wire up.
-Routes are recorded as templates in one style across frameworks: Django's
-`users/<int:pk>/` and DRF's `^users/(?P<pk>[^/.]+)/$` both become `/users/{pk}/`.
-The release you're running is picked up automatically from your CI or host
-(`GITHUB_SHA`, `RENDER_GIT_COMMIT`, `VERCEL_GIT_COMMIT_SHA`, …), so deploys show up in
-Reqly with no extra code.
+That's it: every route now reports its latency, errors, status codes and release to your
+own [Reqly collector](https://github.com/tanisheesh/reqly). No decorators, no agent, no
+vendor account.
 
 ## What you get
 
-From the SDK, per request: method, **route template** (`/orders/{id}`, never the raw
-path), status code, duration, error type, host, **release**, environment and
-request/response **body size**.
+| | |
+|---|---|
+| 📈 **Real percentiles** | p50 / p95 / p99 per route and per service, merged exactly across routes and time |
+| 🚀 **Deploy-aware** | The release is picked up from your CI or host (`GITHUB_SHA`, `RENDER_GIT_COMMIT`, …); every alert says which release was running |
+| 🔔 **Alerts that explain** | Hourly checks against each route's weekday × hour baseline, naming the host, error type and clients behind a spike; to Slack, Discord or a webhook |
+| 💬 **Ask Reqly** | *"Why did /orders start failing?"* answered from your own data, every number checked |
+| 🎯 **SLOs** | Availability and latency objectives with error budgets and burn-rate alerts |
+| 🧾 **OpenAPI drift** | Undocumented, unused and deprecated-but-called endpoints (`push_openapi=True`) |
+| 👥 **API consumers** | Who calls your API and who an incident hit, with ids hashed in the SDK |
+| 💸 **LLM cost per route** | Tokens and cost per route and model, and an alert when it spikes |
 
-In the Reqly dashboard and collector:
+## Your framework
 
-- **p50 / p95 / p99 latency** per route and per service — real percentiles from
-  mergeable sketches, not the max of per-route numbers
-- **Error rates, status codes and top routes** over 1h / 6h / 24h / 7d
-- **Deploy markers and per-release health** — each release's error rate and p95
-- **Hourly alerts** to Slack, Discord or a webhook when a route breaks from its usual
-  weekday-hour pattern, with **root-cause hints**
-- **Top consumers** — requests and error rate per API client, and which clients an incident
-  hit (in the alert itself)
-- **LLM cost per route** — tokens and estimated spend per route and model
-- **API surface vs your OpenAPI spec** — undocumented endpoints that get traffic, documented
-  ones nobody calls, and deprecated ones still in use (`push_openapi=True`)
-- **Weekly AI report** — statistics find the anomalies, Groq (gpt-oss-120b) writes the
-  summary; plain-text fallback without an API key
+| Framework | What to write |
+|---|---|
+| FastAPI, Starlette, Litestar, Flask | `reqly.instrument(app, service_name="...")`, detected automatically |
+| Django, DRF, Django Ninja | `"reqly.integrations.django.ReqlyMiddleware"` first in `MIDDLEWARE` |
+| Bottle, Pyramid, Falcon, any WSGI app | `app = reqly.instrument_wsgi(app, route_resolver=...)` |
+| Any ASGI app | `app = reqly.instrument_asgi(app, route_resolver=...)` |
 
-An alert from the demo data looks like this:
+```python
+# settings.py (Django)
+MIDDLEWARE = ["reqly.integrations.django.ReqlyMiddleware", ...]
+REQLY = {"service_name": "checkout-api", "api_key": "your-ingest-key"}
+
+# Bottle: tell Reqly where the route template is
+app = reqly.instrument_wsgi(app, service_name="checkout-api",
+                            route_resolver=lambda environ: environ["bottle.route"].rule)
+```
+
+Routes are recorded as **templates** (`/users/{id}`), never raw paths; requests no route
+matched become `__unmatched__`, so 404 scanners can't flood your data.
+
+## Who is calling, and what it costs
+
+```python
+reqly.instrument(app, consumer_header="X-API-Key", consumer_salt=os.environ["REQLY_CONSUMER_SALT"])
+
+completion = client.chat.completions.create(model="gpt-4o-mini", messages=messages)
+reqly.record_llm_response(completion)          # OpenAI / Anthropic responses, or:
+reqly.record_llm_usage("gpt-4o-mini", input_tokens=1200, output_tokens=240)
+```
+
+Consumer ids are HMAC-SHA256-hashed with your salt before they leave the app; the collector
+never sees an API key.
+
+## An alert looks like this
 
 ```
 🔴 Anomaly — flask-demo /orders (Friday 15:00-16:00 UTC, z=5.37)
@@ -129,106 +101,73 @@ An alert from the demo data looks like this:
 • 100% of errors came from host pod-3, which served 23% of requests
 ```
 
-**Not on Python?** Node, Java, Go and .NET apps can report to the same collector through
-OpenTelemetry — no Reqly SDK needed. See the
-[OpenTelemetry guide](https://reqly.tanisheesh.in/docs/instrument/opentelemetry/).
-
 ## Configuration
 
-Every option can be passed to `instrument()` or set as an environment variable.
-Resolution order: **argument → environment variable → default**.
+Pass options to `instrument()` or set environment variables (argument → environment variable → default).
 
-| argument | environment variable | default |
+| Argument | Environment variable | Default |
 |---|---|---|
-| `service_name` | `REQLY_SERVICE_NAME` | `sys.argv[0]` basename |
+| `service_name` | `REQLY_SERVICE_NAME` | the script name |
 | `collector_url` | `REQLY_COLLECTOR_URL` | `http://localhost:8000` |
 | `api_key` | `REQLY_API_KEY` | `None` |
-| `release` | `REQLY_RELEASE`, then CI variables (`GITHUB_SHA`, `CI_COMMIT_SHA`, `RENDER_GIT_COMMIT`, `VERCEL_GIT_COMMIT_SHA`, `RAILWAY_GIT_COMMIT_SHA`, `HEROKU_SLUG_COMMIT`, `K_REVISION`, …) | auto-detected, else `None` |
+| `release` | `REQLY_RELEASE`, then CI variables | auto-detected |
 | `environment` | `REQLY_ENVIRONMENT` | `None` |
 | `sample_rate` | `REQLY_SAMPLE_RATE` | `1.0` |
-| `flush_interval_seconds` | `REQLY_FLUSH_INTERVAL_SECONDS` | `5.0` |
-| `max_batch_size` | `REQLY_MAX_BATCH_SIZE` | `200` |
-| `max_queue_size` | `REQLY_MAX_QUEUE_SIZE` | `2000` |
-| `ignore_routes` | `REQLY_IGNORE_ROUTES` (comma-separated) | `/health,/metrics` |
-| `consumer_header` | `REQLY_CONSUMER_HEADER` | `None` — header that identifies the caller, e.g. `X-API-Key` |
-| `consumer` | — | `None` — `callable(RequestInfo) -> str \| None`, instead of a header |
-| `consumer_salt` | `REQLY_CONSUMER_SALT` | `None` — secret for hashing consumer ids (set it) |
-| `hash_consumer` | `REQLY_HASH_CONSUMER` | `True` — `False` sends ids unhashed (only for non-secret ids) |
-| `push_openapi` | `REQLY_PUSH_OPENAPI` | `False` — upload the app's OpenAPI spec (FastAPI, Litestar) on the first request |
-| `capture_request_body` | `REQLY_CAPTURE_REQUEST_BODY` | `False` (not implemented yet) |
+| `flush_interval_seconds` | `REQLY_FLUSH_INTERVAL_SECONDS` (or `_MS`) | `5.0`; a full batch is sent at once |
+| `max_batch_size` / `max_queue_size` | `REQLY_MAX_BATCH_SIZE` / `REQLY_MAX_QUEUE_SIZE` | `200` / `2000` |
+| `ignore_routes` | `REQLY_IGNORE_ROUTES` | `/health,/metrics` |
+| `consumer_header` / `consumer` | `REQLY_CONSUMER_HEADER` / — | `None` |
+| `consumer_salt` / `hash_consumer` | `REQLY_CONSUMER_SALT` / `REQLY_HASH_CONSUMER` | `None` / `True` |
+| `push_openapi` | `REQLY_PUSH_OPENAPI` | `False` (FastAPI, Litestar) |
 
-With `sample_rate` below 1.0, request counts in the dashboard are the sampled volume;
-latency percentiles and error rates stay unbiased.
+Every option, explained: [Python SDK docs](https://reqly.tanisheesh.in/docs/instrument/python/#configuration).
 
-## Design guarantees
+## Built to stay out of your way
 
-**Small overhead** — about 13 µs per request on FastAPI and Starlette and 33 µs on Flask,
-measured in-process with consumer tracking on and the shipper running
-([benchmark](https://github.com/tanisheesh/reqly/blob/main/bench/README.md)).
-
-**Fail-open** — any internal SDK error is caught and logged once; instrumentation disables
-itself rather than raise into your app. A slow or unreachable collector never blocks
-request threads — shipping happens on a background thread with strict HTTP timeouts.
-
-**Bounded cardinality** — routes are recorded as the framework's matched template
-(`/users/{id}`), never the raw path (`/users/123`). Unmatched paths (404s, scanners)
-collapse into a single `__unmatched__` bucket.
-
-**Bounded memory** — events wait in a fixed-size in-memory queue; under backpressure the
-oldest events are dropped and counted instead of growing without limit.
-
-**Safe retries** — batches are retried with exponential backoff on `408`, `429` and any
-`5xx` (for example a collector restart behind a proxy); other `4xx` responses are dropped
-immediately. Every event carries a unique `event_id` the collector deduplicates on, so a
-retry never double-counts.
-
-**Pre-fork servers** — under gunicorn `--preload` (or uWSGI without lazy-apps) each
-forked worker restarts its own flush thread and HTTP connection pool, so workers' events
-are shipped instead of silently queuing forever.
+- ⚡ **~13 µs per request** on FastAPI and Starlette, ~33 µs on Flask ([benchmark](https://reqly.tanisheesh.in/docs/reference/benchmarks/))
+- 🛡️ **Fail-open:** an internal error is logged once and instrumentation turns itself off; it never raises into your app
+- 🧵 **Off the request path:** a background thread ships batches with strict timeouts, so a slow collector never blocks a request
+- 📦 **Bounded:** a fixed-size queue (oldest dropped first) and route templates only
+- 🔁 **Safe retries** on 408, 429 and 5xx, deduplicated by the collector
+- 🍴 **Pre-fork servers** (gunicorn `--preload`, uWSGI) restart the shipper in each worker
 
 ## Compatibility
 
-| | Supported |
+| | |
 |---|---|
 | Python | 3.9 – 3.13 |
-| FastAPI | 0.100+ (including routes in `app.mount()`ed sub-apps) |
-| Starlette | 0.27+ (including `Mount`) |
-| Litestar | 2.0+ |
-| Flask | 2.3+ |
+| FastAPI | 0.100+, including `app.mount()`ed sub-apps |
+| Starlette · Litestar · Flask | 0.27+ · 2.0+ · 2.3+ |
 | Django | 4.2+, sync and async views; DRF and Django Ninja |
-| Other WSGI / ASGI | any, with `instrument_wsgi()` / `instrument_asgi()` and a `route_resolver` |
-| Collector | any version; `release`, `environment` and body sizes are stored by collector 0.3.0+ and ignored by older ones; `push_openapi` needs 0.7.0+; consumer and LLM views need 0.8.0+ |
+| Collector | consumer and LLM views need 0.8.0+, `push_openapi` 0.7.0+ |
 
-## Self-hosting the collector
+Not on Python? There's a [Node.js SDK](https://www.npmjs.com/package/reqly-node), and any
+language can report through [OpenTelemetry](https://reqly.tanisheesh.in/docs/instrument/opentelemetry/).
 
-The SDK sends data to a Reqly collector you run. The full stack — collector,
-TimescaleDB and dashboard — starts with Docker Compose:
+## Run the collector
+
+The SDK sends to a Reqly collector you host (TimescaleDB + collector + dashboard):
 
 ```bash
-git clone https://github.com/tanisheesh/reqly.git
-cd reqly
-docker compose up -d
+git clone https://github.com/tanisheesh/reqly && cd reqly && docker compose up -d
+# or on Kubernetes
+helm install reqly oci://ghcr.io/tanisheesh/charts/reqly -n reqly --create-namespace
 ```
 
-Full documentation: **[reqly.tanisheesh.in/docs](https://reqly.tanisheesh.in/docs/)** ·
-[Python SDK guide](https://reqly.tanisheesh.in/docs/instrument/python/) ·
-[self-hosting](https://reqly.tanisheesh.in/docs/self-hosting/deploy/) ·
-[ingest API spec](https://reqly.tanisheesh.in/docs/reference/ingest-spec/)
+[Quickstart](https://reqly.tanisheesh.in/docs/quickstart/) ·
+[Deploy to production](https://reqly.tanisheesh.in/docs/self-hosting/deploy/) ·
+[Changelog](https://github.com/tanisheesh/reqly/blob/main/sdk/CHANGELOG.md) ·
+License: [GPL-3.0](https://github.com/tanisheesh/reqly/blob/main/LICENSE)
 
-## Live demo
+---
 
-Reqly monitors [EventFlow](https://eventflow-g2h5.onrender.com), a Flask event management
-app, in production:
+<div align="center">
 
-- **Demo app** → [eventflow-g2h5.onrender.com](https://eventflow-g2h5.onrender.com)
-- **Metrics dashboard** → [reqly-eventflow-dashboard.onrender.com](https://reqly-eventflow-dashboard.onrender.com)
+<h3>Tanish Poddar</h3>
 
-> The dashboard is public. To make some traffic, use EventFlow (log in as `admin@eventhub.com` / `Admin@123`).
+<a href="https://tanisheesh.in"><img src="https://img.shields.io/badge/Website-tanisheesh.in-111111?style=flat-square&logo=googlechrome&logoColor=white" alt="Website"></a>
+<a href="https://linkedin.com/in/tanisheesh"><img src="https://img.shields.io/badge/LinkedIn-tanisheesh-0A66C2?style=flat-square" alt="LinkedIn"></a>
+<a href="https://github.com/tanisheesh"><img src="https://img.shields.io/badge/GitHub-tanisheesh-181717?style=flat-square&logo=github&logoColor=white" alt="GitHub"></a>
+<a href="mailto:hey@tanisheesh.in"><img src="https://img.shields.io/badge/Email-hey%40tanisheesh.in-EA4335?style=flat-square&logo=gmail&logoColor=white" alt="Email"></a>
 
-## Changelog
-
-See [CHANGELOG.md](https://github.com/tanisheesh/reqly/blob/main/sdk/CHANGELOG.md).
-
-## License
-
-GPL-3.0-or-later — see [LICENSE](https://github.com/tanisheesh/reqly/blob/main/LICENSE).
+</div>

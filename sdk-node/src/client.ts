@@ -4,7 +4,7 @@ import { hostname } from "node:os";
 import { ReqlyOptions, ResolvedConfig, resolveConfig } from "./config.js";
 import { LlmSummary, RequestInfo } from "./context.js";
 
-export const SDK_VERSION = "0.2.0";
+export const SDK_VERSION = "0.3.0";
 export const UNMATCHED_ROUTE = "__unmatched__";
 
 const HOST = hostname();
@@ -75,7 +75,14 @@ export class ReqlyClient {
   private disabled = false;
   // The same few API keys / tenants call over and over: hash each once.
   private readonly hashedConsumers = new Map<string, string>();
-  readonly stats = { recorded: 0, shipped: 0, dropped: 0, failedBatches: 0 };
+  private openapiSource: (() => unknown) | undefined;
+  private openapiPushed = false;
+  /**
+   * observed: requests seen (before sampling and ignored routes); recorded:
+   * the ones queued; shipped / dropped: events sent / lost; failedBatches:
+   * batches given up after retries.
+   */
+  readonly stats = { observed: 0, recorded: 0, shipped: 0, dropped: 0, failedBatches: 0 };
 
   constructor(options: ReqlyOptions = {}) {
     this.config = resolveConfig(options);
@@ -85,6 +92,9 @@ export class ReqlyClient {
           "(user ids, emails) can be reversed by trying candidates; set a secret salt",
       );
     }
+    const spec = this.config.pushOpenapi;
+    if (typeof spec === "function") this.openapiSource = spec as () => unknown;
+    else if (spec && typeof spec === "object") this.openapiSource = () => spec;
     this.timer = setInterval(() => void this.flush(), this.config.flushIntervalMs);
     this.timer.unref(); // never keeps the process alive
     liveClients.add(this);
@@ -96,9 +106,19 @@ export class ReqlyClient {
     return this.queue.length > 0;
   }
 
+  /** Where `pushOpenapi: true` gets the spec from (set by a framework integration). */
+  useOpenapiSource(source: () => unknown): void {
+    if (this.config.pushOpenapi === true && !this.openapiSource) this.openapiSource = source;
+  }
+
   record(request: RecordedRequest): void {
     if (this.disabled) return;
     try {
+      if (!this.openapiPushed && this.config.pushOpenapi) {
+        this.openapiPushed = true;
+        void this.pushOpenapi();
+      }
+      this.stats.observed += 1;
       const route = request.route || UNMATCHED_ROUTE;
       if (this.config.ignoreRoutes.has(route)) return;
       if (this.config.sampleRate < 1 && Math.random() >= this.config.sampleRate) return;
@@ -212,9 +232,39 @@ export class ReqlyClient {
       // Not unref'd: while a flush is in flight (e.g. `await client.shutdown()`
       // with the collector down) the process must not exit mid-retry. The
       // waits are short (200 + 400 ms); the flush *interval* stays unref'd.
-      if (attempt < MAX_RETRIES - 1) await new Promise((resolve) => setTimeout(resolve, 200 * 2 ** attempt));
+      // Jitter, so many processes don't retry against a restarting collector in lockstep.
+      if (attempt < MAX_RETRIES - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 200 * 2 ** attempt + Math.random() * 100));
+      }
     }
     return false;
+  }
+
+  /** Uploads the app's OpenAPI spec once. Never throws; failures are logged. */
+  private async pushOpenapi(): Promise<void> {
+    try {
+      if (!this.openapiSource) {
+        console.warn(
+          "reqly: pushOpenapi needs a spec: pass the document or a function returning it " +
+            "(Fastify with @fastify/swagger is picked up by itself)",
+        );
+        return;
+      }
+      const spec = await this.openapiSource();
+      if (!spec || typeof spec !== "object") return;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (this.config.apiKey) headers["X-Reqly-Key"] = this.config.apiKey;
+      const url = `${this.config.collectorUrl}/v1/services/${encodeURIComponent(this.config.serviceName)}/openapi`;
+      const response = await fetch(url, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(spec),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) console.warn(`reqly: OpenAPI spec upload failed with ${response.status}`);
+    } catch (err) {
+      console.warn("reqly: OpenAPI spec upload failed:", err);
+    }
   }
 
   /** Stops the timer and sends what is queued. Call on graceful shutdown. */

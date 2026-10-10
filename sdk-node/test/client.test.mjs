@@ -85,6 +85,7 @@ test("ignored routes, sampling and env configuration", async () => {
     client.record(request({ route: "/health" }));
     await client.shutdown();
     assert.equal(client.stats.recorded, 0);
+    assert.equal(client.stats.observed, 2); // seen, then sampled out / ignored
   } finally {
     delete process.env.REQLY_SERVICE_NAME;
     delete process.env.GITHUB_SHA;
@@ -158,4 +159,25 @@ test("shutdown during an in-flight flush still sends everything", async () => {
   assert.equal(collector.events().length, 35);
   assert.equal(client.stats.shipped, 35);
   await collector.close();
+});
+
+
+test("the flush interval reads either SDK's environment variable", () => {
+  const interval = () => new ReqlyClient({ collectorUrl: "http://127.0.0.1:9" });
+  try {
+    const a = interval();
+    assert.equal(a.config.flushIntervalMs, 5000);
+    void a.shutdown();
+    process.env.REQLY_FLUSH_INTERVAL_SECONDS = "2.5"; // the Python SDK's name
+    const b = interval();
+    assert.equal(b.config.flushIntervalMs, 2500);
+    void b.shutdown();
+    process.env.REQLY_FLUSH_INTERVAL_MS = "1000"; // Node's own name wins
+    const c = interval();
+    assert.equal(c.config.flushIntervalMs, 1000);
+    void c.shutdown();
+  } finally {
+    delete process.env.REQLY_FLUSH_INTERVAL_SECONDS;
+    delete process.env.REQLY_FLUSH_INTERVAL_MS;
+  }
 });

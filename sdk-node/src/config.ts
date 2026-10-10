@@ -29,6 +29,13 @@ export interface ReqlyOptions {
   consumerSalt?: string;
   /** Hash consumer ids before they leave the app. Default true (REQLY_HASH_CONSUMER). */
   hashConsumer?: boolean;
+  /**
+   * Upload the app's OpenAPI spec once, on the first request, for API drift:
+   * the spec object (e.g. NestJS `SwaggerModule.createDocument(...)`), a
+   * function returning it (sync or async), or `true` to take it from the
+   * framework (Fastify with @fastify/swagger). Default: REQLY_PUSH_OPENAPI.
+   */
+  pushOpenapi?: boolean | object | (() => unknown);
 }
 
 export interface ResolvedConfig {
@@ -46,6 +53,7 @@ export interface ResolvedConfig {
   consumer?: (info: RequestInfo) => string | null | undefined;
   consumerSalt?: string;
   hashConsumer: boolean;
+  pushOpenapi: boolean | object | (() => unknown);
 }
 
 // Commit SHA variables set by common CI/CD and hosting platforms (same list
@@ -89,7 +97,12 @@ export function resolveConfig(options: ReqlyOptions = {}): ResolvedConfig {
     release: release?.slice(0, 128),
     environment: (options.environment ?? env("REQLY_ENVIRONMENT"))?.slice(0, 32),
     sampleRate: Math.min(1, Math.max(0, sampleRate)),
-    flushIntervalMs: options.flushIntervalMs ?? envNumber("REQLY_FLUSH_INTERVAL_MS") ?? 5000,
+    // REQLY_FLUSH_INTERVAL_SECONDS is the Python SDK's name; accepted too, so
+    // one environment configures both SDKs.
+    flushIntervalMs:
+      options.flushIntervalMs ??
+      envNumber("REQLY_FLUSH_INTERVAL_MS") ??
+      (envNumber("REQLY_FLUSH_INTERVAL_SECONDS") !== undefined ? envNumber("REQLY_FLUSH_INTERVAL_SECONDS")! * 1000 : 5000),
     maxBatchSize: options.maxBatchSize ?? envNumber("REQLY_MAX_BATCH_SIZE") ?? 200,
     maxQueueSize: options.maxQueueSize ?? envNumber("REQLY_MAX_QUEUE_SIZE") ?? 2000,
     ignoreRoutes: new Set(
@@ -100,5 +113,6 @@ export function resolveConfig(options: ReqlyOptions = {}): ResolvedConfig {
     consumer: options.consumer,
     consumerSalt: options.consumerSalt ?? env("REQLY_CONSUMER_SALT"),
     hashConsumer: options.hashConsumer ?? envBool("REQLY_HASH_CONSUMER") ?? true,
+    pushOpenapi: options.pushOpenapi ?? envBool("REQLY_PUSH_OPENAPI") ?? false,
   };
 }

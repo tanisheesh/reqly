@@ -43,7 +43,7 @@ Reqly only needs traces. If your setup also exports metrics or logs, point those
     NODE_OPTIONS="--require @opentelemetry/auto-instrumentations-node/register" node app.js
     ```
 
-    A runnable example is in [`examples/otel/express`](https://github.com/tanisheesh/reqly/tree/main/examples/otel/express). For Express, Fastify, Hono, Koa and NestJS there is also the native [Node SDK](node.md): one middleware line, plus consumer and LLM-cost tracking that OTLP doesn't carry.
+    A runnable example is in [`examples/otel/express`](https://github.com/tanisheesh/reqly/tree/main/examples/otel/express). For Express, Fastify, Hono, Koa and NestJS there is also the native [Node SDK](node.md): one middleware line, plus consumer tracking that OTLP doesn't carry.
 
 === "Python"
 
@@ -92,9 +92,16 @@ Reqly is API-level monitoring, not a tracing backend. From each export it keeps 
 | error | status ≥ 500, or span status ERROR |
 | error type | `error.type`, else the `exception.type` of the span's first exception event |
 | body sizes | `http.request.body.size` / `http.response.body.size` |
+| LLM model and tokens | GenAI spans under the request (see below) |
 
 !!! warning "The route matters"
     Reqly groups by route template (`/users/:id`), never by raw URL. If your instrumentation doesn't set `http.route`, every request lands in `__unmatched__`. Check your framework's instrumentation docs for how to turn on route reporting.
+
+### LLM calls
+
+If your app's LLM calls are instrumented with the OpenTelemetry **GenAI conventions** (OpenLLMetry, OpenInference, or the official `opentelemetry-instrumentation-openai` and similar), Reqly reads `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens` (or the older `prompt_tokens` / `completion_tokens`) and the model (`gen_ai.response.model`, else `gen_ai.request.model`) from those spans. It adds them to the HTTP request they ran under, so [LLM cost per route](../features/llm-cost.md) and [LLM cost alerts](../features/alerts.md#llm-cost-alerts) work without a Reqly SDK.
+
+A call is matched to its request by walking up its parent spans within the same export. An exporter normally sends a request and its child spans together; a call whose request isn't in the same export is not counted.
 
 Each span gets a deterministic event id derived from its trace and span id. When an exporter retries a failed export, the duplicates are dropped instead of counted twice.
 

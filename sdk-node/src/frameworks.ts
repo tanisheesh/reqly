@@ -37,6 +37,54 @@ function intOrUndefined(value: unknown): number | undefined {
   return value !== undefined && value !== null && value !== "" && Number.isInteger(n) && n >= 0 ? n : undefined;
 }
 
+// Response bodies without a Content-Length (streams, chunked, server-sent
+// events, LLM token streams) are measured by counting what is written.
+const BODY_BYTES = Symbol.for("reqly.bodyBytes");
+
+function chunkBytes(chunk: unknown, encoding: unknown): number {
+  if (chunk === undefined || chunk === null || typeof chunk === "function") return 0;
+  if (typeof chunk === "string") {
+    return Buffer.byteLength(chunk, typeof encoding === "string" ? (encoding as BufferEncoding) : "utf8");
+  }
+  return chunk instanceof Uint8Array ? chunk.byteLength : 0;
+}
+
+/** Counts the body bytes written to a node:http response; returns a getter. */
+function countBodyBytes(res: unknown): () => number | undefined {
+  const r = res as Record<string | symbol, unknown> | null;
+  if (!r) return () => undefined;
+  const existing = r[BODY_BYTES];
+  if (typeof existing === "function") return existing as () => number;
+  const write = r.write;
+  const end = r.end;
+  if (typeof write !== "function" || typeof end !== "function") return () => undefined;
+  let bytes = 0;
+  r.write = function (this: unknown, chunk: unknown, encoding: unknown, ...rest: unknown[]) {
+    try {
+      bytes += chunkBytes(chunk, encoding);
+    } catch {
+      // never reaches the app
+    }
+    return (write as (...a: unknown[]) => unknown).call(this, chunk, encoding, ...rest);
+  };
+  r.end = function (this: unknown, chunk: unknown, encoding: unknown, ...rest: unknown[]) {
+    try {
+      bytes += chunkBytes(chunk, encoding);
+    } catch {
+      // never reaches the app
+    }
+    return (end as (...a: unknown[]) => unknown).call(this, chunk, encoding, ...rest);
+  };
+  const get = () => bytes;
+  r[BODY_BYTES] = get;
+  return get;
+}
+
+/** Content-Length when the response has one, else the bytes counted. */
+function responseSize(contentLength: unknown, counted: () => number | undefined): number | undefined {
+  return intOrUndefined(contentLength) ?? counted();
+}
+
 // --- Express -------------------------------------------------------------------
 
 /* Minimal structural types so Express isn't a dependency. */
@@ -78,6 +126,7 @@ function expressMiddleware(client: ReqlyClient, isUnmatched?: (route: string, st
     if (!claim(req)) return next();
     const start = process.hrtime.bigint();
     const usage = new LlmUsage();
+    const bodyBytes = countBodyBytes(res);
     // The template is captured when Express assigns req.route: at that
     // moment req.baseUrl is the router's mount path. By the time the
     // response finishes, an error leaving a sub-router has already reset it.
@@ -111,7 +160,7 @@ function expressMiddleware(client: ReqlyClient, isUnmatched?: (route: string, st
           durationMs: elapsedMs(start),
           errorType: res.locals?.[EXPRESS_ERROR] as string | undefined,
           requestBytes: intOrUndefined(req.headers["content-length"]),
-          responseBytes: intOrUndefined(res.getHeader("content-length")),
+          responseBytes: responseSize(res.getHeader("content-length"), bodyBytes),
           requestInfo: (): RequestInfo => ({
             method: req.method,
             path: req.path ?? req.originalUrl ?? "/",
@@ -129,8 +178,10 @@ function expressMiddleware(client: ReqlyClient, isUnmatched?: (route: string, st
     requestStorage.run(usage, () => next());
   };
 
+  // Like the other integrations, only an error that becomes a 5xx is an
+  // error: next(createError(404)) or a thrown 400 is the app answering.
   const errorHandler = (err: unknown, _req: ExpressRequest, res: ExpressResponse, next: Next): void => {
-    if (res.locals) res.locals[EXPRESS_ERROR] = (err as Error | undefined)?.name ?? "Error";
+    if (res.locals && httpStatusOf(err) >= 500) res.locals[EXPRESS_ERROR] = (err as Error | undefined)?.name ?? "Error";
     next(err);
   };
 
@@ -150,6 +201,7 @@ interface FastifyRequestLike {
 interface FastifyReplyLike {
   statusCode: number;
   getHeader(name: string): unknown;
+  raw?: unknown; // the node:http response
 }
 type Done = (err?: Error) => void;
 interface FastifyLike {
@@ -162,6 +214,7 @@ const START = Symbol("reqly.start");
 const USAGE = Symbol("reqly.usage");
 const ERROR = Symbol("reqly.error");
 const OWNER = Symbol("reqly.owner");
+const BYTES = Symbol("reqly.bytes");
 
 /**
  * Fastify plugin (4 and 5):
@@ -174,10 +227,17 @@ export function reqlyFastify(clientOrOptions?: ClientOrOptions) {
   const client = toClient(clientOrOptions);
 
   const plugin = (fastify: FastifyLike, _opts: unknown, done: Done) => {
-    fastify.addHook("onRequest", (req, _reply, next) => {
+    // pushOpenapi: true -> the spec from @fastify/swagger, read on the first request
+    client.useOpenapiSource(() => {
+      const swagger = (fastify as unknown as { swagger?: () => unknown }).swagger;
+      if (typeof swagger !== "function") throw new Error("@fastify/swagger is not registered");
+      return swagger.call(fastify);
+    });
+    fastify.addHook("onRequest", (req, reply, next) => {
       if (!claim(req)) return next();
       req[OWNER] = plugin;
       req[START] = process.hrtime.bigint();
+      req[BYTES] = countBodyBytes(reply.raw);
       const usage = new LlmUsage();
       req[USAGE] = usage;
       requestStorage.run(usage, () => next());
@@ -196,9 +256,14 @@ export function reqlyFastify(clientOrOptions?: ClientOrOptions) {
             route: req.routeOptions?.url ?? req.routerPath,
             statusCode: reply.statusCode,
             durationMs: elapsedMs(start),
-            errorType: req[ERROR] as string | undefined,
+            // like the other integrations, only errors that end in a 5xx
+            // (a 400 validation error is the app answering)
+            errorType: reply.statusCode >= 500 ? (req[ERROR] as string | undefined) : undefined,
             requestBytes: intOrUndefined(req.headers["content-length"]),
-            responseBytes: intOrUndefined(reply.getHeader("content-length")),
+            responseBytes: responseSize(
+              reply.getHeader("content-length"),
+              (req[BYTES] as (() => number | undefined) | undefined) ?? (() => undefined),
+            ),
             requestInfo: () => ({
               method: req.method,
               path: req.url.split("?")[0],
@@ -308,6 +373,7 @@ interface KoaContextLike {
   status: number;
   headers: Record<string, unknown>;
   req: object;
+  res: object;
   response: { length?: number };
   _matchedRoute?: unknown; // set by @koa/router: the full template, prefixes included
 }
@@ -339,6 +405,7 @@ export function reqlyKoa(clientOrOptions?: ClientOrOptions) {
     }
     const start = process.hrtime.bigint();
     const usage = new LlmUsage();
+    const bodyBytes = countBodyBytes(ctx.res);
     let statusCode: number | undefined;
     let errorType: string | undefined;
     try {
@@ -349,21 +416,36 @@ export function reqlyKoa(clientOrOptions?: ClientOrOptions) {
       if (statusCode >= 500) errorType = (err as Error | undefined)?.name ?? "Error";
       throw err;
     } finally {
-      try {
-        const route = ctx._matchedRoute;
-        client.record({
-          method: ctx.method,
-          route: typeof route === "string" ? route : undefined,
-          statusCode: statusCode ?? ctx.status,
-          durationMs: elapsedMs(start),
-          errorType,
-          requestBytes: intOrUndefined(ctx.headers["content-length"]),
-          responseBytes: intOrUndefined(ctx.response.length),
-          requestInfo: () => ({ method: ctx.method, path: ctx.path, headers: lowerHeaders(ctx.headers), raw: ctx }),
-          llm: usage.summary(),
-        });
-      } catch {
-        // never reaches the app
+      // Koa writes the body after the middleware chain returns (a stream body
+      // is piped then), so record when the response has actually finished:
+      // the duration and byte count then include the body.
+      let done = false;
+      const record = () => {
+        if (done) return;
+        done = true;
+        try {
+          const route = ctx._matchedRoute;
+          client.record({
+            method: ctx.method,
+            route: typeof route === "string" ? route : undefined,
+            statusCode: statusCode ?? ctx.status,
+            durationMs: elapsedMs(start),
+            errorType,
+            requestBytes: intOrUndefined(ctx.headers["content-length"]),
+            responseBytes: responseSize(ctx.response.length, bodyBytes),
+            requestInfo: () => ({ method: ctx.method, path: ctx.path, headers: lowerHeaders(ctx.headers), raw: ctx }),
+            llm: usage.summary(),
+          });
+        } catch {
+          // never reaches the app
+        }
+      };
+      const res = ctx.res as { writableFinished?: boolean; once?: (event: string, listener: () => void) => unknown };
+      if (res.writableFinished || typeof res.once !== "function") {
+        record();
+      } else {
+        res.once("finish", record);
+        res.once("close", record); // client aborted
       }
     }
   };
@@ -469,4 +551,110 @@ export function reqlyNest(app: NestAppLike, clientOrOptions?: ClientOrOptions) {
   };
   app.useGlobalInterceptors(interceptor);
   return { client };
+}
+
+// --- Plain node:http (any framework) -------------------------------------------
+
+interface NodeRequestLike {
+  method?: string;
+  url?: string;
+  headers: Record<string, unknown>;
+}
+interface NodeResponseLike {
+  statusCode: number;
+  getHeader(name: string): unknown;
+  once(event: "finish" | "close", listener: () => void): unknown;
+}
+
+export interface ReqlyHttpOptions<Req = NodeRequestLike> extends ReqlyOptions {
+  /**
+   * The route template for a request ("/users/:id"), read when the response
+   * finishes, so values your router set on the request by then are there.
+   * Without one, every request is recorded as "__unmatched__" -- never as the
+   * raw path.
+   */
+  routeResolver?: (req: Req) => string | null | undefined;
+  /** A client to share with other middleware, instead of creating one. */
+  client?: ReqlyClient;
+}
+
+/**
+ * Wraps a plain `(req, res)` handler -- node:http, or a framework without a
+ * built-in integration -- the way `instrument_wsgi` does for Python:
+ *
+ *     const handler = reqlyHttp(app, {
+ *       serviceName: "checkout-api",
+ *       routeResolver: (req) => req.matchedRoute,
+ *     });
+ *     http.createServer(handler).listen(3000);
+ *
+ * An error the handler throws (or a promise it returns rejects with) is
+ * recorded with its type and rethrown.
+ */
+export function reqlyHttp<Req extends NodeRequestLike, Res extends NodeResponseLike>(
+  handler: (req: Req, res: Res) => unknown,
+  options: ReqlyHttpOptions<Req> = {},
+) {
+  const { routeResolver, client: shared, ...clientOptions } = options;
+  const client = shared ?? new ReqlyClient(clientOptions);
+
+  const wrapped = (req: Req, res: Res): unknown => {
+    if (!claim(req)) return handler(req, res);
+    const start = process.hrtime.bigint();
+    const usage = new LlmUsage();
+    const bodyBytes = countBodyBytes(res);
+    let errorType: string | undefined;
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      try {
+        let route: string | undefined;
+        try {
+          const resolved = routeResolver?.(req);
+          route = typeof resolved === "string" && resolved !== "" ? resolved : undefined;
+        } catch {
+          route = undefined; // a failing resolver means "no route", never an app error
+        }
+        const method = (req.method ?? "GET").toUpperCase();
+        client.record({
+          method,
+          route,
+          statusCode: res.statusCode,
+          durationMs: elapsedMs(start),
+          errorType,
+          requestBytes: intOrUndefined(req.headers["content-length"]),
+          responseBytes: responseSize(res.getHeader("content-length"), bodyBytes),
+          requestInfo: () => ({
+            method,
+            path: (req.url ?? "/").split("?")[0],
+            headers: lowerHeaders(req.headers),
+            raw: req,
+          }),
+          llm: usage.summary(),
+        });
+      } catch {
+        // never reaches the app
+      }
+    };
+    res.once("finish", finish);
+    res.once("close", finish); // client aborted
+    const markError = (err: unknown) => {
+      errorType = (err as Error | undefined)?.name ?? "Error";
+    };
+    try {
+      const out = requestStorage.run(usage, () => handler(req, res));
+      if (out && typeof (out as Promise<unknown>).then === "function") {
+        return (out as Promise<unknown>).then(undefined, (err: unknown) => {
+          markError(err);
+          throw err;
+        });
+      }
+      return out;
+    } catch (err) {
+      markError(err);
+      throw err;
+    }
+  };
+  return Object.assign(wrapped, { client });
 }

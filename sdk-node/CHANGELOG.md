@@ -2,6 +2,29 @@
 
 All notable changes to `reqly-node`.
 
+## 0.3.0 — 2026-10-11
+
+### Added
+- `reqlyHttp(handler, { routeResolver })`: wraps a plain `(req, res)` handler for node:http or
+  a framework without a built-in integration, like the Python SDK's `instrument_wsgi`. Without
+  a resolver (or when it throws) requests are `__unmatched__`, never the raw path; errors the
+  handler throws or rejects with are recorded with their type and rethrown.
+- Verified on Bun: Hono on `Bun.serve` and `reqlyHttp` on Bun's node:http, run in CI.
+- `pushOpenapi`: uploads the app's OpenAPI spec once, on the first request, for API drift: the
+  spec object (e.g. NestJS `SwaggerModule.createDocument`), a function returning it, or `true`
+  to read it from @fastify/swagger. Also `REQLY_PUSH_OPENAPI`.
+- Streamed response bodies (no Content-Length: streams, chunked, server-sent events) are
+  measured by counting what is written, in Express, Fastify, Koa, NestJS and `reqlyHttp`.
+- `stats.observed`: requests seen before sampling; retries get jitter.
+- `REQLY_FLUSH_INTERVAL_SECONDS` (the Python SDK's name) is read too.
+
+### Fixed
+- Express and Fastify counted any error as an error, so `next(createError(404))` or a 400
+  validation error raised the error rate; now, like Koa, NestJS and the Python SDK, only errors
+  that end in a 5xx are errors.
+- Koa recorded a request before Koa sent a stream body, so its time and size were missing;
+  it now records when the response finishes.
+
 ## 0.2.0 — 2026-10-10
 
 ### Added
@@ -45,3 +68,16 @@ First release.
 - Consumers from a header or a function, HMAC-SHA256-hashed in the SDK.
 - `recordLlmUsage()` / `recordLlmResponse()` for LLM cost per route.
 - Batched, bounded, fail-open shipping with retries; ESM and CommonJS builds.
+
+---
+
+<div align="center">
+
+<h3>Tanish Poddar</h3>
+
+<a href="https://tanisheesh.in"><img src="https://img.shields.io/badge/Website-tanisheesh.in-111111?style=flat-square&logo=googlechrome&logoColor=white" alt="Website"></a>
+<a href="https://linkedin.com/in/tanisheesh"><img src="https://img.shields.io/badge/LinkedIn-tanisheesh-0A66C2?style=flat-square" alt="LinkedIn"></a>
+<a href="https://github.com/tanisheesh"><img src="https://img.shields.io/badge/GitHub-tanisheesh-181717?style=flat-square&logo=github&logoColor=white" alt="GitHub"></a>
+<a href="mailto:hey@tanisheesh.in"><img src="https://img.shields.io/badge/Email-hey%40tanisheesh.in-EA4335?style=flat-square&logo=gmail&logoColor=white" alt="Email"></a>
+
+</div>

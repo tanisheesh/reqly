@@ -30,6 +30,7 @@ The collector warns at start-up if the keys are the defaults or if the two keys 
 | `ASK_MODEL` | `GROQ_MODEL` | Model for Ask Reqly; needs tool calling |
 | `ASK_DAILY_LIMIT` | `200` | Ask Reqly questions per collector per day. `0` turns Ask off |
 | `LLM_PRICES_FILE` | empty | YAML price table that overrides and extends the built-in one ([LLM cost](../features/llm-cost.md#prices)) |
+| `CONSUMER_LIMIT_PER_DAY` | `1000` | Distinct [API consumers](../features/consumers.md#a-cap-on-distinct-consumers) kept per service per day; later new ones are `__other__`. `0` turns the cap off |
 
 ## Alerts and jobs
 

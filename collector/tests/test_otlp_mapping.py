@@ -156,3 +156,59 @@ def test_body_sizes_are_mapped():
     span = _span({**HTTP_OK, "http.request.body.size": 12, "http.response.body.size": 345})
     e = _events(map_resource_spans(_payload(span)))[0]
     assert (e["request_bytes"], e["response_bytes"]) == (12, 345)
+
+
+# --- GenAI spans -> LLM usage on the request -------------------------------------
+
+def _tree(*spans):
+    """One export with several spans of the same trace."""
+    return {"resourceSpans": [{
+        "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "svc"}}]},
+        "scopeSpans": [{"spans": list(spans)}],
+    }]}
+
+
+def _child(span_id, parent_id, attrs, kind=3):  # 3 = CLIENT
+    span = _span(attrs, kind=kind)
+    span["spanId"], span["parentSpanId"] = span_id, parent_id
+    return span
+
+
+SERVER_ID = "eee19b7ec3c1b174"
+
+
+def test_genai_span_tokens_land_on_the_request_that_made_the_call():
+    server = _span({**HTTP_OK, "http.route": "/chat"})
+    handler = _child("1111111111111111", SERVER_ID, {"code.function": "chat"}, kind=1)  # INTERNAL
+    call1 = _child("2222222222222222", "1111111111111111", {
+        "gen_ai.request.model": "gpt-4o-mini", "gen_ai.response.model": "gpt-4o-mini-2024-07-18",
+        "gen_ai.usage.input_tokens": 1200, "gen_ai.usage.output_tokens": 240})
+    call2 = _child("3333333333333333", SERVER_ID, {
+        "gen_ai.request.model": "gpt-4o", "gen_ai.usage.prompt_tokens": 100,  # legacy names
+        "gen_ai.usage.completion_tokens": 20})
+    [event] = _events(map_resource_spans(_tree(server, handler, call1, call2)))
+    assert event["route"] == "/chat"
+    # tokens summed, attributed to the model with the most tokens (like the SDKs)
+    assert (event["llm_model"], event["llm_input_tokens"], event["llm_output_tokens"]) == \
+        ("gpt-4o-mini-2024-07-18", 1300, 260)
+
+
+def test_genai_span_without_its_request_in_the_export_is_ignored():
+    orphan = _child("2222222222222222", "9999999999999999", {
+        "gen_ai.request.model": "gpt-4o-mini", "gen_ai.usage.input_tokens": 10})
+    server = _span(HTTP_OK)
+    [event] = _events(map_resource_spans(_tree(server, orphan)))
+    assert event["llm_model"] is None and event["llm_input_tokens"] is None
+
+
+def test_request_without_llm_calls_has_no_llm_usage():
+    [event] = _events(map_resource_spans(_payload(_span(HTTP_OK))))
+    assert event["llm_model"] is None
+
+
+def test_genai_span_needs_a_model_and_sane_token_counts():
+    server = _span(HTTP_OK)
+    no_model = _child("2222222222222222", SERVER_ID, {"gen_ai.usage.input_tokens": 10})
+    huge = _child("3333333333333333", SERVER_ID, {"gen_ai.request.model": "m", "gen_ai.usage.input_tokens": 10**12})
+    [event] = _events(map_resource_spans(_tree(server, no_model, huge)))
+    assert event["llm_model"] is None

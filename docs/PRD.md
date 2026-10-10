@@ -130,7 +130,7 @@ Teams running a handful of HTTP APIs have two bad options for knowing whether th
 
 ## 9. Risks & Open Questions
 
-- **LLM price table** — filled from published list prices as of 2025-10; must be checked before cost numbers are relied on (`LLM_PRICES_FILE` overrides it).
+- **LLM price table** — checked against the providers' pricing pages in 2026-10; prices change, so it needs re-checking with new models (`LLM_PRICES_FILE` overrides it). Unknown models are unpriced, never matched to a similar name.
 - **Public read key** — with `PUBLIC_DASHBOARD` on, anyone with the dashboard URL can read every project; it's meant for demos only.
 - **Single instance** — the scheduler, rate limits and caches are per process; running two collectors duplicates jobs.
 - **Provider dependence** — AI features need Groq; models get retired (Llama 3.3 already was), so the model is configurable and the reports fall back to plain text.
@@ -141,7 +141,6 @@ Teams running a handful of HTTP APIs have two bad options for knowing whether th
 ## 10. v2 Candidates
 
 - **Node SDK** — a generic `http` wrapper and streamed byte counts; built when a real user asks (OTLP covers them today).
-- **LLM cost from OTLP GenAI spans**, so OpenTelemetry apps get LLM cost and its alerts too.
 - **OIDC sign-in** and multi-instance collectors.
 
 ---
