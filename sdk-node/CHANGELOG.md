@@ -2,6 +2,15 @@
 
 All notable changes to `reqly-node`.
 
+## 0.1.2 — 2026-10-11
+
+### Fixed
+- Under steady traffic every request caused its own HTTP call to the collector: a flush kept
+  sending until the queue was empty, so events arriving during a send went out one per
+  batch. A flush now sends what was queued when it started (Express overhead: +330 µs →
+  +27 µs per request), and `shutdown()` keeps flushing until the queue is empty.
+- Consumer ids are hashed once per distinct value.
+
 ## 0.1.1 — 2026-10-10
 
 ### Fixed
