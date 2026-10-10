@@ -305,8 +305,50 @@ def seed_slos() -> None:
     logger.info("demo SLOs ready (%d)", len(DEMO_SLOS))
 
 
+# Demo OpenAPI spec, uploaded for every demo service on start. It drifts
+# from the traffic on purpose: POST /auth/logout is called but missing
+# (undocumented), GET /products is deprecated but still called, and two
+# operations are never called (dead). Parameter names differ from the
+# routes ({user_id} vs {id}) -- drift matching compares path shapes.
+_SPEC_UNDOCUMENTED = {("POST", "/auth/logout")}
+_SPEC_DEPRECATED = {("GET", "/products")}
+_SPEC_DEAD = [("DELETE", "/users/{user_id}"), ("GET", "/reports/legacy")]
+
+
+def demo_openapi_spec(service_name: str) -> dict:
+    paths: dict[str, dict] = {}
+    operations = [(m, r) for r, m, *_ in ROUTES if (m, r) not in _SPEC_UNDOCUMENTED] + _SPEC_DEAD
+    for method, route in operations:
+        path = route.replace("{id}", "{user_id}" if route.startswith("/users") else "{id}")
+        op = {"summary": f"{method} {route}", "responses": {"200": {"description": "OK"}}}
+        if (method, route) in _SPEC_DEPRECATED:
+            op["deprecated"] = True
+            op["summary"] = "List products (deprecated: use /catalog)"
+        paths.setdefault(path, {})[method.lower()] = op
+    return {"openapi": "3.1.0", "info": {"title": service_name, "version": "1.0.0"}, "paths": paths}
+
+
+def seed_openapi() -> None:
+    for service_name in SERVICES:
+        req = urllib.request.Request(
+            f"{COLLECTOR_URL}/v1/services/{service_name}/openapi",
+            data=json.dumps(demo_openapi_spec(service_name)).encode(),
+            headers={"Content-Type": "application/json", "X-Reqly-Key": INGEST_KEY},
+            method="PUT",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10):
+                pass
+        except urllib.error.HTTPError as exc:
+            # Collectors before 0.7 have no spec upload; the demo works without it.
+            logger.warning("could not upload demo OpenAPI spec: HTTP %s", exc.code)
+            return
+    logger.info("demo OpenAPI specs uploaded (%d)", len(SERVICES))
+
+
 if __name__ == "__main__":
     wait_for_collector()
     seed_slos()
+    seed_openapi()
     backfill()
     live_loop()

@@ -5,6 +5,7 @@ import logging
 from .buffer import EventBuffer
 from .capture import build_event
 from .config import Config
+from .openapi_push import OpenAPIPusher
 from .sampling import Sampler
 from .shipper import Shipper
 
@@ -26,6 +27,7 @@ class ReqlyClient:
         self.config = config
         self._disabled = False
         self._ignore_routes = set(config.ignore_routes)
+        self._openapi_pusher: OpenAPIPusher | None = None
 
         try:
             self._sampler = Sampler(config.sample_rate)
@@ -65,6 +67,8 @@ class ReqlyClient:
         if self._disabled:
             return
         try:
+            if self._openapi_pusher is not None:
+                self._openapi_pusher.maybe_push()
             if route in self._ignore_routes:
                 return
             if not self._sampler.should_sample():
@@ -88,6 +92,16 @@ class ReqlyClient:
                 exc_info=True,
             )
             self._disabled = True
+
+    def enable_openapi_push(self, spec_factory) -> None:
+        """Upload ``spec_factory()`` (the app's OpenAPI document) to the
+        collector once, when the first request is recorded."""
+        self._openapi_pusher = OpenAPIPusher(
+            spec_factory=spec_factory,
+            collector_url=self.config.collector_url,
+            api_key=self.config.api_key,
+            service_name=self.config.service_name,
+        )
 
     def stats(self) -> dict:
         if self._disabled:
