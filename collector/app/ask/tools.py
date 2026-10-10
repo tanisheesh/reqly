@@ -304,6 +304,15 @@ async def get_alerts(pool, service: str, args: dict, now: datetime) -> dict:
             alert["slo"] = details.get("slo", {}).get("name")
             alert["state"] = st.get("state")
             alert["burn_rate_1h"] = st.get("burn_rates", {}).get("1h")
+        elif r["kind"] == "llm_cost":
+            alert["hour"] = _ts(r["last_hour"]) if r["last_hour"] else None
+            alert["cause"] = details.get("cause")
+            for key in ("observed_cost_usd", "baseline_cost_usd", "extra_cost_usd",
+                        "observed_cost_per_1k_requests", "baseline_cost_per_1k_requests"):
+                alert[key] = _num(details.get(key))
+            alert["drivers"] = [d.get("text") for d in details.get("drivers") or []]
+            if details.get("model_mix"):
+                alert["model_mix"] = details["model_mix"].get("text")
         else:
             for key in ("observed_error_rate", "baseline_error_rate", "observed_p95_ms",
                         "baseline_p95_ms", "z_score"):
@@ -498,7 +507,7 @@ TOOL_SCHEMAS = [
     _schema("list_releases", "Recent releases (deploys), newest first, with when each was first seen and its error rate and p95.", {}),
     _schema(
         "get_alerts",
-        "Recent alerts: hourly anomalies (with baseline, z-score, release and root-cause hints) and SLO burn alerts.",
+        "Recent alerts: hourly anomalies (with baseline, z-score, release and root-cause hints), SLO burn alerts, and LLM cost spikes (with what drove the cost).",
         {"status": {"type": "string", "enum": ["open", "all"], "description": "Default all (recent, incl. resolved)."}},
     ),
     _schema("get_slos", "The service's SLOs with SLI, error budget remaining, burn rates and state.", {}),

@@ -65,6 +65,7 @@ def _alert_payload(row) -> dict:
         details = json.loads(details)
     return {
         "id": row["id"],
+        "kind": row["kind"],
         "service_name": row["service_name"],
         "route": row["route"],
         "opened_at": row["opened_at"].isoformat(),
@@ -82,10 +83,11 @@ async def apply_detections(
     anomalies: list[dict],
     now: datetime,
     renotify_after: timedelta,
+    kind: str = "anomaly",
 ) -> list[tuple[str, dict]]:
-    """Opens/updates/resolves alerts for one service and hour. Returns the
-    (event, alert) notifications to send. Pure DB state machine -- no I/O to
-    notification channels -- so it can be tested on its own."""
+    """Opens/updates/resolves alerts of one kind for one service and hour.
+    Returns the (event, alert) notifications to send. Pure DB state machine
+    -- no I/O to notification channels -- so it can be tested on its own."""
     events: list[tuple[str, dict]] = []
     detected = {a["route"]: a for a in anomalies}
     async with pool.acquire() as conn:
@@ -93,9 +95,9 @@ async def apply_detections(
             open_alerts = {
                 r["route"]: r
                 for r in await conn.fetch(
-                    "SELECT * FROM alerts WHERE service_name = $1 AND kind = 'anomaly' "
+                    "SELECT * FROM alerts WHERE service_name = $1 AND kind = $2 "
                     "AND resolved_at IS NULL FOR UPDATE",
-                    service_name,
+                    service_name, kind,
                 )
             }
             for route, anomaly in detected.items():
@@ -103,10 +105,10 @@ async def apply_detections(
                 if existing is None:
                     row = await conn.fetchrow(
                         """
-                        INSERT INTO alerts (service_name, route, first_hour, last_hour, last_notified_at, details)
-                        VALUES ($1, $2, $3, $3, $4, $5::jsonb) RETURNING *
+                        INSERT INTO alerts (service_name, route, kind, first_hour, last_hour, last_notified_at, details)
+                        VALUES ($1, $2, $6, $3, $3, $4, $5::jsonb) RETURNING *
                         """,
-                        service_name, route, hour, now, json.dumps(anomaly),
+                        service_name, route, hour, now, json.dumps(anomaly), kind,
                     )
                     events.append((notifier.OPENED, _alert_payload(row)))
                     continue
@@ -169,15 +171,30 @@ async def run_hourly_check(
     channels: notifier.Channels,
     renotify_after: timedelta,
     now: datetime | None = None,
+    llm_cost_min_usd: float | None = None,
 ) -> int:
+    """Error/latency anomalies for every service, then (when llm_cost_min_usd
+    is set) LLM cost anomalies."""
+    from . import llm_cost
+
     now = now or datetime.now(timezone.utc)
     hour = last_complete_hour(now)
     await _refresh_hour(pool, hour)
+    if llm_cost_min_usd is not None:
+        await llm_cost.refresh_hour(pool, hour)
     total = 0
     for service_name in services:
         try:
             total += len(await check_service(pool, service_name, hour, now, channels, renotify_after))
         except Exception:
             logger.exception("hourly alert check failed for service=%s", service_name)
+        if llm_cost_min_usd is None:
+            continue
+        try:
+            total += len(await llm_cost.check_service(
+                pool, service_name, hour, now, channels, renotify_after, llm_cost_min_usd
+            ))
+        except Exception:
+            logger.exception("LLM cost check failed for service=%s", service_name)
     logger.info("Reqly collector: hourly alert check for %s -> %d notifications", hour.isoformat(), total)
     return total

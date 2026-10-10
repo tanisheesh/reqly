@@ -40,6 +40,8 @@ services:
       ALERT_DISCORD_WEBHOOK_URL: ${ALERT_DISCORD_WEBHOOK_URL:-}
       ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
       ALERT_RENOTIFY_HOURS: ${ALERT_RENOTIFY_HOURS:-6}
+      # Local demo: a low floor so the load generator's prompt-bloat scenario alerts (default 1.0)
+      LLM_COST_ALERT_MIN_USD: ${LLM_COST_ALERT_MIN_USD:-0.4}
       DASHBOARD_URL: ${DASHBOARD_URL:-http://localhost:5173}
       FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-127.0.0.1}
     depends_on:

@@ -14,6 +14,15 @@ def _env_flag(name: str, default: bool) -> bool:
     return raw.strip().lower() in ("1", "true", "yes", "on")
 
 
+def _positive_or_none(raw: str) -> float | None:
+    try:
+        value = float(raw)
+    except ValueError:
+        _logger.warning("ignoring non-numeric value %r, using the default", raw)
+        return 1.0
+    return value if value > 0 else None
+
+
 @dataclass(frozen=True)
 class Settings:
     database_url: str
@@ -34,6 +43,7 @@ class Settings:
     alert_discord_webhook_url: str | None
     alert_webhook_url: str | None
     alert_renotify_hours: float
+    llm_cost_alert_min_usd: float | None
     dashboard_url: str | None
     public_dashboard: bool
     admin_username: str
@@ -92,6 +102,9 @@ class Settings:
             alert_discord_webhook_url=os.environ.get("ALERT_DISCORD_WEBHOOK_URL") or None,
             alert_webhook_url=os.environ.get("ALERT_WEBHOOK_URL") or None,
             alert_renotify_hours=float(os.environ.get("ALERT_RENOTIFY_HOURS", "6")),
+            # LLM cost alerts: the smallest extra spend per route-hour, in USD,
+            # worth an alert. 0 or negative turns them off.
+            llm_cost_alert_min_usd=_positive_or_none(os.environ.get("LLM_COST_ALERT_MIN_USD", "1.0")),
             dashboard_url=os.environ.get("DASHBOARD_URL") or None,
             # true: the read key (public in the dashboard bundle) can read
             # everything -- a public demo. false: reading needs a signed-in
