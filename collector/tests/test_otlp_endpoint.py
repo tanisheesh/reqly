@@ -26,6 +26,11 @@ def client(monkeypatch):
         pass
 
     monkeypatch.setattr(otlp_module, "get_pool", lambda: object())
+
+    async def any_service(principal, service):
+        return True  # project ownership is covered by tests/test_projects_db.py
+
+    monkeypatch.setattr(otlp_module, "writable_service", any_service)
     monkeypatch.setattr(otlp_module, "insert_events", fake_insert)
     monkeypatch.setattr(otlp_module, "record_deployments", fake_deployments)
     # The fixtures are real exports with fixed timestamps; judge their age as

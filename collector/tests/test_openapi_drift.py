@@ -144,4 +144,4 @@ def test_upload_rejects_non_specs(api, body, error):
 
 def test_upload_needs_the_ingest_key(api):
     response = _put(api, '{"openapi": "3.0.0", "paths": {}}', key=settings.read_key)
-    assert response.status_code == 401
+    assert response.status_code == 403  # valid key, no admin scope

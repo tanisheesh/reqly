@@ -215,7 +215,7 @@ def test_ask_rejects_unknown_service_and_bad_keys(api, monkeypatch):
             "/v1/ask", json={"service_name": "flask-demo", "question": "hi?"},
             headers={"X-Reqly-Key": settings.ingest_key},
         )
-        assert response.status_code == 401
+        assert response.status_code == 403  # valid key, no read scope
 
 
 def test_ask_daily_limit_and_model_errors(api, monkeypatch):

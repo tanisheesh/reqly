@@ -4,7 +4,7 @@ import asyncio
 
 from fastapi import APIRouter, Depends, Query
 
-from ..auth import verify_read_key
+from ..auth import Principal, allowed_services, verify_read_key
 from ..db import queries
 from ..db.pool import get_pool
 
@@ -12,9 +12,11 @@ router = APIRouter(dependencies=[Depends(verify_read_key)])
 
 
 @router.get("/v1/services")
-async def services():
+async def services(principal: Principal = Depends(verify_read_key)):
     pool = get_pool()
-    return {"services": await queries.list_services(pool)}
+    names = await queries.list_services(pool)
+    allowed = await allowed_services(principal)
+    return {"services": names if allowed is None else [s for s in names if s in allowed]}
 
 
 @router.get("/v1/services/{service_name}/routes")

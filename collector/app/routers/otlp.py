@@ -22,15 +22,17 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceResponse,
 )
 
-from ..auth import verify_ingest_key
+from ..auth import Principal, verify_ingest_key, writable_service
 from ..db.late_data import event_time_problem
 from ..db.late_data import tracker as late_data_tracker
 from ..db.pool import get_pool
-from ..db.queries import insert_events, record_deployments, row_time
+from ..db.queries import EVENT_COLUMNS, insert_events, record_deployments, row_time
 from ..otlp.mapping import map_resource_spans
 from ..rate_limit import RATE_LIMIT, limiter
 
 router = APIRouter()
+
+_SERVICE_INDEX = EVENT_COLUMNS.index("service_name")
 
 # Compressed request bodies are capped before reading, decompressed ones
 # while inflating, so a small gzip bomb can't exhaust memory.
@@ -75,9 +77,9 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-@router.post("/otlp/v1/traces", dependencies=[Depends(verify_ingest_key)])
+@router.post("/otlp/v1/traces")
 @limiter.limit(RATE_LIMIT)
-async def export_traces(request: Request) -> Response:
+async def export_traces(request: Request, principal: Principal = Depends(verify_ingest_key)) -> Response:
     content_type = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
     if content_type not in (_PROTOBUF, _JSON):
         raise HTTPException(
@@ -110,8 +112,15 @@ async def export_traces(request: Request) -> Response:
     result = map_resource_spans(payload)
     now = _now()
     accepted = []
+    writable: dict[str, bool] = {}
     for row in result.rows:
-        problem = event_time_problem(row_time(row), now)
+        service = row[_SERVICE_INDEX]
+        if service not in writable:
+            writable[service] = await writable_service(principal, service)
+        problem = (
+            event_time_problem(row_time(row), now)
+            or (None if writable[service] else f"service {service!r} belongs to another project")
+        )
         if problem:
             result.reject(problem)
         else:
