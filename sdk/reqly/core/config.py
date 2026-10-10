@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from typing import Any
 from importlib.metadata import PackageNotFoundError, version as _pkg_version
 
 
@@ -87,6 +88,10 @@ class Config:
     release: str | None = None
     environment: str | None = None
     push_openapi: bool = False
+    consumer_header: str | None = None
+    consumer: Any = None  # callable(RequestInfo) -> str | None
+    consumer_salt: str | None = None
+    hash_consumer: bool = True
     sdk_version: str = field(default_factory=_get_sdk_version)
 
     @classmethod
@@ -104,6 +109,10 @@ class Config:
         release: str | None = None,
         environment: str | None = None,
         push_openapi: bool | None = None,
+        consumer_header: str | None = None,
+        consumer: Any = None,
+        consumer_salt: str | None = None,
+        hash_consumer: bool | None = None,
     ) -> "Config":
         import sys as _sys
 
@@ -167,5 +176,13 @@ class Config:
                 push_openapi
                 if push_openapi is not None
                 else _env_bool("REQLY_PUSH_OPENAPI", False)
+            ),
+            consumer_header=consumer_header or os.environ.get("REQLY_CONSUMER_HEADER") or None,
+            consumer=consumer,
+            consumer_salt=consumer_salt or os.environ.get("REQLY_CONSUMER_SALT") or None,
+            hash_consumer=(
+                hash_consumer
+                if hash_consumer is not None
+                else _env_bool("REQLY_HASH_CONSUMER", True)
             ),
         )

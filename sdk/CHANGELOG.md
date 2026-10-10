@@ -2,6 +2,21 @@
 
 All notable changes to the `reqly` Python SDK.
 
+## 0.5.0 — 2026-10-10
+
+### Added
+- **Consumers:** `consumer_header="X-API-Key"` (or `REQLY_CONSUMER_HEADER`) or
+  `consumer=callable` identifies the caller of each request. Ids are HMAC-SHA256-hashed
+  with `consumer_salt` (`REQLY_CONSUMER_SALT`) in the SDK, so raw keys never leave the app;
+  `hash_consumer=False` sends them as they are (e.g. tenant names).
+- **LLM usage:** `reqly.record_llm_usage(model, input_tokens, output_tokens)` inside a
+  request handler, or `reqly.record_llm_response(response)` with an OpenAI- or
+  Anthropic-style response. The collector (0.8.0+) turns it into cost per route.
+- **Any WSGI / ASGI app:** `reqly.instrument_wsgi(app, route_resolver=...)` and
+  `reqly.instrument_asgi(app, route_resolver=...)` return the wrapped app, for frameworks
+  without a dedicated integration (Bottle, Pyramid, Falcon, ...).
+- Django: `REQLY` settings accept the consumer options.
+
 ## 0.4.0 — 2026-10-10
 
 ### Added
