@@ -4,7 +4,7 @@ import { hostname } from "node:os";
 import { ReqlyOptions, ResolvedConfig, resolveConfig } from "./config.js";
 import { LlmSummary, RequestInfo } from "./context.js";
 
-export const SDK_VERSION = "0.1.1";
+export const SDK_VERSION = "0.1.2";
 export const UNMATCHED_ROUTE = "__unmatched__";
 
 const HOST = hostname();
@@ -73,6 +73,8 @@ export class ReqlyClient {
   private timer: NodeJS.Timeout | undefined;
   private flushing: Promise<void> | undefined;
   private disabled = false;
+  // The same few API keys / tenants call over and over: hash each once.
+  private readonly hashedConsumers = new Map<string, string>();
   readonly stats = { recorded: 0, shipped: 0, dropped: 0, failedBatches: 0 };
 
   constructor(options: ReqlyOptions = {}) {
@@ -139,7 +141,14 @@ export class ReqlyClient {
       const value = consumer ? consumer(info) : info.headers[consumerHeader!];
       if (value === undefined || value === null || value === "") return null;
       if (!hashConsumer) return String(value).slice(0, 128);
-      return createHmac("sha256", consumerSalt ?? "").update(String(value)).digest("hex").slice(0, 16);
+      const raw = String(value);
+      let hashed = this.hashedConsumers.get(raw);
+      if (hashed === undefined) {
+        if (this.hashedConsumers.size >= 4096) this.hashedConsumers.clear(); // bounded
+        hashed = createHmac("sha256", consumerSalt ?? "").update(raw).digest("hex").slice(0, 16);
+        this.hashedConsumers.set(raw, hashed);
+      }
+      return hashed;
     } catch (err) {
       // A failing consumer function costs the consumer id, not the event.
       console.warn("reqly: consumer lookup failed:", err);
@@ -157,8 +166,13 @@ export class ReqlyClient {
   }
 
   private async drain(): Promise<void> {
-    while (this.queue.length > 0) {
-      const batch = this.queue.splice(0, this.config.maxBatchSize);
+    // Only what was queued when the flush started. Looping until the queue
+    // is empty would send each event that arrives during the sends as its
+    // own one-event batch -- an HTTP call per request under steady traffic.
+    let remaining = this.queue.length;
+    while (remaining > 0) {
+      const batch = this.queue.splice(0, Math.min(this.config.maxBatchSize, remaining));
+      remaining -= batch.length;
       if (!(await this.send(batch))) {
         this.stats.failedBatches += 1;
         this.stats.dropped += batch.length;
@@ -208,6 +222,10 @@ export class ReqlyClient {
     if (this.timer) clearInterval(this.timer);
     this.timer = undefined;
     liveClients.delete(this);
-    await this.flush();
+    // A flush sends what was queued when it started; keep going until the
+    // queue is empty (failed batches are dropped, so this ends).
+    do {
+      await this.flush();
+    } while (this.queue.length > 0);
   }
 }

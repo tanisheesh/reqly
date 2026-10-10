@@ -105,6 +105,9 @@ or `process.exit()`, `await reqly.client.shutdown()` first.
 
 ## Guarantees
 
+- **Small overhead:** about 6 µs per request on Hono, 10 µs on Fastify and 27 µs on Express,
+  with consumer tracking on and the shipper running
+  ([benchmark](https://github.com/tanisheesh/reqly/blob/main/bench/README.md)).
 - **Fail-open:** nothing the SDK does can throw into your request path; an internal error
   disables instrumentation and logs once.
 - **Non-blocking:** events are queued in memory and sent in batches by a timer that never
