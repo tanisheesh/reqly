@@ -1,0 +1,63 @@
+{
+  "name": "reqly-node",
+  "version": "0.1.0",
+  "description": "Reqly SDK for Node.js: per-route latency, errors, consumers and LLM cost for Express, Fastify and Hono, sent to a self-hosted Reqly collector.",
+  "license": "GPL-3.0-only",
+  "author": "Tanish Poddar",
+  "homepage": "https://github.com/tanisheesh/reqly/tree/main/sdk-node",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tanisheesh/reqly.git",
+    "directory": "sdk-node"
+  },
+  "keywords": [
+    "apm",
+    "observability",
+    "express",
+    "fastify",
+    "hono",
+    "latency",
+    "monitoring",
+    "reqly"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "type": "module",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "node scripts/clean.mjs && tsc -p tsconfig.json && tsc -p tsconfig.cjs.json && node scripts/cjs-package.mjs",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "prepublishOnly": "npm test"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "express": "^5.1.0",
+    "express4": "npm:express@^4.22.3",
+    "fastify": "^5.2.0",
+    "fastify4": "npm:fastify@^4.29.1",
+    "hono": "^4.7.0",
+    "typescript": "^5.8.0"
+  }
+}

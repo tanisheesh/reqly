@@ -148,6 +148,9 @@ def _django_views():
         return HttpResponse(b"x" * 10)
 
     def created(request):
+        import reqly
+
+        reqly.record_llm_usage("gpt-4o", 7, 3)
         return HttpResponse(status=201)
 
     return user, drf_style, boom, async_item, created
@@ -234,6 +237,23 @@ def test_django_async_view(django_app):
     events = _events(reqly_django._client, batches)
     assert _summary(events) == [("GET", "/v2/items/{item_id}", 200, False)]
     assert events[0]["response_bytes"] == 10
+
+
+def test_django_consumer_and_llm_usage(django_app):
+    import hashlib
+    import hmac
+
+    from django.conf import settings
+    from django.test import Client
+
+    from reqly.integrations import django as reqly_django
+
+    batches = django_app
+    settings.REQLY = {**settings.REQLY, "consumer_header": "X-API-Key", "consumer_salt": "s3cret"}
+    Client().post("/v2/orders", HTTP_X_API_KEY="key_1")
+    [event] = _events(reqly_django._client, batches)
+    assert event["consumer_id"] == hmac.new(b"s3cret", b"key_1", hashlib.sha256).hexdigest()[:16]
+    assert (event["llm_model"], event["llm_input_tokens"], event["llm_output_tokens"]) == ("gpt-4o", 7, 3)
 
 
 @pytest.mark.parametrize("route, expected", [

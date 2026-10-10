@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 import asyncpg
 
+from ..consumers.queries import top_consumers_for_operation
 from ..db import queries
 from .drift import Traffic, compare, spec_operations
 
@@ -89,6 +90,13 @@ async def drift_report(pool: asyncpg.Pool, service_name: str, now: datetime | No
     spec = stored["spec"]
     operations = spec_operations(spec, stored["base_path"])
     traffic, days = await observed_traffic(pool, service_name, now)
+    report = compare(operations, traffic).to_dict()
+    # who still calls each deprecated operation (needs consumer ids from the SDK)
+    since = now - timedelta(days=days)
+    for op in report["deprecated_in_use"]:
+        op["consumers"] = await top_consumers_for_operation(
+            pool, service_name, op["method"], op["routes"], since
+        )
     info = spec.get("info") if isinstance(spec.get("info"), dict) else {}
     return {
         "service_name": service_name,
@@ -99,5 +107,5 @@ async def drift_report(pool: asyncpg.Pool, service_name: str, now: datetime | No
             "uploaded_at": stored["uploaded_at"],
         },
         "window_days": days,
-        **compare(operations, traffic).to_dict(),
+        **report,
     }

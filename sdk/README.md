@@ -63,6 +63,34 @@ MIDDLEWARE = [
 REQLY = {"service_name": "checkout-api", "api_key": "your-ingest-key"}  # optional
 ```
 
+**Any other WSGI or ASGI app** (Bottle, Pyramid, Falcon, CherryPy, a bare ASGI app) — wrap it
+and serve the result. A `route_resolver` returns the route template, because only the framework
+knows it; without one every request is recorded as `__unmatched__`, never as a raw path:
+
+```python
+app = reqly.instrument_wsgi(
+    app, service_name="checkout-api",
+    route_resolver=lambda environ: environ["bottle.route"].rule,  # Bottle
+)
+# Pyramid: environ["bfg.routes.route"].pattern; ASGI: reqly.instrument_asgi(app, route_resolver=...)
+```
+
+**Who is calling** — tag each request with its API consumer. The id is hashed (HMAC-SHA256
+with your secret salt) before it leaves the app:
+
+```python
+reqly.instrument(app, consumer_header="X-API-Key", consumer_salt=os.environ["REQLY_CONSUMER_SALT"])
+# or any logic: consumer=lambda info: info.headers.get("x-tenant-id")
+```
+
+**LLM cost per route** — record token usage where you call a model; the collector prices it:
+
+```python
+completion = client.chat.completions.create(model="gpt-4o-mini", messages=messages)
+reqly.record_llm_response(completion)   # OpenAI / Anthropic responses, or:
+reqly.record_llm_usage("gpt-4o-mini", input_tokens=1200, output_tokens=240)
+```
+
 `instrument()` detects the framework by itself — no decorators, no middleware to wire up.
 Routes are recorded as templates in one style across frameworks: Django's
 `users/<int:pk>/` and DRF's `^users/(?P<pk>[^/.]+)/$` both become `/users/{pk}/`.
@@ -84,6 +112,9 @@ In the Reqly dashboard and collector:
 - **Deploy markers and per-release health** — each release's error rate and p95
 - **Hourly alerts** to Slack, Discord or a webhook when a route breaks from its usual
   weekday-hour pattern, with **root-cause hints**
+- **Top consumers** — requests and error rate per API client, and which clients an incident
+  hit (in the alert itself)
+- **LLM cost per route** — tokens and estimated spend per route and model
 - **API surface vs your OpenAPI spec** — undocumented endpoints that get traffic, documented
   ones nobody calls, and deprecated ones still in use (`push_openapi=True`)
 - **Weekly AI report** — statistics find the anomalies, Groq (gpt-oss-120b) writes the
@@ -119,6 +150,10 @@ Resolution order: **argument → environment variable → default**.
 | `max_batch_size` | `REQLY_MAX_BATCH_SIZE` | `200` |
 | `max_queue_size` | `REQLY_MAX_QUEUE_SIZE` | `2000` |
 | `ignore_routes` | `REQLY_IGNORE_ROUTES` (comma-separated) | `/health,/metrics` |
+| `consumer_header` | `REQLY_CONSUMER_HEADER` | `None` — header that identifies the caller, e.g. `X-API-Key` |
+| `consumer` | — | `None` — `callable(RequestInfo) -> str \| None`, instead of a header |
+| `consumer_salt` | `REQLY_CONSUMER_SALT` | `None` — secret for hashing consumer ids (set it) |
+| `hash_consumer` | `REQLY_HASH_CONSUMER` | `True` — `False` sends ids unhashed (only for non-secret ids) |
 | `push_openapi` | `REQLY_PUSH_OPENAPI` | `False` — upload the app's OpenAPI spec (FastAPI, Litestar) on the first request |
 | `capture_request_body` | `REQLY_CAPTURE_REQUEST_BODY` | `False` (not implemented yet) |
 
@@ -157,7 +192,8 @@ are shipped instead of silently queuing forever.
 | Litestar | 2.0+ |
 | Flask | 2.3+ |
 | Django | 4.2+, sync and async views; DRF and Django Ninja |
-| Collector | any version; `release`, `environment` and body sizes are stored by collector 0.3.0+ and ignored by older ones; `push_openapi` needs 0.7.0+ |
+| Other WSGI / ASGI | any, with `instrument_wsgi()` / `instrument_asgi()` and a `route_resolver` |
+| Collector | any version; `release`, `environment` and body sizes are stored by collector 0.3.0+ and ignored by older ones; `push_openapi` needs 0.7.0+; consumer and LLM views need 0.8.0+ |
 
 ## Self-hosting the collector
 

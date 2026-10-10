@@ -4,8 +4,10 @@ import time
 
 from ..core.capture import normalize_route
 from ..core.client import ReqlyClient
+from ..core.request_context import RequestInfo, begin_request, end_request
 
 _START_TIME_ATTR = "_REQLY_start_time"
+_USAGE_TOKEN_ATTR = "_REQLY_usage_token"
 
 
 def instrument_flask(app, client: ReqlyClient) -> None:
@@ -19,6 +21,7 @@ def instrument_flask(app, client: ReqlyClient) -> None:
     @app.before_request
     def _REQLY_before_request():
         setattr(g, _START_TIME_ATTR, time.perf_counter())
+        setattr(g, _USAGE_TOKEN_ATTR, begin_request())
 
     @app.teardown_request
     def _REQLY_teardown_request(exc):
@@ -26,6 +29,7 @@ def instrument_flask(app, client: ReqlyClient) -> None:
         if start is None:
             return
         duration_ms = (time.perf_counter() - start) * 1000
+        llm = end_request(getattr(g, _USAGE_TOKEN_ATTR, None))
 
         route_template = None
         if request.url_rule is not None:
@@ -53,6 +57,13 @@ def instrument_flask(app, client: ReqlyClient) -> None:
             # consuming it, so chunked requests/streamed responses report None.
             request_bytes=request.content_length,
             response_bytes=getattr(g, "_REQLY_response_bytes", None),
+            request_info=lambda: RequestInfo(
+                method=request.method,
+                path=request.path,
+                headers={k.lower(): v for k, v in request.headers.items()},
+                raw=request,
+            ),
+            llm=llm,
         )
 
     @app.after_request

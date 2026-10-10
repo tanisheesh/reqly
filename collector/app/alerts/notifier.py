@@ -89,6 +89,13 @@ def format_text(event: str, service_name: str, route: str, details: dict, dashbo
         lines.append(line)
     for hint in details.get("hints") or []:
         lines.append(f"• {hint['text']}")
+    affected = details.get("affected_consumers")
+    if affected and affected.get("affected"):
+        line = f"• {affected['affected']} of {affected['active']} consumers got errors"
+        top = affected.get("top") or []
+        if top:
+            line += " — most: " + ", ".join(f"`{c['consumer_id']}` ({c['errors']})" for c in top[:3])
+        lines.append(line)
     if dashboard_url:
         lines.append(f"<{dashboard_url}|Open dashboard>")
     return "\n".join(lines)

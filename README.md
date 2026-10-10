@@ -54,11 +54,13 @@ reqly.instrument(app, service_name="checkout-api")
 - **Error rates & status distribution** — 2xx / 3xx / 4xx / 5xx breakdown over time, top routes ranked by volume and error rate
 - **AI anomaly reports** — weekly detection against a day-of-week × hour-of-day seasonal baseline, with Groq writing the narrative. Degrades to plain-text stats if no API key is set.
 - **Ask Reqly** — ask *"why did /orders start failing?"* on the dashboard; the model answers from the collector's own data through read-only, validated query tools, shows the queries behind every answer, and flags any number it can't find in their results
+- **Consumers and LLM cost** — who calls each route (API keys hashed in the SDK), which clients an incident hit, and LLM tokens and spend per route
 - **OpenAPI drift** — upload your spec (or let the SDK push it) and see undocumented endpoints that get traffic, documented ones nobody calls, and deprecated ones still in use
 - **SLOs and error budgets** — availability or latency objectives per service or route, budget remaining on the dashboard, and multi-window burn-rate alerts (Google SRE workbook style)
 - **Hourly alerts with root-cause hints** — Slack / Discord / webhook alerts when a route breaks from its weekday-hour norm, deduplicated and auto-resolved, with leads like *"92% of errors came from pod-7, which served 34% of requests"* or *"new TimeoutError"*
 - **Deploy-aware** — every event carries its release (auto-detected from CI variables like `GITHUB_SHA`), so each anomaly says which release was running and how the route behaved before vs after it; deploys show up as markers on the charts and in a per-release health table
-- **Python frameworks** — FastAPI, Flask, Starlette and Litestar with one `reqly.instrument(app)` call; Django (incl. DRF and Django Ninja) via one middleware line
+- **Python frameworks** — FastAPI, Flask, Starlette and Litestar with one `reqly.instrument(app)` call; Django (incl. DRF and Django Ninja) via one middleware line; any other WSGI/ASGI app with `reqly.instrument_wsgi()` / `instrument_asgi()`
+- **Node.js SDK** — `reqly-node` for Express, Fastify and Hono: one middleware line, same consumers and LLM-cost tracking ([sdk-node](sdk-node/README.md))
 - **Zero-overhead SDK** — fail-open (never crashes your app), non-blocking background thread, bounded 2 000-event queue, bounded cardinality (route templates, never raw paths)
 - **Any language via OpenTelemetry** — Node, Java, Go, .NET and more report to Reqly through its OTLP/HTTP endpoint with only exporter env vars, no Reqly SDK ([guide](docs/OTEL.md))
 

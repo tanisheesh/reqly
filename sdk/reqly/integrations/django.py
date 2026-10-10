@@ -31,6 +31,7 @@ from django.core.exceptions import MiddlewareNotUsed
 from ..core.capture import normalize_route
 from ..core.client import ReqlyClient
 from ..core.config import Config
+from ..core.request_context import RequestInfo, begin_request, end_request
 
 logger = logging.getLogger("reqly")
 
@@ -42,7 +43,7 @@ _client_lock = threading.Lock()
 _CONFIG_KEYS = (
     "service_name", "collector_url", "api_key", "sample_rate", "flush_interval_seconds",
     "max_batch_size", "max_queue_size", "ignore_routes", "capture_request_body",
-    "release", "environment",
+    "release", "environment", "consumer_header", "consumer", "consumer_salt", "hash_consumer",
 )
 
 # <int:pk>, <slug:slug>, <pk>  ->  {pk}
@@ -102,14 +103,22 @@ class ReqlyMiddleware:
         if self._is_async:
             return self.__acall__(request)
         start = time.perf_counter()
-        response = self.get_response(request)
-        self._record(request, response, start)
+        token = begin_request()
+        try:
+            response = self.get_response(request)
+        finally:
+            llm = end_request(token)
+        self._record(request, response, start, llm)
         return response
 
     async def __acall__(self, request):
         start = time.perf_counter()
-        response = await self.get_response(request)
-        self._record(request, response, start)
+        token = begin_request()
+        try:
+            response = await self.get_response(request)
+        finally:
+            llm = end_request(token)
+        self._record(request, response, start, llm)
         return response
 
     def process_exception(self, request, exception):
@@ -118,7 +127,7 @@ class ReqlyMiddleware:
         setattr(request, _EXCEPTION_ATTR, exception)
         return None
 
-    def _record(self, request, response, start: float) -> None:
+    def _record(self, request, response, start: float, llm=None) -> None:
         try:
             duration_ms = (time.perf_counter() - start) * 1000
             match = getattr(request, "resolver_match", None)
@@ -135,6 +144,13 @@ class ReqlyMiddleware:
                 error_type=type(exception).__name__ if exception is not None else None,
                 request_bytes=int(content_length) if content_length and content_length.isdigit() else None,
                 response_bytes=None if getattr(response, "streaming", False) else len(response.content),
+                request_info=lambda: RequestInfo(
+                    method=request.method,
+                    path=request.path,
+                    headers={k.lower(): v for k, v in request.headers.items()},
+                    raw=request,
+                ),
+                llm=llm,
             )
         except Exception:
             # record_request is already fail-open; this guards the attribute

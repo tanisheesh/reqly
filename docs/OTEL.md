@@ -38,6 +38,7 @@ elsewhere or turn them off (`OTEL_METRICS_EXPORTER=none`, `OTEL_LOGS_EXPORTER=no
 npm install @opentelemetry/auto-instrumentations-node @opentelemetry/sdk-node
 NODE_OPTIONS="--require @opentelemetry/auto-instrumentations-node/register" node app.js
 ```
+For Express, Fastify and Hono there is also a native SDK, [`reqly-node`](../sdk-node/README.md): one middleware line, plus consumer and LLM-cost tracking that OTLP doesn't carry.
 A runnable example lives in [`examples/otel/express`](../examples/otel/express).
 
 **Python** (any framework with an OpenTelemetry instrumentation) — verified with FastAPI:

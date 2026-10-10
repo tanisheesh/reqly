@@ -14,7 +14,9 @@ from datetime import datetime, timedelta, timezone
 
 import asyncpg
 
+from ..consumers import queries as consumer_queries
 from ..db import queries
+from ..llm.usage import llm_usage
 from ..openapi import store as openapi_store
 from ..slo import status as slo_status
 
@@ -24,7 +26,7 @@ DEFAULT_RANGE = timedelta(hours=24)
 MAX_SERIES_POINTS = 72
 MAX_GROUPS = 25
 
-BREAKDOWN_DIMENSIONS = ("host", "environment", "release", "status_code", "error_type", "method")
+BREAKDOWN_DIMENSIONS = ("host", "environment", "release", "status_code", "error_type", "method", "consumer_id")
 GROUP_BY = ("none", "route", "hour", "day")
 
 
@@ -360,7 +362,80 @@ async def get_api_drift(pool, service: str, args: dict, now: datetime) -> dict:
         "undocumented_count": len(report["undocumented"]),
         "dead": trim(report["dead"], {"method", "path", "operation_id", "deprecated"}),
         "dead_count": len(report["dead"]),
-        "deprecated_in_use": trim(report["deprecated_in_use"], {"method", "path", "requests", "last_seen"}),
+        "deprecated_in_use": [
+            {**item, "consumers": [c["consumer_id"] for c in op.get("consumers", [])]}
+            for item, op in zip(
+                trim(report["deprecated_in_use"], {"method", "path", "requests", "last_seen"}),
+                report["deprecated_in_use"],
+            )
+        ],
+    }
+
+
+USAGE_WINDOWS = ("24h", "7d", "30d")
+
+
+def _window_arg(args: dict) -> str:
+    window = args.get("window") or "7d"
+    if window not in USAGE_WINDOWS:
+        raise ToolError(f"window must be one of {', '.join(USAGE_WINDOWS)}")
+    return window
+
+
+async def get_consumers(pool, service: str, args: dict, now: datetime) -> dict:
+    window = _window_arg(args)
+    consumer_id = args.get("consumer_id")
+    if consumer_id:
+        detail = await consumer_queries.consumer_detail(pool, service, consumer_id, window, now)
+        if detail is None:
+            return {"consumer_id": consumer_id, "note": "no traffic from this consumer in the window"}
+        return {
+            "consumer_id": consumer_id,
+            "window": window,
+            "routes": [
+                {"method": r["method"], "route": r["route"], "requests": r["requests"],
+                 "error_rate": _num(r["error_rate"]), "p95_ms": _num(r["p95_ms"])}
+                for r in detail["routes"][:MAX_GROUPS]
+            ],
+        }
+    top = await consumer_queries.top_consumers(pool, service, window, now)
+    if not top["requests_with_consumer"]:
+        return {"window": window, "note": "no request in the window carried a consumer id "
+                "(the SDK's consumer_header / consumer option isn't set)"}
+    return {
+        "window": window,
+        "consumers": top["consumers"],
+        "share_of_requests_with_consumer": _num(top["requests_with_consumer"] / top["requests"]),
+        "top": [
+            {"consumer_id": c["consumer_id"], "requests": c["requests"],
+             "share_of_requests": _num(c["share_of_requests"]), "errors": c["errors"],
+             "error_rate": _num(c["error_rate"]), "routes": c["routes"]}
+            for c in top["top"][:15]
+        ],
+    }
+
+
+async def get_llm_costs(pool, service: str, args: dict, now: datetime) -> dict:
+    window = _window_arg(args)
+    usage = await llm_usage(pool, service, window, now)
+    if not usage["totals"]["llm_requests"]:
+        return {"window": window, "note": "no LLM usage recorded (reqly.record_llm_usage)"}
+    return {
+        "window": window,
+        "prices_as_of": usage["prices_as_of"],
+        "total_cost_usd": _num(usage["totals"]["cost_usd"]),
+        "llm_requests": usage["totals"]["llm_requests"],
+        "input_tokens": usage["totals"]["input_tokens"],
+        "output_tokens": usage["totals"]["output_tokens"],
+        "routes": [
+            {"route": r["route"], "cost_usd": _num(r["cost_usd"]),
+             "cost_per_1k_requests": _num(r["cost_per_1k_requests"]),
+             "tokens_per_llm_request": _num(r["tokens_per_llm_request"]),
+             "models": [m["model"] for m in r["models"]]}
+            for r in usage["routes"][:MAX_GROUPS]
+        ],
+        "daily_cost_usd": [{"day": _ts(d["day"])[:10], "cost_usd": _num(d["cost_usd"])} for d in usage["daily"]],
+        "unpriced_models": [m["model"] for m in usage["unpriced_models"]],
     }
 
 
@@ -410,7 +485,7 @@ TOOL_SCHEMAS = [
     ),
     _schema(
         "get_breakdown",
-        "Splits requests in a time range (last 14 days only) by one dimension -- host, environment, release, "
+        "Splits requests in a time range (last 14 days only) by one dimension -- host, environment, release, consumer_id, "
         "status_code, error_type or method -- with each value's share of traffic and of errors, error rate "
         "and p95. Use it to find what a problem is concentrated in.",
         {
@@ -428,6 +503,20 @@ TOOL_SCHEMAS = [
     ),
     _schema("get_slos", "The service's SLOs with SLI, error budget remaining, burn rates and state.", {}),
     _schema(
+        "get_consumers",
+        "API consumers (hashed client ids sent by the SDK): the top ones by requests with error rates, or "
+        "one consumer's routes when consumer_id is given.",
+        {
+            "window": {"type": "string", "enum": ["24h", "7d", "30d"], "description": "Default 7d."},
+            "consumer_id": {"type": "string"},
+        },
+    ),
+    _schema(
+        "get_llm_costs",
+        "LLM token usage and estimated cost (USD, list prices) per route and per day.",
+        {"window": {"type": "string", "enum": ["24h", "7d", "30d"], "description": "Default 7d."}},
+    ),
+    _schema(
         "get_api_drift",
         "Compares the service's uploaded OpenAPI spec with the last 30 days of traffic: undocumented "
         "endpoints (called but not in the spec), dead ones (in the spec, never called) and deprecated "
@@ -444,6 +533,8 @@ TOOLS = {
     "get_alerts": get_alerts,
     "get_slos": get_slos,
     "get_api_drift": get_api_drift,
+    "get_consumers": get_consumers,
+    "get_llm_costs": get_llm_costs,
 }
 
 
