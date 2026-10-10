@@ -1,0 +1,89 @@
+# ╔══════════════════════════════════════════════════════════════════════╗
+# ║  TANISH'S SETUP TOOLKIT · tanisheesh.in                              ║
+# ║  Auto-merge Dependabot PRs once CI is green.                         ║
+# ║  Goes to: <repo>/.github/workflows/dependabot-auto-merge.yml         ║
+# ╚══════════════════════════════════════════════════════════════════════╝
+#
+# Works as-is. No repo settings or branch protection needed.
+#
+# Flow: Dependabot opens a PR → CI runs → when CI finishes, this workflow
+# checks it was a Dependabot PR and that CI passed, then squash-merges it.
+# If CI fails, the PR stays open, gets a `needs-review` label, and shows up
+# in the weekly maintenance report.
+#
+# AUTO_MERGE_MAJOR: "true"  → merge every update that passes CI (default)
+#                   "false" → only auto-merge minor/patch; majors wait for you
+
+name: Dependabot auto-merge
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  AUTO_MERGE_MAJOR: "true"
+
+jobs:
+  merge:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      startsWith(github.event.workflow_run.head_branch, 'dependabot/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge or flag the PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        run: |
+          set -euo pipefail
+
+          case "$CONCLUSION" in cancelled|skipped|neutral) echo "CI was $CONCLUSION, waiting for the next run."; exit 0;; esac
+
+          pr=$(gh pr list -R "$REPO" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -z "$pr" ]; then echo "No open PR for $BRANCH, nothing to do."; exit 0; fi
+          author=$(gh pr view "$pr" -R "$REPO" --json author --jq .author.login)
+          if [ "$author" != "app/dependabot" ] && [ "$author" != "dependabot[bot]" ] && [ "$author" != "dependabot" ]; then
+            echo "PR #$pr is by $author, not Dependabot. Skipping."; exit 0
+          fi
+          title=$(gh pr view "$pr" -R "$REPO" --json title --jq .title)
+          echo "PR #$pr: $title (CI: $CONCLUSION)"
+
+          gh label create needs-review -R "$REPO" --color D93F0B \
+            --description "Dependency update that needs a manual look" 2>/dev/null || true
+
+          if [ "$CONCLUSION" != "success" ]; then
+            gh pr edit "$pr" -R "$REPO" --add-label needs-review
+            gh pr comment "$pr" -R "$REPO" --body "⚠️ CI failed on this update, so it wasn't auto-merged. It will be listed in the weekly maintenance report."
+            exit 0
+          fi
+
+          # Major-version check from the title: "bump <pkg> from 1.2.3 to 2.0.0".
+          # Grouped PRs ("bump the minor-and-patch group ...") never contain majors.
+          is_major=false
+          if [[ "$title" =~ from[[:space:]]+v?([0-9]+)[^[:space:]]*[[:space:]]+to[[:space:]]+v?([0-9]+) ]]; then
+            [ "${BASH_REMATCH[1]}" != "${BASH_REMATCH[2]}" ] && is_major=true
+          fi
+
+          if [ "$is_major" = true ] && [ "$AUTO_MERGE_MAJOR" != "true" ]; then
+            gh pr edit "$pr" -R "$REPO" --add-label needs-review
+            gh pr comment "$pr" -R "$REPO" --body "🚨 Major version update. CI passed, but it's waiting for a manual review (AUTO_MERGE_MAJOR is off)."
+            exit 0
+          fi
+
+          gh pr merge "$pr" -R "$REPO" --squash --delete-branch
+          echo "✅ Merged #$pr"
+
+# ──────────────────────────────────────────────────────────────────────────
+#  Tanish Poddar
+#  Website   https://tanisheesh.in
+#  LinkedIn  https://linkedin.com/in/tanisheesh
+#  GitHub    https://github.com/tanisheesh
+#  Email     hey@tanisheesh.in
+# ──────────────────────────────────────────────────────────────────────────

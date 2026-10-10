@@ -1,0 +1,147 @@
+# ╔══════════════════════════════════════════════════════════════════════╗
+# ║  TANISH'S SETUP TOOLKIT · tanisheesh.in                              ║
+# ║  Weekly maintenance report, emailed to you.                          ║
+# ║  Goes to: <repo>/.github/workflows/maintenance-report.yml            ║
+# ╚══════════════════════════════════════════════════════════════════════╝
+#
+# Every Monday 10:00 IST (after Dependabot + auto-merge have run) this emails:
+#   • dependency updates merged automatically this period
+#   • update PRs still open / needing review (CI failed, or major held back)
+#   • open security alerts (if ALERTS_TOKEN is set)
+#   • latest CI result on main
+# The same report is also shown on the workflow run's Summary page.
+#
+# One-time setup (per repo, or once per account with `gh secret set --user`):
+#   MAIL_USERNAME   repo secret. The Gmail address that sends the mail
+#   MAIL_PASSWORD   repo secret. A Gmail App Password (myaccount.google.com/apppasswords),
+#                   NOT your normal password. Needs 2-step verification on.
+#   ALERTS_TOKEN    optional secret. Fine-grained PAT with "Dependabot alerts: read",
+#                   to include security alerts. Without it that section is skipped.
+#   REPORT_EMAIL    optional repo *variable* to send somewhere else.
+# scripts/setup-github-repo.ps1 sets these for you from the toolkit's .env file.
+#
+# Monthly instead of weekly: cron → "30 4 1 * *" and PERIOD_DAYS → "30".
+
+name: Maintenance report
+
+on:
+  schedule:
+    - cron: "30 4 * * 1"   # Monday 04:30 UTC = 10:00 IST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
+env:
+  PERIOD_DAYS: "7"
+  DEFAULT_REPORT_EMAIL: "tanishpoddar.18@gmail.com"
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    env:
+      HAS_MAIL: ${{ secrets.MAIL_USERNAME != '' }}
+    steps:
+      - name: Build report
+        id: build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ALERTS_TOKEN: ${{ secrets.ALERTS_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          since=$(date -u -d "$PERIOD_DAYS days ago" +%Y-%m-%d)
+          today=$(date -u +%Y-%m-%d)
+
+          merged=$(gh pr list -R "$REPO" --state merged --limit 100 \
+            --search "author:app/dependabot merged:>=$since" \
+            --json number,title,url 2>/dev/null || echo '[]')
+          open=$(gh pr list -R "$REPO" --state open --author "app/dependabot" --limit 100 \
+            --json number,title,url,labels 2>/dev/null || echo '[]')
+          ci=$(gh run list -R "$REPO" --workflow ci.yml --branch main --limit 1 \
+            --json conclusion,status,url,createdAt 2>/dev/null || echo '[]')
+
+          alerts='[]'; alerts_ok=false
+          if [ -n "${ALERTS_TOKEN:-}" ]; then
+            if a=$(GH_TOKEN="$ALERTS_TOKEN" gh api "repos/$REPO/dependabot/alerts?state=open&per_page=100" 2>/dev/null); then
+              alerts="$a"; alerts_ok=true
+            fi
+          fi
+
+          n_merged=$(jq length <<<"$merged")
+          n_open=$(jq length <<<"$open")
+          n_alerts=$(jq length <<<"$alerts")
+          ci_state=$(jq -r '.[0] | if . == null then "no runs" elif .status != "completed" then .status else .conclusion end' <<<"$ci")
+          ci_url=$(jq -r '.[0].url // ""' <<<"$ci")
+
+          case "$ci_state" in success) ci_badge="✅ passing";; failure) ci_badge="❌ failing";; *) ci_badge="⚪ $ci_state";; esac
+          if [ "$n_open" -gt 0 ] || [ "$n_alerts" -gt 0 ] || [ "$ci_state" = failure ]; then
+            headline="⚠️ Needs your attention"
+          else
+            headline="✅ All good. Nothing to do"
+          fi
+
+          li_merged=$(jq -r '.[] | "<li><a href=\"\(.url)\">#\(.number)</a> \(.title | @html)</li>"' <<<"$merged")
+          li_open=$(jq -r '.[] | "<li><a href=\"\(.url)\">#\(.number)</a> \(.title | @html)\(if any(.labels[]; .name == "needs-review") then " <b style=\"color:#d93f0b\">needs review</b>" else "" end)</li>"' <<<"$open")
+          li_alerts=$(jq -r '.[] | "<li><b>\(.security_advisory.severity | ascii_upcase)</b> · \(.dependency.package.name | @html): \(.security_advisory.summary | @html) · <a href=\"\(.html_url)\">view</a></li>"' <<<"$alerts")
+
+          section() {  # title, count, items, empty-text
+            echo "<h3 style=\"margin:24px 0 8px;font-size:15px\">$1 <span style=\"color:#888;font-weight:normal\">($2)</span></h3>"
+            if [ "$2" -gt 0 ]; then echo "<ul style=\"margin:0;padding-left:20px;line-height:1.7\">$3</ul>"
+            else echo "<p style=\"margin:0;color:#888\">$4</p>"; fi
+          }
+
+          {
+            echo "<div style=\"font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;margin:auto;color:#111\">"
+            echo "<p style=\"font-size:11px;letter-spacing:1px;color:#888;margin:0\">TANISH'S SETUP TOOLKIT · MAINTENANCE REPORT</p>"
+            echo "<h2 style=\"margin:4px 0\"><a href=\"https://github.com/$REPO\" style=\"color:#111;text-decoration:none\">$REPO</a></h2>"
+            echo "<p style=\"margin:0 0 16px;color:#555\">$since → $today</p>"
+            echo "<p style=\"font-size:17px;margin:0 0 8px\"><b>$headline</b></p>"
+            echo "<table style=\"border-collapse:collapse;font-size:14px\">"
+            echo "<tr><td style=\"padding:4px 16px 4px 0\">Auto-merged updates</td><td><b>$n_merged</b></td></tr>"
+            echo "<tr><td style=\"padding:4px 16px 4px 0\">Open update PRs</td><td><b>$n_open</b></td></tr>"
+            if $alerts_ok; then echo "<tr><td style=\"padding:4px 16px 4px 0\">Open security alerts</td><td><b>$n_alerts</b></td></tr>"; fi
+            echo "<tr><td style=\"padding:4px 16px 4px 0\">CI on main</td><td><b>${ci_url:+<a href=\"$ci_url\">}$ci_badge${ci_url:+</a>}</b></td></tr>"
+            echo "</table>"
+            section "✅ Merged automatically" "$n_merged" "$li_merged" "No dependency updates merged this period."
+            section "⏳ Waiting on you" "$n_open" "$li_open" "No open update PRs."
+            if $alerts_ok; then
+              section "🔒 Security alerts" "$n_alerts" "$li_alerts" "No open security alerts."
+            else
+              echo "<p style=\"margin:24px 0 0;color:#888;font-size:13px\">🔒 Security alerts not included (add an ALERTS_TOKEN secret to enable).</p>"
+            fi
+            echo "<hr style=\"border:none;border-top:1px solid #eee;margin:28px 0 12px\">"
+            echo "<p style=\"font-size:12px;color:#888;margin:0\">Tanish Poddar · <a href=\"https://tanisheesh.in\">tanisheesh.in</a> · <a href=\"https://github.com/tanisheesh\">GitHub</a> · <a href=\"https://linkedin.com/in/tanisheesh\">LinkedIn</a> · <a href=\"mailto:hey@tanisheesh.in\">hey@tanisheesh.in</a></p>"
+            echo "</div>"
+          } > report.html
+
+          cat report.html >> "$GITHUB_STEP_SUMMARY"
+          echo "subject=📦 ${REPO#*/} · $n_merged merged · $n_open open · CI $ci_state" >> "$GITHUB_OUTPUT"
+
+      - name: Email report
+        if: env.HAS_MAIL == 'true'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          from: Setup Toolkit <${{ secrets.MAIL_USERNAME }}>
+          to: ${{ vars.REPORT_EMAIL || env.DEFAULT_REPORT_EMAIL }}
+          subject: ${{ steps.build.outputs.subject }}
+          html_body: file://report.html
+
+      - name: Note when email is not configured
+        if: env.HAS_MAIL != 'true'
+        run: echo "::warning::MAIL_USERNAME / MAIL_PASSWORD secrets not set. Report is on the Summary page only, no email sent."
+
+# ──────────────────────────────────────────────────────────────────────────
+#  Tanish Poddar
+#  Website   https://tanisheesh.in
+#  LinkedIn  https://linkedin.com/in/tanisheesh
+#  GitHub    https://github.com/tanisheesh
+#  Email     hey@tanisheesh.in
+# ──────────────────────────────────────────────────────────────────────────

@@ -1,0 +1,96 @@
+# ╔══════════════════════════════════════════════════════════════════════╗
+# ║  TANISH'S SETUP TOOLKIT · tanisheesh.in                              ║
+# ║  Dependabot config. Goes to: <repo>/.github/dependabot.yml           ║
+# ╚══════════════════════════════════════════════════════════════════════╝
+#
+# What this does, every week (Monday 06:00 IST):
+#   1. Dependabot checks every dependency and opens update PRs.
+#      Minor + patch updates are grouped into ONE PR per folder;
+#      major updates get their own PR each.
+#   2. CI (ci.yml) runs on each PR.
+#   3. dependabot-auto-merge.yml merges the PR automatically once CI is green
+#      (majors too, unless you turn that off there).
+#   4. maintenance-report.yml emails you a summary on Monday 10:00 IST.
+#
+# The two SDKs are published libraries: `increase-if-necessary` only raises a
+# version range when the new release falls outside it, so users' minimum
+# versions don't creep up with every update.
+
+version: 2
+
+updates:
+  # GitHub Actions used in .github/workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule: { interval: "weekly", day: "monday", time: "06:00", timezone: "Asia/Kolkata" }
+    commit-message: { prefix: "👷" }
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # ── Python ────────────────────────────────────────────────────────────
+  - package-ecosystem: "pip"            # Python SDK (sdk/pyproject.toml)
+    directory: "/sdk"
+    schedule: { interval: "weekly", day: "monday", time: "06:00", timezone: "Asia/Kolkata" }
+    versioning-strategy: "increase-if-necessary"
+    open-pull-requests-limit: 10
+    commit-message: { prefix: "👆", include: "scope" }
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "pip"            # collector (pyproject.toml + requirements.txt)
+    directory: "/collector"
+    schedule: { interval: "weekly", day: "monday", time: "06:00", timezone: "Asia/Kolkata" }
+    open-pull-requests-limit: 10
+    commit-message: { prefix: "👆", include: "scope" }
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "pip"            # optional weekly-report Lambda
+    directory: "/infra/sam/insights_lambda"
+    schedule: { interval: "weekly", day: "monday", time: "06:00", timezone: "Asia/Kolkata" }
+    commit-message: { prefix: "👆", include: "scope" }
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  # ── Node ──────────────────────────────────────────────────────────────
+  - package-ecosystem: "npm"            # Node SDK (reqly-node; dev dependencies only)
+    directory: "/sdk-node"
+    schedule: { interval: "weekly", day: "monday", time: "06:00", timezone: "Asia/Kolkata" }
+    versioning-strategy: "increase-if-necessary"
+    open-pull-requests-limit: 10
+    commit-message: { prefix: "👆", include: "scope" }
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "npm"            # dashboard
+    directory: "/dashboard"
+    schedule: { interval: "weekly", day: "monday", time: "06:00", timezone: "Asia/Kolkata" }
+    open-pull-requests-limit: 10
+    commit-message: { prefix: "👆", include: "scope" }
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  # ── Docker base images ────────────────────────────────────────────────
+  - package-ecosystem: "docker"
+    directories: ["/collector", "/dashboard", "/load_generator"]
+    schedule: { interval: "weekly", day: "monday", time: "06:00", timezone: "Asia/Kolkata" }
+    commit-message: { prefix: "👆", include: "scope" }
+    # CI doesn't build the images, so only take patch-level base image updates
+    # automatically; move to a new Python / Node line by hand.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+
+# ──────────────────────────────────────────────────────────────────────────
+#  Tanish Poddar
+#  Website   https://tanisheesh.in
+#  LinkedIn  https://linkedin.com/in/tanisheesh
+#  GitHub    https://github.com/tanisheesh
+#  Email     hey@tanisheesh.in
+# ──────────────────────────────────────────────────────────────────────────
