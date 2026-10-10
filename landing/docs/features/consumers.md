@@ -39,6 +39,12 @@ Consumer ids are **hashed with HMAC-SHA256 and your salt inside the SDK**, befor
 
 Set `consumer_salt` to a secret and keep it stable; changing it makes every consumer look new. For ids that aren't secret, such as tenant names, `hash_consumer=False` (`hashConsumer: false` in Node) sends them as they are, so they're readable on the dashboard.
 
+## A cap on distinct consumers
+
+The consumer id comes from your app, so a misconfiguration (a request id or a timestamp passed as the consumer) would create a new "consumer" on every request. To keep that from flooding the data, each service keeps the **first 1,000 distinct consumers per UTC day** as they are; consumers that appear after that are recorded as `__other__`, and they show up as one row of that name. Consumers already seen that day keep their own id.
+
+Change the limit with `CONSUMER_LIMIT_PER_DAY` (`0` turns the cap off). It's per collector process and approximate at the edge: two batches arriving at the same moment can both take the last free place.
+
 ## Where the data comes from
 
 Consumer ids have unbounded cardinality, so they stay out of the per-minute aggregates. Windows up to 7 days read the raw events; 30 days read an hourly rollup per service, consumer, route and method.

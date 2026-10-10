@@ -74,7 +74,7 @@ An SLO is one objective for a service or route over a window (default 28 days): 
 
 ### Consumers
 
-The SDK tags each request with a consumer id (from a header or a callable), HMAC-SHA256-hashed with the app's salt before it leaves the process, so the collector never holds API keys. Consumer ids stay out of the minute-level aggregates (their cardinality is unbounded): windows up to 7 days read the raw events, 30 days the hourly rollup `consumer_usage_1hour` (service, consumer, route, method). They answer three questions: who uses the API (top consumers), who an incident hit (hourly alerts and weekly anomalies carry `affected_consumers`: how many of the consumers active on the route that hour got errors, and the top ones — also in the Slack/Discord message), and who still calls a deprecated operation (drift report).
+The SDK tags each request with a consumer id (from a header or a callable), HMAC-SHA256-hashed with the app's salt before it leaves the process, so the collector never holds API keys. Consumer ids stay out of the minute-level aggregates (their cardinality is unbounded), and ingest caps them at `CONSUMER_LIMIT_PER_DAY` distinct ids per service per UTC day (default 1,000; later new ones become `__other__`, see `app/consumers/cap.py`): windows up to 7 days read the raw events, 30 days the hourly rollup `consumer_usage_1hour` (service, consumer, route, method). They answer three questions: who uses the API (top consumers), who an incident hit (hourly alerts and weekly anomalies carry `affected_consumers`: how many of the consumers active on the route that hour got errors, and the top ones — also in the Slack/Discord message), and who still calls a deprecated operation (drift report).
 
 ### LLM cost per route
 

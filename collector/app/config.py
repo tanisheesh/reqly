@@ -44,6 +44,7 @@ class Settings:
     alert_webhook_url: str | None
     alert_renotify_hours: float
     llm_cost_alert_min_usd: float | None
+    consumer_limit_per_day: int
     dashboard_url: str | None
     public_dashboard: bool
     admin_username: str
@@ -105,6 +106,9 @@ class Settings:
             # LLM cost alerts: the smallest extra spend per route-hour, in USD,
             # worth an alert. 0 or negative turns them off.
             llm_cost_alert_min_usd=_positive_or_none(os.environ.get("LLM_COST_ALERT_MIN_USD", "1.0")),
+            # Distinct consumers kept per service per UTC day; later new ones
+            # are stored as "__other__". 0 turns the cap off.
+            consumer_limit_per_day=int(os.environ.get("CONSUMER_LIMIT_PER_DAY", "1000")),
             dashboard_url=os.environ.get("DASHBOARD_URL") or None,
             # true: the read key (public in the dashboard bundle) can read
             # everything -- a public demo. false: reading needs a signed-in

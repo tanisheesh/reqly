@@ -11,6 +11,9 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 ### ✨ Added
 - OpenTelemetry apps get LLM cost: GenAI spans (`gen_ai.usage.*`) are added to the HTTP request
   they ran under, so cost per route and LLM cost alerts work without a Reqly SDK
+- A cap on distinct API consumers: the first `CONSUMER_LIMIT_PER_DAY` (1,000) per service per day
+  keep their id, later new ones are stored as `__other__`, so a misconfigured consumer id
+  can't flood the data
 
 ### 🐛 Fixed
 - LLM prices: the table is checked against the providers' pages (2026-10) and covers current

@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import AwareDatetime, BaseModel, Field, ValidationError, field_validator
 
 from ..auth import Principal, verify_ingest_key, writable_service
+from ..config import settings
+from ..consumers.cap import consumer_cap
 from ..db.late_data import event_time_problem
 from ..db.late_data import tracker as late_data_tracker
 from ..db.pool import get_pool
@@ -85,7 +87,7 @@ async def ingest(request: Request, body: IngestRequest, principal: Principal = D
     if not await writable_service(principal, body.service_name):
         raise HTTPException(status_code=403, detail="this service belongs to another project")
 
-    rows = []
+    valid: list[EventIn] = []
     rejected = 0
     reasons: list[str] = []
     now = datetime.now(timezone.utc)
@@ -104,6 +106,14 @@ async def ingest(request: Request, body: IngestRequest, principal: Principal = D
             if len(reasons) < 5:
                 reasons.append(problem)
             continue
+        valid.append(e)
+
+    pool = get_pool()
+    consumers = await consumer_cap.apply(
+        pool, body.service_name, [(e.timestamp, e.consumer_id) for e in valid], settings.consumer_limit_per_day
+    )
+    rows = []
+    for e, consumer_id in zip(valid, consumers):
         rows.append(
             event_row(
                 event_id=str(e.event_id),
@@ -118,7 +128,7 @@ async def ingest(request: Request, body: IngestRequest, principal: Principal = D
                 host=e.host,
                 release=e.release or body.release,
                 environment=e.environment or body.environment,
-                consumer_id=e.consumer_id,
+                consumer_id=consumer_id,
                 request_bytes=e.request_bytes,
                 response_bytes=e.response_bytes,
                 llm_model=e.llm_model,
@@ -127,7 +137,6 @@ async def ingest(request: Request, body: IngestRequest, principal: Principal = D
             )
         )
 
-    pool = get_pool()
     await insert_events(pool, rows)
     if rows:
         await record_deployments(pool, rows)

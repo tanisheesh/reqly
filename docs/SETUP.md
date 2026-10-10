@@ -51,6 +51,7 @@ cp .env.example .env
 | `PUBLIC_DASHBOARD` | `true` | `true`: anyone with the dashboard can read (public demo). `false`: sign-in required |
 | `REQLY_ADMIN_USERNAME` / `REQLY_ADMIN_PASSWORD` | `admin` / *(empty)* | First admin, created at start-up when there are no users (password 12+ characters) |
 | `SESSION_TTL_HOURS` | `168` | How long a sign-in lasts |
+| `CONSUMER_LIMIT_PER_DAY` | `1000` | Distinct API consumers kept per service per UTC day; later new ones are stored as `__other__`; `0` turns the cap off |
 | `LLM_PRICES_FILE` | *(empty)* | YAML price table that overrides/extends `collector/app/llm/llm_prices.yaml` (USD per 1M tokens) |
 | `ASK_DAILY_LIMIT` | `200` | Ask Reqly questions per day per collector (the read key is public to dashboard viewers); `0` turns Ask off |
 | `CORS_ORIGINS` | `*` | Comma-separated list of allowed origins; restrict in production |
