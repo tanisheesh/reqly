@@ -1,168 +1,186 @@
-# reqly-node
+<p align="center">
+  <a href="https://reqly.tanisheesh.in"><img src="https://reqly.tanisheesh.in/docs/assets/logo.svg" width="64" height="64" alt="Reqly"></a>
+</p>
 
-Node.js SDK for [Reqly](https://github.com/tanisheesh/reqly), a self-hosted API
-observability tool: per-route p50/p95/p99 latency, error rates, deploy-aware alerts,
-SLOs, API consumers and LLM cost, sent to a Reqly collector you run.
+<h1 align="center">reqly-node</h1>
 
-Express, Fastify, Hono, Koa and NestJS in one line, or any `(req, res)` handler. No runtime dependencies; Node 20+ (and Bun).
+<p align="center">
+  <strong>API monitoring for Node.js that tells you what broke, when, and which deploy did it.</strong><br>
+  Express · Fastify · Hono · Koa · NestJS · plain node:http, in one line. Zero dependencies.
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/reqly-node"><img src="https://img.shields.io/npm/v/reqly-node?color=06b6d4&style=flat-square&label=npm" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/reqly-node"><img src="https://img.shields.io/npm/dm/reqly-node?color=06b6d4&style=flat-square&label=downloads" alt="Downloads"></a>
+  <img src="https://img.shields.io/badge/node-%E2%89%A520-06b6d4?style=flat-square" alt="Node 20+">
+  <img src="https://img.shields.io/badge/dependencies-0-06b6d4?style=flat-square" alt="Zero dependencies">
+  <a href="https://github.com/tanisheesh/reqly/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-06b6d4?style=flat-square" alt="License"></a>
+</p>
+
+<p align="center">
+  <a href="https://reqly.tanisheesh.in/docs/instrument/node/"><strong>Documentation</strong></a> ·
+  <a href="https://reqly.tanisheesh.in/docs/quickstart/">Quickstart</a> ·
+  <a href="https://reqly-eventflow-dashboard.onrender.com">Live demo</a> ·
+  <a href="https://github.com/tanisheesh/reqly">GitHub</a>
+</p>
+
+---
+
+## Install
 
 ```bash
 npm install reqly-node
 ```
-
-## Usage
-
-**Express** (4 and 5)
 
 ```js
 import express from "express";
 import { reqlyExpress } from "reqly-node";
 
 const app = express();
-const reqly = reqlyExpress({
+app.use(reqlyExpress({
   serviceName: "checkout-api",
   collectorUrl: "https://reqly.example.com",
   apiKey: process.env.REQLY_API_KEY,
-});
-app.use(reqly);            // before your routes
-// ...routes and routers...
-app.use(reqly.errorHandler); // optional, after your routes: records the error's type
+}));
 ```
 
-**Fastify** (4 and 5)
+That's it: every route now reports its latency, errors, status codes and release to your
+own [Reqly collector](https://github.com/tanisheesh/reqly). No agent, no vendor account.
+ESM and CommonJS (`require("reqly-node")`) both work.
+
+## What you get
+
+| | |
+|---|---|
+| 📈 **Real percentiles** | p50 / p95 / p99 per route and per service, merged exactly across routes and time |
+| 🚀 **Deploy-aware** | The release is picked up from your CI or host (`GITHUB_SHA`, `RENDER_GIT_COMMIT`, …); every alert says which release was running |
+| 🔔 **Alerts that explain** | Hourly checks against each route's weekday × hour baseline, naming the host, error type and clients behind a spike; to Slack, Discord or a webhook |
+| 💬 **Ask Reqly** | *"Why did /orders start failing?"* answered from your own data, every number checked |
+| 🎯 **SLOs** | Availability and latency objectives with error budgets and burn-rate alerts |
+| 🧾 **OpenAPI drift** | Undocumented, unused and deprecated-but-called endpoints (`pushOpenapi`) |
+| 👥 **API consumers** | Who calls your API and who an incident hit, with ids hashed in the SDK |
+| 💸 **LLM cost per route** | Tokens and cost per route and model, and an alert when it spikes |
+
+## Your framework
+
+| Framework | What to write |
+|---|---|
+| Express 4 / 5 | `app.use(reqlyExpress(options))` before your routes; `app.use(reqly.errorHandler)` after them records error types |
+| Fastify 4 / 5 | `await app.register(reqlyFastify(options))` |
+| Hono | `app.use(reqlyHono(options))` (Node.js and Bun) |
+| Koa 2 / 3 | `app.use(reqlyKoa(options))` first, before your routers |
+| NestJS | `reqlyNest(app, options)` before `app.listen()` (Express or Fastify adapter) |
+| node:http, anything else | `http.createServer(reqlyHttp(handler, { routeResolver }))` |
 
 ```js
-import Fastify from "fastify";
-import { reqlyFastify } from "reqly-node";
-
-const app = Fastify();
-await app.register(reqlyFastify({ serviceName: "checkout-api" }));
-```
-
-**Hono** (Node.js)
-
-```js
-import { Hono } from "hono";
-import { reqlyHono } from "reqly-node";
-
-const app = new Hono();
-app.use(reqlyHono({ serviceName: "checkout-api" }));
-```
-
-**Koa** (2 and 3, with @koa/router)
-
-```js
-import Koa from "koa";
-import { reqlyKoa } from "reqly-node";
-
-const app = new Koa();
-app.use(reqlyKoa({ serviceName: "checkout-api" })); // first, before your routers
-app.use(router.routes());
-```
-
-**NestJS** (Express or Fastify adapter)
-
-```js
-import { NestFactory } from "@nestjs/core";
-import { reqlyNest } from "reqly-node";
-
+// NestJS
 const app = await NestFactory.create(AppModule);
-reqlyNest(app, { serviceName: "checkout-api" }); // before app.listen()
+reqlyNest(app, { serviceName: "checkout-api" });
 await app.listen(3000);
-```
 
-Nest routes include the global prefix and controller path; exceptions that become 5xx are
-recorded with their type, `HttpException`s below 500 (`NotFoundException`, …) are not errors.
-
-**Plain node:http, or any other framework**: wrap the handler and say where the route
-template is (only the router knows it; without a resolver requests are `__unmatched__`):
-
-```js
-import http from "node:http";
-import { reqlyHttp } from "reqly-node";
-
-const handler = reqlyHttp(app, {
+// plain node:http: tell Reqly where the route template is
+http.createServer(reqlyHttp(handler, {
   serviceName: "checkout-api",
-  routeResolver: (req) => req.matchedRoute, // whatever your router sets
-});
-http.createServer(handler).listen(3000);
+  routeResolver: (req) => req.matchedRoute,
+})).listen(3000);
 ```
 
-Routes are recorded as templates (`/api/users/:id`, including router mount paths),
-never as raw paths; requests no route matched are recorded as `__unmatched__`. CommonJS
-works too: `const { reqlyExpress } = require("reqly-node")`.
+Routes are recorded as **templates** (`/api/users/:id`, router prefixes included), never raw
+paths; requests no route matched become `__unmatched__`, so 404 scanners can't flood your data.
 
-### Who is calling
-
-```js
-reqlyExpress({ consumerHeader: "x-api-key", consumerSalt: process.env.REQLY_CONSUMER_SALT });
-// or any logic: consumer: (info) => info.headers["x-tenant-id"]
-```
-
-Ids are HMAC-SHA256-hashed with your salt before they leave the process; raw API keys never
-reach the collector. `hashConsumer: false` sends them as they are (only for non-secret ids
-such as tenant names).
-
-### LLM cost per route
-
-Record token usage where you call a model; the collector prices it per route:
+## Who is calling, and what it costs
 
 ```js
 import { recordLlmResponse, recordLlmUsage } from "reqly-node";
 
+reqlyExpress({ consumerHeader: "x-api-key", consumerSalt: process.env.REQLY_CONSUMER_SALT });
+
 const completion = await openai.chat.completions.create({ model: "gpt-4o-mini", messages });
-recordLlmResponse(completion);      // OpenAI- or Anthropic-style responses
-recordLlmUsage("gpt-4o-mini", 1200, 240); // or explicitly
+recordLlmResponse(completion);              // OpenAI / Anthropic responses, or:
+recordLlmUsage("gpt-4o-mini", 1200, 240);
 ```
 
-Usage is tied to the request through `AsyncLocalStorage`, so it works after `await`s.
+Consumer ids are HMAC-SHA256-hashed with your salt before they leave the process; the
+collector never sees an API key. LLM usage follows the request through `AsyncLocalStorage`,
+so it works after any number of `await`s.
+
+## Your OpenAPI spec, uploaded for you
+
+```js
+await app.register(reqlyFastify({ serviceName: "checkout-api", pushOpenapi: true }));  // @fastify/swagger
+reqlyNest(app, { serviceName: "checkout-api", pushOpenapi: SwaggerModule.createDocument(app, config) });
+reqlyExpress({ serviceName: "checkout-api", pushOpenapi: () => spec });                 // any spec
+```
+
+Sent once, on the first request; the dashboard then shows where your spec and your real traffic disagree.
+
+## An alert looks like this
+
+```
+🔴 Anomaly — flask-demo /orders (Friday 15:00-16:00 UTC, z=5.37)
+• error rate 30.0% vs 2.2% usual · p95 6588ms vs 1576ms usual
+• running release v2 — vs v1: errors 2.6% → 33.1%, p95 2072ms → 4501ms
+• 100% of errors came from host pod-3, which served 23% of requests
+```
 
 ## Configuration
 
-Options passed to `reqlyExpress()` / `reqlyFastify()` / `reqlyHono()` (or a shared
-`new ReqlyClient(options)`), else environment variables, else defaults:
+Options passed to the middleware (or to a shared `new ReqlyClient(options)`), else environment
+variables, else defaults:
 
-| option | environment variable | default |
+| Option | Environment variable | Default |
 |---|---|---|
 | `serviceName` | `REQLY_SERVICE_NAME` | `npm_package_name`, else `unnamed-service` |
 | `collectorUrl` | `REQLY_COLLECTOR_URL` | `http://localhost:8000` |
 | `apiKey` | `REQLY_API_KEY` | none |
-| `release` | `REQLY_RELEASE`, then `GITHUB_SHA`, `CI_COMMIT_SHA`, `RENDER_GIT_COMMIT`, `VERCEL_GIT_COMMIT_SHA`, … | auto-detected |
+| `release` | `REQLY_RELEASE`, then CI variables | auto-detected |
 | `environment` | `REQLY_ENVIRONMENT` | none |
 | `sampleRate` | `REQLY_SAMPLE_RATE` | `1` |
-| `flushIntervalMs` | `REQLY_FLUSH_INTERVAL_MS` (or `REQLY_FLUSH_INTERVAL_SECONDS`) | `5000` |
-| `maxBatchSize` | `REQLY_MAX_BATCH_SIZE` | `200` |
-| `maxQueueSize` | `REQLY_MAX_QUEUE_SIZE` | `2000` |
-| `ignoreRoutes` | `REQLY_IGNORE_ROUTES` (comma-separated) | `/health,/metrics` |
-| `consumerHeader` | `REQLY_CONSUMER_HEADER` | none |
-| `consumer` | — | none: `(info) => string \| undefined` |
-| `consumerSalt` | `REQLY_CONSUMER_SALT` | none (set it) |
-| `hashConsumer` | `REQLY_HASH_CONSUMER` | `true` |
-| `pushOpenapi` | `REQLY_PUSH_OPENAPI` | `false`: the spec object, a function returning it, or `true` for @fastify/swagger |
+| `flushIntervalMs` | `REQLY_FLUSH_INTERVAL_MS` (or `_SECONDS`) | `5000`; a full batch is sent at once |
+| `maxBatchSize` / `maxQueueSize` | `REQLY_MAX_BATCH_SIZE` / `REQLY_MAX_QUEUE_SIZE` | `200` / `2000` |
+| `ignoreRoutes` | `REQLY_IGNORE_ROUTES` | `/health,/metrics` |
+| `consumerHeader` / `consumer` | `REQLY_CONSUMER_HEADER` / — | none |
+| `consumerSalt` / `hashConsumer` | `REQLY_CONSUMER_SALT` / `REQLY_HASH_CONSUMER` | none / `true` |
+| `pushOpenapi` | `REQLY_PUSH_OPENAPI` | `false` |
 
 Events still queued when the process exits on its own are sent automatically; on `SIGTERM`
-or `process.exit()`, `await reqly.client.shutdown()` first.
+or before `process.exit()`, `await reqly.client.shutdown()` first.
 
-## Guarantees
+## Built to stay out of your way
 
-- **Small overhead:** about 6 µs per request on Hono, 10 µs on Fastify and 27 µs on Express,
-  with consumer tracking on and the shipper running
-  ([benchmark](https://github.com/tanisheesh/reqly/blob/main/bench/README.md)).
-- **Fail-open:** nothing the SDK does can throw into your request path; an internal error
-  disables instrumentation and logs once.
-- **Non-blocking:** events are queued in memory and sent in batches by a timer that never
-  keeps the process alive. The queue is bounded (oldest events dropped first).
-- **Retries:** 408/429/5xx and network errors are retried with backoff; other 4xx drop the
-  batch.
+- ⚡ **~6 µs per request** on Hono, ~10–13 µs on Fastify, ~22–27 µs on Express ([benchmark](https://reqly.tanisheesh.in/docs/reference/benchmarks/))
+- 🛡️ **Fail-open:** nothing the SDK does can throw into your request path; an internal error turns instrumentation off and logs once
+- 🧵 **Off the request path:** events are batched in memory and sent by a timer that never keeps your process alive
+- 📦 **Bounded:** a fixed-size queue (oldest dropped first) and route templates only
+- 🔁 **Safe retries** on 408, 429, 5xx and network errors, deduplicated by the collector
+- 📏 **Streamed responses measured:** server-sent events and LLM token streams get their real size (Express, Fastify, Koa, NestJS, node:http)
 
-Prefer OpenTelemetry? Reqly also ingests OTLP traces — see the
-[OpenTelemetry guide](https://reqly.tanisheesh.in/docs/instrument/opentelemetry/).
+## Compatibility
 
-Full documentation: **[reqly.tanisheesh.in/docs](https://reqly.tanisheesh.in/docs/instrument/node/)**.
+| | |
+|---|---|
+| Runtimes | Node.js 20+, Bun. Edge runtimes (Cloudflare Workers): use [OpenTelemetry](https://reqly.tanisheesh.in/docs/instrument/opentelemetry/) |
+| Frameworks | Express 4/5 · Fastify 4/5 · Hono · Koa 2/3 · NestJS · node:http |
+| Modules | ESM and CommonJS, TypeScript types included |
+| Collector | consumer and LLM views need 0.8.0+, `pushOpenapi` 0.7.0+ |
 
-## License
+On Python too? There's a [Python SDK](https://pypi.org/project/reqly/), and any language can
+report through [OpenTelemetry](https://reqly.tanisheesh.in/docs/instrument/opentelemetry/).
 
-GPL-3.0
+## Run the collector
+
+The SDK sends to a Reqly collector you host (TimescaleDB + collector + dashboard):
+
+```bash
+git clone https://github.com/tanisheesh/reqly && cd reqly && docker compose up -d
+# or on Kubernetes
+helm install reqly oci://ghcr.io/tanisheesh/charts/reqly -n reqly --create-namespace
+```
+
+[Quickstart](https://reqly.tanisheesh.in/docs/quickstart/) ·
+[Deploy to production](https://reqly.tanisheesh.in/docs/self-hosting/deploy/) ·
+[Changelog](https://github.com/tanisheesh/reqly/blob/main/sdk-node/CHANGELOG.md) ·
+License: [GPL-3.0](https://github.com/tanisheesh/reqly/blob/main/LICENSE)
 
 ---
 
