@@ -108,6 +108,18 @@ _BAD_POD_UNTIL   = _BAD_POD_FROM + timedelta(hours=2)
 _BAD_POD_ERROR_RATE = 0.6
 _BAD_POD_P95_FACTOR = 4.0
 
+# Prompt-bloat scenario for LLM cost alerts: 6 hours ago fastapi-demo's
+# /assistant/chat started sending ~6x the input tokens per call (think: the
+# whole knowledge base pasted into the system prompt). The request rate is the
+# same, so the hourly check reports a cost-per-request spike with "tokens per
+# model call" as the driver. Backfilled hours are too quiet to clear the
+# alert floor; live traffic does (docker-compose sets LLM_COST_ALERT_MIN_USD).
+_PROMPT_BLOAT_SERVICE = "fastapi-demo"
+_PROMPT_BLOAT_SINCE   = (datetime.now(timezone.utc) - timedelta(hours=6)).replace(
+    minute=0, second=0, microsecond=0
+)
+_PROMPT_BLOAT_FACTOR  = 6
+
 
 def _release_for(service_name: str, ts: datetime) -> str:
     current = _RELEASES[service_name][0][0]
@@ -177,6 +189,8 @@ def _make_event(
     extra = {"consumer_id": _consumer_for(method, route, rng)}
     if route == "/assistant/chat" and not is_error:
         extra.update(_llm_usage(rng))
+        if service_name == _PROMPT_BLOAT_SERVICE and ts >= _PROMPT_BLOAT_SINCE:
+            extra["llm_input_tokens"] *= _PROMPT_BLOAT_FACTOR
     return {
         **extra,
         "event_id":    event_id or str(uuid.uuid4()),
