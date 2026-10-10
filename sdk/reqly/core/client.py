@@ -6,6 +6,7 @@ from .buffer import EventBuffer
 from .capture import build_event
 from .config import Config
 from .openapi_push import OpenAPIPusher
+from .request_context import ConsumerResolver
 from .sampling import Sampler
 from .shipper import Shipper
 
@@ -28,8 +29,16 @@ class ReqlyClient:
         self._disabled = False
         self._ignore_routes = set(config.ignore_routes)
         self._openapi_pusher: OpenAPIPusher | None = None
+        self._consumers: ConsumerResolver | None = None
 
         try:
+            if config.consumer_header or config.consumer is not None:
+                self._consumers = ConsumerResolver(
+                    header=config.consumer_header,
+                    func=config.consumer,
+                    salt=config.consumer_salt,
+                    hash_ids=config.hash_consumer,
+                )
             self._sampler = Sampler(config.sample_rate)
             shipper = Shipper(
                 collector_url=config.collector_url,
@@ -63,7 +72,12 @@ class ReqlyClient:
         error_type: str | None,
         request_bytes: int | None = None,
         response_bytes: int | None = None,
+        request_info=None,
+        llm: tuple[str, int, int] | None = None,
     ) -> None:
+        """``request_info``: zero-argument callable returning a RequestInfo,
+        only called when consumer tracking is on. ``llm``: (model,
+        input_tokens, output_tokens) recorded during the request."""
         if self._disabled:
             return
         try:
@@ -74,6 +88,8 @@ class ReqlyClient:
             if not self._sampler.should_sample():
                 return
             event = build_event(
+                consumer_id=self._consumer_id(request_info),
+                llm=llm,
                 service_name=self.config.service_name,
                 method=method,
                 route=route,
@@ -92,6 +108,16 @@ class ReqlyClient:
                 exc_info=True,
             )
             self._disabled = True
+
+    def _consumer_id(self, request_info) -> str | None:
+        if self._consumers is None or request_info is None:
+            return None
+        try:
+            return self._consumers.resolve(request_info)
+        except Exception:
+            # A failing consumer= callable costs the consumer id, not the event.
+            logger.warning("reqly: consumer lookup failed", exc_info=True)
+            return None
 
     def enable_openapi_push(self, spec_factory) -> None:
         """Upload ``spec_factory()`` (the app's OpenAPI document) to the

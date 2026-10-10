@@ -4,10 +4,18 @@ import logging
 
 from .core.client import ReqlyClient
 from .core.config import Config, _get_sdk_version
+from .core.request_context import RequestInfo, record_llm_response, record_llm_usage
 
 __version__ = _get_sdk_version()
 
-__all__ = ["instrument"]
+__all__ = [
+    "instrument",
+    "instrument_asgi",
+    "instrument_wsgi",
+    "record_llm_usage",
+    "record_llm_response",
+    "RequestInfo",
+]
 
 logger = logging.getLogger("reqly")
 
@@ -34,7 +42,8 @@ def _detect_framework(app) -> str:
     raise TypeError(
         "reqly.instrument(): could not detect framework for app of type "
         f"{type(app)!r}. Supported: FastAPI, Starlette, Litestar, Flask "
-        "(Django: add reqly.integrations.django.ReqlyMiddleware to MIDDLEWARE)."
+        "(Django: add reqly.integrations.django.ReqlyMiddleware to MIDDLEWARE; any other "
+        "WSGI/ASGI app: reqly.instrument_wsgi() / reqly.instrument_asgi())."
     )
 
 
@@ -66,6 +75,10 @@ def instrument(
     release: str | None = None,
     environment: str | None = None,
     push_openapi: bool | None = None,
+    consumer_header: str | None = None,
+    consumer=None,
+    consumer_salt: str | None = None,
+    hash_consumer: bool | None = None,
 ) -> ReqlyClient | None:
     """Instrument a FastAPI, Starlette, Litestar or Flask app with one line.
     (Django: add ``reqly.integrations.django.ReqlyMiddleware`` to MIDDLEWARE.)
@@ -73,6 +86,11 @@ def instrument(
     Config resolution order for any omitted argument: explicit kwarg >
     environment variable (REQLY_*) > default. See core.config.Config
     for the full list of environment variables.
+
+    Consumers (who is calling): ``consumer_header="X-API-Key"`` or
+    ``consumer=lambda info: ...`` (gets a RequestInfo, returns an id or
+    None). Ids are HMAC-SHA256-hashed with ``consumer_salt``
+    (REQLY_CONSUMER_SALT) before leaving the app unless ``hash_consumer=False``.
 
     ``push_openapi=True`` (or REQLY_PUSH_OPENAPI=true) uploads the app's
     OpenAPI spec (FastAPI, Litestar) to the collector on the first request,
@@ -107,6 +125,10 @@ def instrument(
             release=release,
             environment=environment,
             push_openapi=push_openapi,
+            consumer_header=consumer_header,
+            consumer=consumer,
+            consumer_salt=consumer_salt,
+            hash_consumer=hash_consumer,
         )
         client = ReqlyClient(config)
         if config.push_openapi:
@@ -143,3 +165,58 @@ def instrument(
             exc_info=True,
         )
         return None
+
+
+_GENERIC_OPTIONS = (
+    "service_name", "collector_url", "api_key", "sample_rate", "flush_interval_seconds",
+    "max_batch_size", "max_queue_size", "ignore_routes", "capture_request_body",
+    "release", "environment", "consumer_header", "consumer", "consumer_salt", "hash_consumer",
+)
+
+
+def _generic_client(kind: str, route_resolver, options: dict) -> ReqlyClient:
+    if route_resolver is None:
+        logger.warning(
+            "reqly: instrument_%s() without route_resolver records every request as "
+            "__unmatched__; pass a function that returns the route template", kind,
+        )
+    if options.pop("push_openapi", None):
+        logger.warning("reqly: push_openapi is not available for generic %s apps", kind.upper())
+    unknown = set(options) - set(_GENERIC_OPTIONS)
+    if unknown:
+        logger.warning("reqly: instrument_%s() ignoring unknown options %s", kind, sorted(unknown))
+    return ReqlyClient(Config.resolve(**{key: options.get(key) for key in _GENERIC_OPTIONS}))
+
+
+def instrument_wsgi(app, *, route_resolver=None, **options):
+    """Wrap any WSGI app (Bottle, Pyramid, Falcon, CherryPy...) and return
+    the wrapped app -- serve that one::
+
+        app = reqly.instrument_wsgi(app, service_name="api",
+                                    route_resolver=lambda environ: environ["bottle.route"].rule)
+
+    ``route_resolver(environ)`` runs after the app handled the request and
+    returns the route template or None. ``options`` are those of
+    ``instrument()``. Like ``instrument()``, a failure leaves the app
+    unwrapped instead of raising."""
+    try:
+        from .integrations.wsgi import ReqlyWSGIMiddleware
+
+        return ReqlyWSGIMiddleware(app, _generic_client("wsgi", route_resolver, options), route_resolver)
+    except Exception:
+        logger.warning("reqly: instrument_wsgi() failed, app will run uninstrumented", exc_info=True)
+        return app
+
+
+def instrument_asgi(app, *, route_resolver=None, **options):
+    """Wrap any ASGI app and return the wrapped app. ``route_resolver(scope)``
+    gets a copy of the scope as it arrived; a template the framework puts in
+    ``scope["route"]`` or ``scope["path_template"]`` is used first."""
+    try:
+        from .integrations.fastapi import ReqlyASGIMiddleware
+
+        client = _generic_client("asgi", route_resolver, options)
+        return ReqlyASGIMiddleware(app, client, route_resolver)
+    except Exception:
+        logger.warning("reqly: instrument_asgi() failed, app will run uninstrumented", exc_info=True)
+        return app

@@ -31,6 +31,10 @@ class RequestEvent:
     host: str = _HOSTNAME
     request_bytes: int | None = None
     response_bytes: int | None = None
+    consumer_id: str | None = None
+    llm_model: str | None = None
+    llm_input_tokens: int | None = None
+    llm_output_tokens: int | None = None
     sdk_version: str = field(default_factory=_get_sdk_version)
 
     def to_dict(self) -> dict:
@@ -59,7 +63,10 @@ def build_event(
     sdk_version: str,
     request_bytes: int | None = None,
     response_bytes: int | None = None,
+    consumer_id: str | None = None,
+    llm: tuple[str, int, int] | None = None,
 ) -> RequestEvent:
+    llm_model, llm_input_tokens, llm_output_tokens = llm if llm else (None, None, None)
     return RequestEvent(
         service_name=service_name,
         method=method,
@@ -71,4 +78,8 @@ def build_event(
         sdk_version=sdk_version,
         request_bytes=request_bytes,
         response_bytes=response_bytes,
+        consumer_id=consumer_id,
+        llm_model=llm_model,
+        llm_input_tokens=llm_input_tokens,
+        llm_output_tokens=llm_output_tokens,
     )
