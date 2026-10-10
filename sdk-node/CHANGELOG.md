@@ -2,6 +2,15 @@
 
 All notable changes to `reqly-node`.
 
+## 0.3.0 — 2026-10-11
+
+### Added
+- `reqlyHttp(handler, { routeResolver })`: wraps a plain `(req, res)` handler for node:http or
+  a framework without a built-in integration, like the Python SDK's `instrument_wsgi`. Without
+  a resolver (or when it throws) requests are `__unmatched__`, never the raw path; errors the
+  handler throws or rejects with are recorded with their type and rethrown.
+- Verified on Bun: Hono on `Bun.serve` and `reqlyHttp` on Bun's node:http, run in CI.
+
 ## 0.2.0 — 2026-10-10
 
 ### Added

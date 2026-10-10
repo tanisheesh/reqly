@@ -4,7 +4,7 @@ Node.js SDK for [Reqly](https://github.com/tanisheesh/reqly), a self-hosted API
 observability tool: per-route p50/p95/p99 latency, error rates, deploy-aware alerts,
 SLOs, API consumers and LLM cost, sent to a Reqly collector you run.
 
-Express, Fastify, Hono, Koa and NestJS in one line. No runtime dependencies; Node 20+.
+Express, Fastify, Hono, Koa and NestJS in one line, or any `(req, res)` handler. No runtime dependencies; Node 20+ (and Bun).
 
 ```bash
 npm install reqly-node
@@ -73,6 +73,20 @@ await app.listen(3000);
 
 Nest routes include the global prefix and controller path; exceptions that become 5xx are
 recorded with their type, `HttpException`s below 500 (`NotFoundException`, …) are not errors.
+
+**Plain node:http, or any other framework**: wrap the handler and say where the route
+template is (only the router knows it; without a resolver requests are `__unmatched__`):
+
+```js
+import http from "node:http";
+import { reqlyHttp } from "reqly-node";
+
+const handler = reqlyHttp(app, {
+  serviceName: "checkout-api",
+  routeResolver: (req) => req.matchedRoute, // whatever your router sets
+});
+http.createServer(handler).listen(3000);
+```
 
 Routes are recorded as templates (`/api/users/:id`, including router mount paths),
 never as raw paths; requests no route matched are recorded as `__unmatched__`. CommonJS
