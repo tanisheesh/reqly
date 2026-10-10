@@ -37,6 +37,7 @@ Dashboard on http://localhost:5173, collector API docs on http://localhost:8000/
 | `bench/` | SDK overhead benchmarks | Python, Node |
 | `landing/` | reqly.tanisheesh.in and the docs site (`landing/docs/`, served at `/docs/`) | HTML, MkDocs Material |
 | `infra/` | EC2 bootstrap, optional AWS Lambda | shell, SAM |
+| `deploy/helm/reqly/` | Helm chart (`helm lint` runs in CI) | Helm |
 
 ---
 

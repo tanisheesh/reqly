@@ -17,6 +17,8 @@ Collector 0.11.0 · reqly-node 0.2.0
   `LLM_COST_ALERT_MIN_USD`, default $1 extra per hour
 - Node SDK: `reqlyKoa()` for Koa 2/3 and `reqlyNest(app)` for NestJS on the Express or
   Fastify adapter
+- **Helm chart** (`oci://ghcr.io/tanisheesh/charts/reqly`): collector, dashboard and an optional
+  TimescaleDB, with generated keys that survive upgrades and an optional ingress
 - A docs site at [reqly.tanisheesh.in/docs](https://reqly.tanisheesh.in/docs/)
 
 ### 🎊 Improved

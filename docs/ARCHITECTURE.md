@@ -15,6 +15,7 @@ Companion to [PRD.md](PRD.md): the PRD says what Reqly does, this says how.
 | Dashboard | React 19 · Vite · TypeScript · Tailwind CSS 4 · Recharts · TanStack Query |
 | AI | Groq API · `openai/gpt-oss-120b` (reports and tool calling) · statistics-first detection (Poisson tail / z-score) |
 | Infra (local) | Docker Compose: timescaledb, collector, dashboard, load-generator |
+| Infra (Kubernetes) | Helm chart `deploy/helm/reqly`: collector, dashboard, optional TimescaleDB StatefulSet; published to `oci://ghcr.io/tanisheesh/charts` |
 | Infra (live demo) | TimescaleDB on an EC2 t3.micro (TLS) · collector and dashboard on Render · GHCR images · PyPI and npm trusted publishing |
 
 ---

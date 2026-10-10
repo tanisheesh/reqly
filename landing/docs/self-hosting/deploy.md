@@ -15,6 +15,9 @@ A production Reqly has three parts:
 
 The [live demo](https://reqly-eventflow-dashboard.onrender.com) runs the database on an AWS EC2 t3.micro and the collector and dashboard on Render.
 
+!!! tip "On Kubernetes?"
+    The [Helm chart](kubernetes.md) installs all three with one command.
+
 ## 1. Database
 
 Run `timescale/timescaledb-ha:pg16` anywhere you can reach from the collector. Use a strong password and TLS, and connect with `?sslmode=require`.
