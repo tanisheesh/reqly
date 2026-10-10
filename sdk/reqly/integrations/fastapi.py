@@ -6,7 +6,7 @@ from typing import Callable, Optional
 
 from ..core.capture import normalize_route
 from ..core.client import ReqlyClient
-from ..core.request_context import RequestInfo, begin_request, end_request
+from ..core.request_context import LazyHeaders, RequestInfo, begin_request, end_request
 
 logger = logging.getLogger("reqly")
 
@@ -34,9 +34,16 @@ def route_template_from_scope(scope: dict, entry_root_path: str = "") -> str | N
 
 
 def asgi_request_info(scope: dict) -> RequestInfo:
-    headers = {
-        k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope.get("headers") or []
-    }
+    raw_headers = scope.get("headers") or []
+
+    def get_one(name: str):
+        wanted = name.encode("latin-1")
+        for key, value in raw_headers:
+            if key.lower() == wanted:
+                return value.decode("latin-1")
+        return None
+
+    headers = LazyHeaders(get_one, lambda: ((k.decode("latin-1"), v.decode("latin-1")) for k, v in raw_headers))
     return RequestInfo(method=scope.get("method", "GET"), path=scope.get("path", "/"), headers=headers, raw=scope)
 
 

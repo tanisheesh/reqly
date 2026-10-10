@@ -15,13 +15,51 @@ import hashlib
 import hmac
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable, Mapping, Optional
+from collections.abc import Mapping as _MappingABC
+from typing import Any, Callable, Iterable, Mapping, Optional
 
 logger = logging.getLogger("reqly")
 
 _CONSUMER_HASH_HEX = 16
+_HASH_CACHE_SIZE = 4096
 _MAX_CONSUMER_LEN = 128
 _MAX_MODEL_LEN = 255
+
+
+class LazyHeaders(_MappingABC):
+    """Request headers as a read-only mapping with lower-case names, read
+    on demand: the consumer header is one lookup, and the full set is only
+    collected if something iterates it (a custom consumer= function)."""
+
+    __slots__ = ("_get_one", "_items", "_all")
+
+    def __init__(self, get_one: Callable[[str], Optional[str]], items: Callable[[], Iterable[tuple]]) -> None:
+        self._get_one = get_one
+        self._items = items
+        self._all: dict | None = None
+
+    def _materialize(self) -> dict:
+        if self._all is None:
+            self._all = {str(k).lower(): v for k, v in self._items()}
+        return self._all
+
+    def __getitem__(self, name: str) -> str:
+        value = self.get(name)
+        if value is None:
+            raise KeyError(name)
+        return value
+
+    def get(self, name: str, default=None):
+        if self._all is not None:
+            return self._all.get(name.lower(), default)
+        value = self._get_one(name.lower())
+        return default if value is None else value
+
+    def __iter__(self):
+        return iter(self._materialize())
+
+    def __len__(self) -> int:
+        return len(self._materialize())
 
 
 @dataclass
@@ -145,6 +183,8 @@ class ConsumerResolver:
         self._func = func
         self._salt = (salt or "").encode()
         self._hash = hash_ids
+        # The same few API keys / tenants call over and over: hash each once.
+        self._hashed: dict[str, str] = {}
         if hash_ids and not salt:
             logger.warning(
                 "reqly: consumer tracking without REQLY_CONSUMER_SALT -- hashed ids of guessable "
@@ -163,5 +203,10 @@ class ConsumerResolver:
         value = str(value)
         if not self._hash:
             return value[:_MAX_CONSUMER_LEN]
-        digest = hmac.new(self._salt, value.encode(), hashlib.sha256).hexdigest()
-        return digest[:_CONSUMER_HASH_HEX]
+        hashed = self._hashed.get(value)
+        if hashed is None:
+            if len(self._hashed) >= _HASH_CACHE_SIZE:
+                self._hashed.clear()  # bounded; refilled by the busy consumers
+            hashed = hmac.new(self._salt, value.encode(), hashlib.sha256).hexdigest()[:_CONSUMER_HASH_HEX]
+            self._hashed[value] = hashed
+        return hashed
