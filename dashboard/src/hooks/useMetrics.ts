@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, TimeWindow, UsageWindow } from "../api/client";
+import { api, projectsApi, TimeWindow, UsageWindow } from "../api/client";
 
 // Plain REST polling, not WebSocket/SSE: the underlying continuous
 // aggregates refresh at 1-minute / 1-hour granularity server-side, so a
@@ -94,5 +94,15 @@ export function useMetricsSummary(
     queryFn: () => api.getMetricsSummary(serviceName!, route, window),
     enabled: !!serviceName,
     refetchInterval: METRICS_POLL_MS,
+  });
+}
+
+export function useProjects(enabled = true) {
+  return useQuery({
+    queryKey: ["projects"],
+    queryFn: projectsApi.list,
+    enabled,
+    staleTime: 60_000,
+    retry: false, // collectors before 0.10 have no projects
   });
 }
