@@ -8,7 +8,7 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 
 ## [Unreleased]
 
-reqly-node 0.3.0
+Collector 0.12.0 · reqly-node 0.3.0
 
 ### ✨ Added
 - Node SDK: `reqlyHttp()` for plain node:http or any framework without an integration (with a
