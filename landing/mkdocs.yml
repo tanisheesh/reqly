@@ -1,0 +1,111 @@
+# Reqly documentation site, served at https://reqly.tanisheesh.in/docs/
+# Built by landing/build.sh on Vercel next to the landing page.
+# Local preview:  pip install -r requirements-docs.txt && mkdocs serve
+
+site_name: Reqly Docs
+site_url: https://reqly.tanisheesh.in/docs/
+site_description: Self-hosted API monitoring that tells you what broke, when, and which deploy did it — for Python, Node.js and any OpenTelemetry stack.
+site_author: Tanish Poddar
+repo_url: https://github.com/tanisheesh/reqly
+repo_name: tanisheesh/reqly
+edit_uri: edit/main/landing/docs/
+copyright: Copyright &copy; 2026 <a href="https://tanisheesh.in">Tanish Poddar</a> · GPL-3.0
+
+docs_dir: docs
+site_dir: public/docs
+
+theme:
+  name: material
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+  features:
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.tracking
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - navigation.indexes
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+    - content.action.edit
+
+extra_css:
+  - assets/extra.css
+
+extra:
+  homepage: https://reqly.tanisheesh.in/
+  generator: false
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/tanisheesh/reqly
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/reqly/
+    - icon: fontawesome/brands/npm
+      link: https://www.npmjs.com/package/reqly-node
+    - icon: fontawesome/solid/globe
+      link: https://tanisheesh.in
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+nav:
+  - Introduction: index.md
+  - Quickstart: quickstart.md
+  - Instrument your app:
+      - Python: instrument/python.md
+      - Node.js: instrument/node.md
+      - OpenTelemetry: instrument/opentelemetry.md
+  - Features:
+      - Metrics & releases: features/metrics.md
+      - Alerts & weekly report: features/alerts.md
+      - SLOs & error budgets: features/slos.md
+      - Ask Reqly: features/ask-reqly.md
+      - OpenAPI drift: features/openapi-drift.md
+      - API consumers: features/consumers.md
+      - LLM cost: features/llm-cost.md
+  - Self-hosting:
+      - Configuration: self-hosting/configuration.md
+      - Projects, keys & sign-in: self-hosting/access.md
+      - Deploy to production: self-hosting/deploy.md
+  - Reference:
+      - HTTP API: reference/http-api.md
+      - Ingest spec: reference/ingest-spec.md
+      - SDK overhead: reference/benchmarks.md
+      - Changelog: https://github.com/tanisheesh/reqly/blob/main/CHANGELOG.md
+  - Website: https://reqly.tanisheesh.in/

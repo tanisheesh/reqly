@@ -1,0 +1,28 @@
+/* Reqly brand colours on top of Material's palettes */
+:root {
+  --md-primary-fg-color: #0891b2;
+  --md-primary-fg-color--light: #22d3ee;
+  --md-primary-fg-color--dark: #0e7490;
+  --md-accent-fg-color: #06b6d4;
+  --md-typeset-a-color: #0891b2;
+}
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #0d1826;
+  --md-primary-fg-color--light: #12203a;
+  --md-primary-fg-color--dark: #060b12;
+  --md-primary-bg-color: #bcd6eb;
+  --md-accent-fg-color: #22d3ee;
+  --md-typeset-a-color: #22d3ee;
+  --md-default-bg-color: #060b12;
+  --md-code-bg-color: #0d1826;
+  --md-footer-bg-color: #0a1320;
+  --md-footer-bg-color--dark: #060b12;
+}
+[data-md-color-scheme="slate"] .md-header,
+[data-md-color-scheme="slate"] .md-tabs { border-bottom: 1px solid #1a2f4a; }
+.md-header__button.md-logo img { height: 1.4rem; }
+.md-typeset table:not([class]) { font-size: .72rem; }
+.md-typeset table:not([class]) td { vertical-align: top; }
+/* tables and long code scroll inside their box on small screens */
+.md-typeset__table { overflow-x: auto; max-width: 100%; }
+.md-typeset .grid.cards > ul > li { border-radius: .4rem; }
