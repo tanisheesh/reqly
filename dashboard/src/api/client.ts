@@ -86,15 +86,44 @@ export interface Hint {
   text: string;
 }
 
+export interface SloStatus {
+  state: "ok" | "slow_burn" | "fast_burn" | "budget_exhausted" | "no_data";
+  sli: number | null;
+  total: number;
+  bad: number;
+  budget_remaining: number | null;
+  burn_rates: Record<"5m" | "30m" | "1h" | "6h", number>;
+  window_days_covered: number;
+}
+
+export interface Slo {
+  id: number;
+  service_name: string;
+  name: string;
+  route: string | null;
+  objective: "availability" | "latency";
+  target: number;
+  latency_threshold_ms: number | null;
+  window_days: number;
+  status: SloStatus;
+}
+
+export interface SloAlertDetails {
+  kind: "slo";
+  slo: Omit<Slo, "status">;
+  status: SloStatus;
+}
+
 export interface Alert {
   id: number;
+  kind?: "anomaly" | "slo";
   service_name: string;
   route: string;
   opened_at: string;
   first_hour: string;
   last_hour: string;
   resolved_at: string | null;
-  details: Anomaly;
+  details: Anomaly | SloAlertDetails;
 }
 
 export interface ReleaseStats {
@@ -168,6 +197,9 @@ export const api = {
     getJSON<{ releases: Release[] }>(
       `/v1/services/${encodeURIComponent(serviceName)}/releases`
     ),
+
+  listSlos: (serviceName: string) =>
+    getJSON<{ slos: Slo[] }>(`/v1/slos?service_name=${encodeURIComponent(serviceName)}`),
 
   listAlerts: (serviceName: string) =>
     getJSON<{ alerts: Alert[] }>(`/v1/alerts?service_name=${encodeURIComponent(serviceName)}`),

@@ -38,9 +38,34 @@ def _pct(value) -> str:
     return "—" if value is None else f"{value:.1%}"
 
 
+def _format_slo(event: str, service_name: str, details: dict) -> str:
+    slo, status = details["slo"], details["status"]
+    scope = f"`{slo['route']}`" if slo.get("route") else "all routes"
+    if slo["objective"] == "availability":
+        goal = f"{slo['target']:.2%} of requests without errors"
+    else:
+        goal = f"{slo['target']:.2%} of requests under {slo['latency_threshold_ms']:.0f}ms"
+    if event == RESOLVED:
+        return f"✅ *Resolved* — SLO `{slo['name']}` (`{service_name}`) is no longer burning its error budget."
+    speed = "Fast" if status["state"] == "fast_burn" else "Slow"
+    icon = "🔥" if status["state"] == "fast_burn" else "🟠"
+    burns = status["burn_rates"]
+    budget = status["budget_remaining"]
+    sli = status["sli"]
+    return "\n".join([
+        f"{icon} *{speed} burn* — SLO `{slo['name']}` on `{service_name}` {scope} ({goal}, {slo['window_days']}d)",
+        f"• burning error budget {burns['1h']:g}× (1h) / {burns['5m']:g}× (5m) / {burns['6h']:g}× (6h) the sustainable rate",
+        f"• SLI {'—' if sli is None else f'{sli:.3%}'} · "
+        f"{'—' if budget is None else f'{max(budget, 0):.0%}'} of the error budget left",
+    ])
+
+
 def format_text(event: str, service_name: str, route: str, details: dict, dashboard_url: str | None = None) -> str:
     """One plain-text message used for Slack and Discord (both render the
     *bold* / `code` subset the same way closely enough)."""
+    if details.get("kind") == "slo":
+        text = _format_slo(event, service_name, details)
+        return f"{text}\n<{dashboard_url}|Open dashboard>" if dashboard_url and event != RESOLVED else text
     if event == RESOLVED:
         return f"✅ *Resolved* — `{service_name}` `{route}` is back within its normal range."
 

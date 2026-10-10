@@ -7,6 +7,7 @@ import { StatusDistributionChart } from "../components/StatusDistributionChart";
 import { TopRoutesTable } from "../components/TopRoutesTable";
 import { ReleasesTable } from "../components/ReleasesTable";
 import { AlertsBanner } from "../components/AlertsBanner";
+import { SloPanel } from "../components/SloPanel";
 import { InsightsPanel } from "../components/InsightsPanel";
 import { useMetricsSummary } from "../hooks/useMetrics";
 import { COLLECTOR_URL, TimeWindow } from "../api/client";
@@ -185,6 +186,9 @@ export function Dashboard() {
                 color={errColor}
               />
             </div>
+
+            {/* SLOs (hidden when none are defined) */}
+            <SloPanel serviceName={serviceName} />
 
             {/* Latency — full width */}
             <LatencyChart data={summary.latency} releases={summary.releases} />

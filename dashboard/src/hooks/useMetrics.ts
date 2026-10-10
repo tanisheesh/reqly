@@ -34,6 +34,16 @@ export function useReleases(serviceName: string | null) {
   });
 }
 
+export function useSlos(serviceName: string | null) {
+  return useQuery({
+    queryKey: ["slos", serviceName],
+    queryFn: () => api.listSlos(serviceName!),
+    enabled: !!serviceName,
+    refetchInterval: 60_000,
+    retry: false, // collectors older than 0.5 have no /v1/slos
+  });
+}
+
 export function useAlerts(serviceName: string | null) {
   return useQuery({
     queryKey: ["alerts", serviceName],

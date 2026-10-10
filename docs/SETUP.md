@@ -168,6 +168,24 @@ curl "http://localhost:8000/v1/insights/latest?service_name=your-service" \
 
 ---
 
+## 6b. Define SLOs
+
+SLOs are managed with the ingest key (the read key can't change anything):
+
+```bash
+curl -X PUT http://localhost:8000/v1/slos \
+  -H "X-Reqly-Key: demo-key" -H "Content-Type: application/json" \
+  -d '{"service_name": "checkout-api", "name": "checkout availability",
+       "route": "/checkout", "objective": "availability", "target": 0.995}'
+
+curl -X PUT http://localhost:8000/v1/slos \
+  -H "X-Reqly-Key: demo-key" -H "Content-Type: application/json" \
+  -d '{"service_name": "checkout-api", "name": "API latency",
+       "objective": "latency", "target": 0.95, "latency_threshold_ms": 800}'
+```
+
+Leave out `route` for a service-wide SLO; `window_days` defaults to 28. The dashboard shows each SLO's error budget, and burn-rate alerts go to the alert channels. The local demo creates three SLOs for the demo services on startup.
+
 ## 7. Deploy to production
 
 See [infra/DEPLOY.md](../infra/DEPLOY.md) for the full AWS production deployment:
