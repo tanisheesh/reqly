@@ -5,7 +5,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, model_validator
 
-from ..auth import verify_admin, verify_read_key
+from ..auth import Principal, allowed_services, check_service, verify_admin, verify_read_key
 from ..db.pool import get_pool
 from ..slo import status as slo_status
 
@@ -28,11 +28,14 @@ class SloIn(BaseModel):
         return self
 
 
-@router.get("/v1/slos", dependencies=[Depends(verify_read_key)])
-async def list_slos(service_name: str | None = None):
+@router.get("/v1/slos")
+async def list_slos(service_name: str | None = None, principal: Principal = Depends(verify_read_key)):
     """SLOs with their live status: SLI, error budget left, burn rates."""
     pool = get_pool()
     slos = await slo_status.list_slos(pool, service_name)
+    allowed = await allowed_services(principal)
+    if allowed is not None:
+        slos = [s for s in slos if s["service_name"] in allowed]
     for slo in slos:
         slo["status"] = await slo_status.slo_status(pool, slo)
     return {"slos": slos}
@@ -40,14 +43,18 @@ async def list_slos(service_name: str | None = None):
 
 # Managing SLOs needs the ingest key or an admin session: the read key ships in the
 # dashboard's JavaScript and must not be able to change anything.
-@router.put("/v1/slos", dependencies=[Depends(verify_admin)])
-async def put_slo(body: SloIn):
+@router.put("/v1/slos")
+async def put_slo(body: SloIn, principal: Principal = Depends(verify_admin)):
     """Create or update (by service_name + name)."""
+    await check_service(principal, body.service_name)
     return await slo_status.upsert_slo(get_pool(), body.model_dump())
 
 
-@router.delete("/v1/slos/{slo_id}", dependencies=[Depends(verify_admin)])
-async def delete_slo(slo_id: int):
+@router.delete("/v1/slos/{slo_id}")
+async def delete_slo(slo_id: int, principal: Principal = Depends(verify_admin)):
+    service = await get_pool().fetchval("SELECT service_name FROM slos WHERE id = $1", slo_id)
+    if service is not None:
+        await check_service(principal, service)
     if not await slo_status.delete_slo(get_pool(), slo_id):
         raise HTTPException(status_code=404, detail="no such SLO")
     return {"deleted": slo_id}

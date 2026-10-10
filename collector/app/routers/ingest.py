@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import AwareDatetime, BaseModel, Field, ValidationError, field_validator
 
-from ..auth import verify_api_key
+from ..auth import Principal, verify_ingest_key, writable_service
 from ..db.late_data import event_time_problem
 from ..db.late_data import tracker as late_data_tracker
 from ..db.pool import get_pool
@@ -73,15 +73,17 @@ class IngestRequest(BaseModel):
     events: list[dict] = Field(min_length=1, max_length=_MAX_BATCH_SIZE)
 
 
-@router.post("/v1/ingest", dependencies=[Depends(verify_api_key)])
+@router.post("/v1/ingest")
 @limiter.limit(RATE_LIMIT)
-async def ingest(request: Request, body: IngestRequest):
+async def ingest(request: Request, body: IngestRequest, principal: Principal = Depends(verify_ingest_key)):
     """Batch ingestion with true partial-batch acceptance: each event is
     validated independently, so one malformed event from a buggy SDK only
     drops itself, not the whole batch of otherwise-good telemetry.
     """
     if not body.service_name:
         raise HTTPException(status_code=422, detail="service_name is required")
+    if not await writable_service(principal, body.service_name):
+        raise HTTPException(status_code=403, detail="this service belongs to another project")
 
     rows = []
     rejected = 0
