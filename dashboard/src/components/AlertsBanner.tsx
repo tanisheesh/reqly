@@ -57,6 +57,19 @@ export function AlertsBanner({ serviceName }: { serviceName: string }) {
                   {h.text}
                 </div>
               ))}
+              {d.affected_consumers && d.affected_consumers.affected > 0 && (
+                <div className="text-slate-400">
+                  {d.affected_consumers.affected} of {d.affected_consumers.active} consumers got errors
+                  {d.affected_consumers.top.length > 0 && (
+                    <>
+                      {" "}— most:{" "}
+                      <span className="font-mono">
+                        {d.affected_consumers.top.slice(0, 3).map((c) => `${c.consumer_id} (${c.errors})`).join(", ")}
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
             </li>
           );
         })}

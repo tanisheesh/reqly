@@ -42,6 +42,8 @@ AGGREGATES: tuple[tuple[str, timedelta], ...] = (
     ("route_errors_1hour", timedelta(hours=1)),
     ("route_status_distribution_1hour", timedelta(hours=1)),
     ("api_latency_1min", timedelta(minutes=1)),
+    ("consumer_usage_1hour", timedelta(hours=1)),
+    ("llm_usage_1hour", timedelta(hours=1)),
 )
 
 

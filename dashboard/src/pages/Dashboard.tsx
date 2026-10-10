@@ -7,6 +7,8 @@ import { StatusDistributionChart } from "../components/StatusDistributionChart";
 import { TopRoutesTable } from "../components/TopRoutesTable";
 import { ReleasesTable } from "../components/ReleasesTable";
 import { ApiSurfacePanel } from "../components/ApiSurfacePanel";
+import { ConsumersPanel } from "../components/ConsumersPanel";
+import { LlmCostPanel } from "../components/LlmCostPanel";
 import { AlertsBanner } from "../components/AlertsBanner";
 import { SloPanel } from "../components/SloPanel";
 import { InsightsPanel } from "../components/InsightsPanel";
@@ -210,6 +212,12 @@ export function Dashboard() {
 
             {/* Releases (deploy history + per-release health) */}
             <ReleasesTable serviceName={serviceName} />
+
+            {/* Consumers and LLM cost (each hidden until the SDK sends that data) */}
+            <div className="grid gap-4 empty:hidden xl:grid-cols-2">
+              <ConsumersPanel key={`c-${serviceName}`} serviceName={serviceName} />
+              <LlmCostPanel key={`l-${serviceName}`} serviceName={serviceName} />
+            </div>
 
             {/* OpenAPI spec vs traffic (hidden when no spec is uploaded) */}
             <ApiSurfacePanel serviceName={serviceName} />

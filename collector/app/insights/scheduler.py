@@ -10,6 +10,7 @@ from ..db import queries
 from ..db.pool import get_pool
 from .anomaly_detection import detect_anomalies
 from .deploys import add_release_context
+from ..consumers.queries import add_affected_consumers
 from .hints import add_hints
 from .groq_client import generate_report
 
@@ -32,7 +33,7 @@ async def run_insights_for_service(service_name: str) -> dict:
     rows = await queries.get_hourly_seasonal_data(pool, service_name)
     anomalies = detect_anomalies(rows)
     anomalies_dicts = [a.to_dict() for a in anomalies]
-    for enrich in (add_release_context, add_hints):
+    for enrich in (add_release_context, add_hints, add_affected_consumers):
         try:
             await enrich(pool, service_name, anomalies_dicts)
         except Exception:
