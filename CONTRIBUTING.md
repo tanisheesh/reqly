@@ -197,6 +197,14 @@ section to `sdk-node/CHANGELOG.md`, merge, then `git tag node-vX.Y.Z && git push
 npmjs.com → reqly-node → Settings → Trusted publishing add GitHub Actions with owner
 `tanisheesh`, repository `reqly`, workflow `release-sdk-node.yml`.
 
+### Container images (GitHub Packages)
+
+`.github/workflows/github-packages.yml` builds `ghcr.io/tanisheesh/reqly-collector` and
+`reqly-dashboard` (amd64 + arm64, tagged with the collector version, the commit SHA and
+`latest`) on a `collector-vX.Y.Z` tag, and mirrors the Node SDK to GitHub's npm registry as
+`@tanisheesh/reqly-node` on a `node-v*` tag. Run it by hand from the Actions tab to publish
+the current `main`.
+
 ## Contributing
 
 1. Fork → branch from `main`
