@@ -1,3 +1,4 @@
+import { Anomaly, SloAlertDetails } from "../api/client";
 import { useAlerts } from "../hooks/useMetrics";
 import { formatMs, formatPercent } from "../format";
 
@@ -16,7 +17,21 @@ export function AlertsBanner({ serviceName }: { serviceName: string }) {
       </div>
       <ul className="space-y-3">
         {alerts.map((a) => {
-          const d = a.details;
+          if (a.kind === "slo") {
+            const s = a.details as SloAlertDetails;
+            return (
+              <li key={a.id} className="text-xs leading-relaxed">
+                <span className="font-semibold text-slate-200">SLO {s.slo.name}</span>{" "}
+                <span className="text-red-300">
+                  {s.status.state === "fast_burn" ? "fast" : "slow"} burn — {s.status.burn_rates["1h"]}× (1h)
+                </span>{" "}
+                <span className="text-slate-500">
+                  · {s.status.budget_remaining === null ? "—" : `${Math.max(0, s.status.budget_remaining * 100).toFixed(0)}%`} of budget left
+                </span>
+              </li>
+            );
+          }
+          const d = a.details as Anomaly;
           const ctx = d.release_context;
           return (
             <li key={a.id} className="text-xs leading-relaxed">
