@@ -4,7 +4,7 @@ import { hostname } from "node:os";
 import { ReqlyOptions, ResolvedConfig, resolveConfig } from "./config.js";
 import { LlmSummary, RequestInfo } from "./context.js";
 
-export const SDK_VERSION = "0.1.0";
+export const SDK_VERSION = "0.1.1";
 export const UNMATCHED_ROUTE = "__unmatched__";
 
 const HOST = hostname();
@@ -42,6 +42,22 @@ interface WireEvent {
   llm_output_tokens: number | null;
 }
 
+// Clients with queued events are flushed when the process is about to exit
+// on its own (the Python SDK's atexit). One listener for all clients.
+// beforeExit doesn't fire on process.exit() or a signal: call shutdown().
+const liveClients = new Set<ReqlyClient>();
+let exitHookInstalled = false;
+
+function installExitHook(): void {
+  if (exitHookInstalled) return;
+  exitHookInstalled = true;
+  process.on("beforeExit", () => {
+    for (const client of liveClients) {
+      if (client.hasQueued()) void client.flush();
+    }
+  });
+}
+
 function retryable(status: number): boolean {
   return status === 408 || status === 429 || status >= 500;
 }
@@ -69,6 +85,13 @@ export class ReqlyClient {
     }
     this.timer = setInterval(() => void this.flush(), this.config.flushIntervalMs);
     this.timer.unref(); // never keeps the process alive
+    liveClients.add(this);
+    installExitHook();
+  }
+
+  /** True while events are waiting to be sent. */
+  hasQueued(): boolean {
+    return this.queue.length > 0;
   }
 
   record(request: RecordedRequest): void {
@@ -184,6 +207,7 @@ export class ReqlyClient {
   async shutdown(): Promise<void> {
     if (this.timer) clearInterval(this.timer);
     this.timer = undefined;
+    liveClients.delete(this);
     await this.flush();
   }
 }

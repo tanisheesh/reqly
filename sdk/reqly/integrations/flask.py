@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 import time
 
 from ..core.capture import normalize_route
 from ..core.client import ReqlyClient
 from ..core.request_context import RequestInfo, begin_request, end_request
+
+logger = logging.getLogger("reqly")
 
 _START_TIME_ATTR = "_REQLY_start_time"
 _USAGE_TOKEN_ATTR = "_REQLY_usage_token"
@@ -28,43 +31,47 @@ def instrument_flask(app, client: ReqlyClient) -> None:
         start = getattr(g, _START_TIME_ATTR, None)
         if start is None:
             return
-        duration_ms = (time.perf_counter() - start) * 1000
-        llm = end_request(getattr(g, _USAGE_TOKEN_ATTR, None))
+        try:
+            duration_ms = (time.perf_counter() - start) * 1000
+            llm = end_request(getattr(g, _USAGE_TOKEN_ATTR, None))
 
-        route_template = None
-        if request.url_rule is not None:
-            route_template = request.url_rule.rule
-        normalized = normalize_route(request.path, route_template)
+            route_template = None
+            if request.url_rule is not None:
+                route_template = request.url_rule.rule
+            normalized = normalize_route(request.path, route_template)
 
-        if exc is not None:
-            status_code = 500
-            error = True
-            error_type = type(exc).__name__
-        else:
-            response = getattr(g, "_REQLY_response_status", None)
-            status_code = response if response is not None else 200
-            error = status_code >= 500
-            error_type = None
+            if exc is not None:
+                status_code = 500
+                error = True
+                error_type = type(exc).__name__
+            else:
+                response = getattr(g, "_REQLY_response_status", None)
+                status_code = response if response is not None else 200
+                error = status_code >= 500
+                error_type = None
 
-        client.record_request(
-            method=request.method,
-            route=normalized,
-            status_code=status_code,
-            duration_ms=duration_ms,
-            error=error,
-            error_type=error_type,
-            # Content-Length based: Flask can't count a streamed body without
-            # consuming it, so chunked requests/streamed responses report None.
-            request_bytes=request.content_length,
-            response_bytes=getattr(g, "_REQLY_response_bytes", None),
-            request_info=lambda: RequestInfo(
+            client.record_request(
                 method=request.method,
-                path=request.path,
-                headers={k.lower(): v for k, v in request.headers.items()},
-                raw=request,
-            ),
-            llm=llm,
-        )
+                route=normalized,
+                status_code=status_code,
+                duration_ms=duration_ms,
+                error=error,
+                error_type=error_type,
+                # Content-Length based: Flask can't count a streamed body without
+                # consuming it, so chunked requests/streamed responses report None.
+                request_bytes=request.content_length,
+                response_bytes=getattr(g, "_REQLY_response_bytes", None),
+                request_info=lambda: RequestInfo(
+                    method=request.method,
+                    path=request.path,
+                    headers={k.lower(): v for k, v in request.headers.items()},
+                    raw=request,
+                ),
+                llm=llm,
+            )
+        except Exception:
+            # Fail-open: nothing here may turn into an error in the app.
+            logger.debug("reqly: could not record Flask request", exc_info=True)
 
     @app.after_request
     def _REQLY_after_request(response):

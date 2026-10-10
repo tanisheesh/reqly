@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import time
 from typing import Callable, Optional
 
 from ..core.capture import normalize_route
 from ..core.client import ReqlyClient
 from ..core.request_context import RequestInfo, begin_request, end_request
+
+logger = logging.getLogger("reqly")
 
 RouteResolver = Callable[[dict], Optional[str]]
 
@@ -104,22 +107,38 @@ class ReqlyASGIMiddleware:
         finally:
             duration_ms = (time.perf_counter() - start) * 1000
             llm = end_request(usage_token)
-            route_template = route_template_from_scope(scope, entry_root_path)
-            if route_template is None and self._route_resolver is not None:
+            try:
+                self._record(scope, original_scope, entry_root_path, status_code, duration_ms,
+                             error, error_type, request_bytes, response_bytes, llm)
+            except Exception:
+                # Fail-open: a broken route_resolver (user code with
+                # instrument_asgi) or anything else here must never reach
+                # the app -- the response has usually been sent already.
+                logger.warning("reqly: could not record ASGI request", exc_info=True)
+
+    def _record(self, scope, original_scope, entry_root_path, status_code, duration_ms,
+                error, error_type, request_bytes, response_bytes, llm) -> None:
+        route_template = route_template_from_scope(scope, entry_root_path)
+        if route_template is None and self._route_resolver is not None:
+            try:
                 route_template = self._route_resolver(original_scope)
-            normalized = normalize_route(scope.get("path", "/"), route_template)
-            self._client.record_request(
-                method=scope.get("method", "GET"),
-                route=normalized,
-                status_code=status_code,
-                duration_ms=duration_ms,
-                error=error or status_code >= 500,
-                error_type=error_type,
-                request_bytes=request_bytes,
-                response_bytes=response_bytes,
-                request_info=lambda: asgi_request_info(scope),
-                llm=llm,
-            )
+            except Exception:
+                # Same as the WSGI wrapper: a failing resolver means "no
+                # route", not a lost event and not an error in the app.
+                logger.debug("reqly: route_resolver failed", exc_info=True)
+        normalized = normalize_route(scope.get("path", "/"), route_template)
+        self._client.record_request(
+            method=scope.get("method", "GET"),
+            route=normalized,
+            status_code=status_code,
+            duration_ms=duration_ms,
+            error=error or status_code >= 500,
+            error_type=error_type,
+            request_bytes=request_bytes,
+            response_bytes=response_bytes,
+            request_info=lambda: asgi_request_info(scope),
+            llm=llm,
+        )
 
 
 def instrument_fastapi(app, client: ReqlyClient) -> None:

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import AwareDatetime, BaseModel, Field, ValidationError, field_validator
 
 from ..auth import verify_api_key
+from ..db.late_data import event_time_problem
 from ..db.late_data import tracker as late_data_tracker
 from ..db.pool import get_pool
 from ..db.queries import event_row, insert_events, record_deployments, row_time
@@ -64,6 +66,10 @@ class IngestRequest(BaseModel):
     # on the event itself wins.
     release: str | None = Field(default=None, max_length=_MAX_RELEASE_LEN)
     environment: str | None = Field(default=None, max_length=_MAX_ENVIRONMENT_LEN)
+    # Historical import: allows events older than the raw retention window.
+    # The sender vouches that each hour it sends is complete, because those
+    # hours are rebuilt in the aggregates from exactly what it sends.
+    backfill: bool = False
     events: list[dict] = Field(min_length=1, max_length=_MAX_BATCH_SIZE)
 
 
@@ -79,11 +85,22 @@ async def ingest(request: Request, body: IngestRequest):
 
     rows = []
     rejected = 0
+    reasons: list[str] = []
+    now = datetime.now(timezone.utc)
     for raw_event in body.events:
         try:
             e = EventIn.model_validate(raw_event)
-        except ValidationError:
+        except ValidationError as exc:
             rejected += 1
+            if len(reasons) < 5:
+                first = exc.errors()[0]
+                reasons.append(f"{'.'.join(str(p) for p in first['loc'])}: {first['msg']}")
+            continue
+        problem = event_time_problem(e.timestamp, now, body.backfill)
+        if problem:
+            rejected += 1
+            if len(reasons) < 5:
+                reasons.append(problem)
             continue
         rows.append(
             event_row(
@@ -112,5 +129,8 @@ async def ingest(request: Request, body: IngestRequest):
     await insert_events(pool, rows)
     if rows:
         await record_deployments(pool, rows)
-        late_data_tracker.note(min(row_time(r) for r in rows))
-    return {"accepted": len(rows), "rejected": rejected}
+        late_data_tracker.note(min(row_time(r) for r in rows), backfill=body.backfill)
+    response = {"accepted": len(rows), "rejected": rejected}
+    if reasons:
+        response["reasons"] = reasons
+    return response

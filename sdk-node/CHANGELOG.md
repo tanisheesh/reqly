@@ -2,6 +2,17 @@
 
 All notable changes to `reqly-node`.
 
+## 0.1.1 — 2026-10-10
+
+### Fixed
+- Hono: routes registered with `app.all()` were recorded as `__unmatched__`. The route is now
+  the handler Hono actually ran; requests that only reached a wildcard middleware are
+  `__unmatched__`.
+- A Reqly middleware registered twice (or two clients) recorded every request twice; the first
+  one that sees a request now owns it.
+- Events still queued when the process exits on its own are sent (`beforeExit`, like the Python
+  SDK's `atexit`). On signals or `process.exit()`, call `client.shutdown()`.
+
 ## 0.1.0 — 2026-10-10
 
 First release.

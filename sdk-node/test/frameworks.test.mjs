@@ -183,3 +183,62 @@ test("fastify 4: same templates", async () => {
   ]);
   await plugin.client.shutdown();
 });
+
+test("registered twice, a request is still recorded once", async () => {
+  collector.batches.length = 0;
+  const opts = options(collector.url);
+
+  const e1 = reqlyExpress(opts);
+  const e2 = reqlyExpress(opts);
+  const eapp = express();
+  eapp.use(e1);
+  eapp.use(e2);
+  eapp.get("/e", (req, res) => res.send("ok"));
+  const { base, close } = await listen(eapp);
+  await fetch(`${base}/e`);
+  await close();
+
+  const f1 = reqlyFastify(opts);
+  const f2 = reqlyFastify(opts);
+  const fapp = Fastify();
+  await fapp.register(f1);
+  await fapp.register(f2);
+  fapp.get("/f", async () => "ok");
+  await fapp.inject({ method: "GET", url: "/f" });
+  await fapp.close();
+
+  const h1 = reqlyHono(opts);
+  const h2 = reqlyHono(opts);
+  const happ = new Hono();
+  happ.use(h1);
+  happ.use(h2);
+  happ.get("/h", (c) => c.text("ok"));
+  await happ.request("/h");
+
+  for (const c of [e1.client, e2.client, f1.client, f2.client, h1.client, h2.client]) await c.flush();
+  assert.deepEqual(collector.events().map((e) => e.route).sort(), ["/e", "/f", "/h"]);
+  for (const c of [e1.client, e2.client, f1.client, f2.client, h1.client, h2.client]) await c.shutdown();
+});
+
+test("hono: app.all routes are recorded; 404s behind a wildcard middleware are unmatched", async () => {
+  collector.batches.length = 0;
+  const middleware = reqlyHono(options(collector.url));
+  const app = new Hono();
+  app.use(middleware);
+  app.use("/api/*", async (c, next) => next());
+  app.all("/any", (c) => c.text("all"));
+  app.get("/api/items/:id", (c) => c.text("item"));
+  app.get("/static/*", (c) => c.text("file"));
+  await app.request("/any", { method: "POST" });
+  await app.request("/api/items/1");
+  await app.request("/api/missing");
+  await app.request("/static/a.css");
+  await middleware.client.flush();
+  assert.deepEqual(summary(collector.events()), [
+    ["POST", "/any", 200, false],
+    ["GET", "/api/items/:id", 200, false],
+    ["GET", "__unmatched__", 404, false],
+    ["GET", "/static/*", 200, false],
+  ]);
+  await middleware.client.shutdown();
+});

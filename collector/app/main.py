@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 
+from .body_limit import BodySizeLimitMiddleware
 from .config import settings
 from .db.late_data import run_refresh_loop
 from .db.pool import close_pool, create_pool
@@ -50,9 +51,12 @@ async def lifespan(app: FastAPI):
         await close_pool()
 
 
-app = FastAPI(title="Reqly Collector", version="0.8.0", lifespan=lifespan)
+app = FastAPI(title="Reqly Collector", version="0.8.1", lifespan=lifespan)
 
 app.state.limiter = limiter
+
+# Outermost: no request body above 16 MB is buffered, whatever the route.
+app.add_middleware(BodySizeLimitMiddleware)
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
