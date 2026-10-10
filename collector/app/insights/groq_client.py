@@ -42,6 +42,6 @@ def _call_groq_sync(service_name: str, week_start: str, anomalies: list[dict]) -
             {"role": "user", "content": json.dumps(payload, indent=2)},
         ],
         temperature=0.3,
-        max_tokens=600,
+        max_tokens=2000,  # includes the model's reasoning tokens
     )
     return response.choices[0].message.content

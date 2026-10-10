@@ -84,7 +84,7 @@ In the Reqly dashboard and collector:
 - **Deploy markers and per-release health** — each release's error rate and p95
 - **Hourly alerts** to Slack, Discord or a webhook when a route breaks from its usual
   weekday-hour pattern, with **root-cause hints**
-- **Weekly AI report** — statistics find the anomalies, Groq (Llama 3.3-70b) writes the
+- **Weekly AI report** — statistics find the anomalies, Groq (gpt-oss-120b) writes the
   summary; plain-text fallback without an API key
 
 An alert from the demo data looks like this:

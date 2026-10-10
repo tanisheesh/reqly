@@ -9,6 +9,7 @@ import { ReleasesTable } from "../components/ReleasesTable";
 import { AlertsBanner } from "../components/AlertsBanner";
 import { SloPanel } from "../components/SloPanel";
 import { InsightsPanel } from "../components/InsightsPanel";
+import { AskPanel } from "../components/AskPanel";
 import { useMetricsSummary } from "../hooks/useMetrics";
 import { COLLECTOR_URL, TimeWindow } from "../api/client";
 
@@ -208,6 +209,9 @@ export function Dashboard() {
 
             {/* Releases (deploy history + per-release health) */}
             <ReleasesTable serviceName={serviceName} />
+
+            {/* Ask Reqly (natural-language questions) */}
+            <AskPanel key={serviceName} serviceName={serviceName} />
 
             {/* AI Insights */}
             <InsightsPanel serviceName={serviceName} />
