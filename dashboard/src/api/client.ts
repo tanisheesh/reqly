@@ -149,6 +149,37 @@ export interface InsightReport {
   generated_at?: string;
 }
 
+export interface DriftOperation {
+  method: string;
+  path: string;
+  operation_id?: string;
+  summary?: string;
+  deprecated?: boolean;
+}
+
+export interface UndocumentedRoute {
+  method: string;
+  route: string;
+  requests: number;
+  error_rate: number | null;
+  last_seen: string;
+}
+
+export interface DriftReport {
+  service_name: string;
+  spec: { title: string | null; version: string | null; base_path: string; uploaded_at: string };
+  window_days: number;
+  operations: number;
+  documented_in_use: number;
+  coverage: number | null;
+  total_requests: number;
+  undocumented_requests: number;
+  unmatched_requests: number;
+  undocumented: UndocumentedRoute[];
+  dead: DriftOperation[];
+  deprecated_in_use: (DriftOperation & { requests: number; last_seen: string; routes: string[] })[];
+}
+
 export interface AskStep {
   tool: string;
   arguments: Record<string, unknown>;
@@ -231,6 +262,9 @@ export const api = {
 
   listSlos: (serviceName: string) =>
     getJSON<{ slos: Slo[] }>(`/v1/slos?service_name=${encodeURIComponent(serviceName)}`),
+
+  getApiDrift: (serviceName: string) =>
+    getJSON<DriftReport>(`/v1/services/${encodeURIComponent(serviceName)}/openapi/drift`),
 
   listAlerts: (serviceName: string) =>
     getJSON<{ alerts: Alert[] }>(`/v1/alerts?service_name=${encodeURIComponent(serviceName)}`),

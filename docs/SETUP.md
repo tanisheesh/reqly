@@ -188,6 +188,22 @@ curl -X PUT http://localhost:8000/v1/slos \
 
 Leave out `route` for a service-wide SLO; `window_days` defaults to 28. The dashboard shows each SLO's error budget, and burn-rate alerts go to the alert channels. The local demo creates three SLOs for the demo services on startup.
 
+## 6c. Compare traffic with your OpenAPI spec
+
+FastAPI and Litestar apps can upload their own spec: `reqly.instrument(app, push_openapi=True)`
+(or `REQLY_PUSH_OPENAPI=true`). For anything else, upload it from CI, JSON or YAML:
+
+```bash
+curl -X PUT http://localhost:8000/v1/services/checkout-api/openapi \
+  -H "X-Reqly-Key: demo-key" -H "Content-Type: application/yaml" \
+  --data-binary @openapi.yaml
+```
+
+Add `?base_path=/api` if the app serves the spec's paths under a prefix (Swagger 2.0's
+`basePath` is used automatically). The dashboard then shows an **API surface** panel:
+undocumented endpoints that get traffic, documented ones nobody called in 30 days, and
+deprecated ones still in use. The local demo uploads a spec for both demo services.
+
 ## 7. Deploy to production
 
 See [infra/DEPLOY.md](../infra/DEPLOY.md) for the full AWS production deployment:

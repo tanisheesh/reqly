@@ -2,6 +2,14 @@
 
 All notable changes to the `reqly` Python SDK.
 
+## 0.4.0 — 2026-10-10
+
+### Added
+- `push_openapi=True` (or `REQLY_PUSH_OPENAPI=true`): FastAPI and Litestar apps upload
+  their OpenAPI spec to the collector on the first request (once per process, on a
+  background thread, failures only logged). Collector 0.7.0+ compares it with the traffic
+  and shows undocumented, unused and deprecated-but-used endpoints.
+
 ## 0.3.0 — 2026-10-10
 
 ### Added

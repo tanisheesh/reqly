@@ -6,6 +6,7 @@ import { ErrorRateChart } from "../components/ErrorRateChart";
 import { StatusDistributionChart } from "../components/StatusDistributionChart";
 import { TopRoutesTable } from "../components/TopRoutesTable";
 import { ReleasesTable } from "../components/ReleasesTable";
+import { ApiSurfacePanel } from "../components/ApiSurfacePanel";
 import { AlertsBanner } from "../components/AlertsBanner";
 import { SloPanel } from "../components/SloPanel";
 import { InsightsPanel } from "../components/InsightsPanel";
@@ -209,6 +210,9 @@ export function Dashboard() {
 
             {/* Releases (deploy history + per-release health) */}
             <ReleasesTable serviceName={serviceName} />
+
+            {/* OpenAPI spec vs traffic (hidden when no spec is uploaded) */}
+            <ApiSurfacePanel serviceName={serviceName} />
 
             {/* Ask Reqly (natural-language questions) */}
             <AskPanel key={serviceName} serviceName={serviceName} />
