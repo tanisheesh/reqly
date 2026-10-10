@@ -8,7 +8,11 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 
 ## [Unreleased]
 
-Collector 0.12.0 · reqly-node 0.3.0
+---
+
+## [0.12.0] — 2026-10-11
+
+Collector 0.12.0 · reqly-node 0.3.0 · Helm chart 0.12.0
 
 ### ✨ Added
 - Node SDK: `reqlyHttp()` for plain node:http or any framework without an integration (with a
@@ -169,7 +173,8 @@ Python SDK 0.1.5
 
 ---
 
-[Unreleased]: https://github.com/tanisheesh/reqly/compare/collector-v0.11.0...HEAD
+[Unreleased]: https://github.com/tanisheesh/reqly/compare/collector-v0.12.0...HEAD
+[0.12.0]: https://github.com/tanisheesh/reqly/tree/collector-v0.12.0
 [0.11.0]: https://github.com/tanisheesh/reqly/tree/collector-v0.11.0
 [0.10.0]: https://github.com/tanisheesh/reqly/commit/0d3fc17
 [0.9.0]: https://github.com/tanisheesh/reqly/commit/ff10848
