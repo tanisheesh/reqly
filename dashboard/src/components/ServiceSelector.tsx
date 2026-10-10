@@ -5,6 +5,8 @@ interface Props {
   route: string | null;
   onServiceChange: (service: string | null) => void;
   onRouteChange: (route: string | null) => void;
+  /** Limit the list to these services (the selected project's). */
+  onlyServices?: string[] | null;
 }
 
 const selectCls =
@@ -12,11 +14,11 @@ const selectCls =
   "focus:border-cyan-600 focus:outline-none focus:ring-1 focus:ring-cyan-600/40 " +
   "disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer";
 
-export function ServiceSelector({ serviceName, route, onServiceChange, onRouteChange }: Props) {
+export function ServiceSelector({ serviceName, route, onServiceChange, onRouteChange, onlyServices }: Props) {
   const { data: servicesData, isLoading: servicesLoading } = useServices();
   const { data: routesData } = useRoutes(serviceName);
 
-  const services = servicesData?.services ?? [];
+  const services = (servicesData?.services ?? []).filter((s) => !onlyServices || onlyServices.includes(s));
   const routes = routesData?.routes ?? [];
 
   return (

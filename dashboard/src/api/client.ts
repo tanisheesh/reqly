@@ -326,6 +326,71 @@ async function sendJSON<T>(path: string, body: unknown): Promise<T> {
   return response.json();
 }
 
+// Any method, JSON body, the collector's `detail` as the error message.
+async function callJSON<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const response = await request(path, {
+    method,
+    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new HttpError(await errorDetail(response, `${method} ${path} failed: ${response.status}`), response.status);
+  }
+  return response.json();
+}
+
+export interface Project {
+  id: number;
+  slug: string;
+  name: string;
+  created_at: string;
+  services: string[];
+}
+
+export type KeyScope = "ingest" | "read" | "admin";
+
+export interface ApiKey {
+  id: number;
+  project_id: number;
+  name: string;
+  prefix: string;
+  scopes: KeyScope[];
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+}
+
+export interface Member {
+  user_id: number;
+  username: string;
+  is_admin: boolean;
+  added_at: string;
+}
+
+export const projectsApi = {
+  list: () => getJSON<{ projects: Project[] }>("/v1/projects"),
+  create: (slug: string, name: string) => callJSON<Project>("POST", "/v1/projects", { slug, name }),
+  moveService: (projectId: number, serviceName: string) =>
+    callJSON<{ service_name: string }>("PUT", `/v1/projects/${projectId}/services`, { service_name: serviceName }),
+  keys: (projectId: number) => getJSON<{ keys: ApiKey[] }>(`/v1/projects/${projectId}/keys`),
+  createKey: (projectId: number, name: string, scopes: KeyScope[]) =>
+    callJSON<ApiKey & { key: string }>("POST", `/v1/projects/${projectId}/keys`, { name, scopes }),
+  revokeKey: (keyId: number) => callJSON<{ revoked: number }>("POST", `/v1/keys/${keyId}/revoke`),
+  members: (projectId: number) => getJSON<{ members: Member[] }>(`/v1/projects/${projectId}/members`),
+  addMember: (projectId: number, username: string) =>
+    callJSON<Member>("POST", `/v1/projects/${projectId}/members`, { username }),
+  removeMember: (projectId: number, userId: number) =>
+    callJSON<{ removed: number }>("DELETE", `/v1/projects/${projectId}/members/${userId}`),
+};
+
+export const accountApi = {
+  changePassword: (currentPassword: string, newPassword: string) =>
+    callJSON<{ changed: boolean }>("POST", "/v1/auth/password", {
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
+};
+
 export interface AuthConfig {
   public_dashboard: boolean;
   login: boolean;
