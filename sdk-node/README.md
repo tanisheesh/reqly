@@ -100,7 +100,8 @@ Options passed to `reqlyExpress()` / `reqlyFastify()` / `reqlyHono()` (or a shar
 | `consumerSalt` | `REQLY_CONSUMER_SALT` | none (set it) |
 | `hashConsumer` | `REQLY_HASH_CONSUMER` | `true` |
 
-On graceful shutdown, `await reqly.client.shutdown()` sends what is still queued.
+Events still queued when the process exits on its own are sent automatically; on `SIGTERM`
+or `process.exit()`, `await reqly.client.shutdown()` first.
 
 ## Guarantees
 
