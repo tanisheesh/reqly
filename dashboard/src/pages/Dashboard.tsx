@@ -15,6 +15,7 @@ import { InsightsPanel } from "../components/InsightsPanel";
 import { AskPanel } from "../components/AskPanel";
 import { useMetricsSummary } from "../hooks/useMetrics";
 import { COLLECTOR_URL, TimeWindow } from "../api/client";
+import { SessionUser } from "../api/auth";
 
 function ReqlyIcon({ size = 18 }: { size?: number }) {
   return (
@@ -99,7 +100,44 @@ function LoadingState() {
   );
 }
 
-export function Dashboard() {
+function Account({
+  user,
+  onSignIn,
+  onSignOut,
+}: {
+  user: SessionUser | null;
+  onSignIn?: () => void;
+  onSignOut: () => void;
+}) {
+  if (user) {
+    return (
+      <div className="flex items-center gap-2 text-xs">
+        <span className="hidden text-slate-400 sm:inline" title={user.is_admin ? "admin" : undefined}>
+          {user.username}
+        </span>
+        <button onClick={onSignOut} className="rounded-md px-2 py-1 text-slate-500 ring-1 ring-slate-800 hover:text-slate-200">
+          Sign out
+        </button>
+      </div>
+    );
+  }
+  if (!onSignIn) return null;
+  return (
+    <button onClick={onSignIn} className="rounded-md px-2 py-1 text-xs text-slate-500 ring-1 ring-slate-800 hover:text-slate-200">
+      Sign in
+    </button>
+  );
+}
+
+export function Dashboard({
+  user = null,
+  onSignIn,
+  onSignOut = () => {},
+}: {
+  user?: SessionUser | null;
+  onSignIn?: () => void;
+  onSignOut?: () => void;
+} = {}) {
   const [serviceName, setServiceName] = useState<string | null>(null);
   const [route, setRoute] = useState<string | null>(null);
   const [timeWindow, setWindowValue] = useState<TimeWindow>("1h");
@@ -153,6 +191,7 @@ export function Dashboard() {
               onRouteChange={setRoute}
             />
             <TimeRangePicker value={timeWindow} onChange={setWindowValue} />
+            <Account user={user} onSignIn={onSignIn} onSignOut={onSignOut} />
           </div>
         </div>
       </header>

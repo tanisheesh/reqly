@@ -5,7 +5,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, model_validator
 
-from ..auth import verify_ingest_key, verify_read_key
+from ..auth import verify_admin, verify_read_key
 from ..db.pool import get_pool
 from ..slo import status as slo_status
 
@@ -38,15 +38,15 @@ async def list_slos(service_name: str | None = None):
     return {"slos": slos}
 
 
-# Managing SLOs needs the ingest (write) key: the read key ships in the
+# Managing SLOs needs the ingest key or an admin session: the read key ships in the
 # dashboard's JavaScript and must not be able to change anything.
-@router.put("/v1/slos", dependencies=[Depends(verify_ingest_key)])
+@router.put("/v1/slos", dependencies=[Depends(verify_admin)])
 async def put_slo(body: SloIn):
     """Create or update (by service_name + name)."""
     return await slo_status.upsert_slo(get_pool(), body.model_dump())
 
 
-@router.delete("/v1/slos/{slo_id}", dependencies=[Depends(verify_ingest_key)])
+@router.delete("/v1/slos/{slo_id}", dependencies=[Depends(verify_admin)])
 async def delete_slo(slo_id: int):
     if not await slo_status.delete_slo(get_pool(), slo_id):
         raise HTTPException(status_code=404, detail="no such SLO")

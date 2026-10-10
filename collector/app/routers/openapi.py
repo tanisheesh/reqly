@@ -4,7 +4,7 @@ import json
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from ..auth import verify_ingest_key, verify_read_key
+from ..auth import verify_admin, verify_read_key
 from ..db.pool import get_pool
 from ..openapi import store
 from ..openapi.drift import SpecError, spec_base_path, spec_operations, validate_spec
@@ -33,7 +33,7 @@ def parse_spec(body: bytes, content_type: str) -> dict:
 
 # Uploading needs the ingest key (the SDK and CI hold it); the read key ships
 # in the dashboard bundle.
-@router.put("/v1/services/{service_name}/openapi", dependencies=[Depends(verify_ingest_key)])
+@router.put("/v1/services/{service_name}/openapi", dependencies=[Depends(verify_admin)])
 async def put_spec(
     service_name: str,
     request: Request,
@@ -57,7 +57,7 @@ async def put_spec(
     }
 
 
-@router.delete("/v1/services/{service_name}/openapi", dependencies=[Depends(verify_ingest_key)])
+@router.delete("/v1/services/{service_name}/openapi", dependencies=[Depends(verify_admin)])
 async def delete_spec(service_name: str):
     if not await store.delete_spec(get_pool(), service_name):
         raise HTTPException(status_code=404, detail="no spec for this service")
