@@ -4,7 +4,7 @@ import { hostname } from "node:os";
 import { ReqlyOptions, ResolvedConfig, resolveConfig } from "./config.js";
 import { LlmSummary, RequestInfo } from "./context.js";
 
-export const SDK_VERSION = "0.3.0";
+export const SDK_VERSION = "0.3.1";
 export const UNMATCHED_ROUTE = "__unmatched__";
 
 const HOST = hostname();

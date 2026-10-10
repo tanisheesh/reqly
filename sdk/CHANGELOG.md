@@ -2,6 +2,12 @@
 
 All notable changes to the `reqly` Python SDK.
 
+## 0.5.4 — 2026-10-11
+
+### Changed
+- License: **MIT** (was GPL-3.0-or-later), so the SDK can be used in any app, open or closed.
+  The Reqly collector and dashboard are AGPL-3.0. No code changes.
+
 ## 0.5.3 — 2026-10-11
 
 ### Fixed
