@@ -2,6 +2,20 @@
 
 All notable changes to `reqly-node`.
 
+## 0.2.0 — 2026-10-10
+
+### Added
+- `reqlyKoa()`: Koa 2 and 3 middleware. Routes are @koa/router templates with router
+  prefixes; a thrown error is recorded with its status (500 unless it carries one, like
+  `ctx.throw(404)`) and, for 5xx, its type.
+- `reqlyNest(app)`: NestJS on the Express or Fastify adapter. Routes include the global
+  prefix and controller path, Nest's catch-all 404 is `__unmatched__`, and a global
+  interceptor records the type of exceptions that become 5xx (HttpExceptions below 500 are
+  not errors). No dependency on @nestjs packages or rxjs.
+
+### Changed
+- The CommonJS build uses `moduleResolution: bundler` (TypeScript 7 removed `node10`).
+
 ## 0.1.2 — 2026-10-11
 
 ### Fixed
