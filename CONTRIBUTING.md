@@ -185,6 +185,18 @@ settings, restricted to `sdk-v*` tags, and a trusted publisher on
 [pypi.org → reqly → Publishing](https://pypi.org/manage/project/reqly/settings/publishing/)
 with owner `tanisheesh`, repository `reqly`, workflow `release-sdk.yml`, environment `pypi`.
 
+### Node SDK (`reqly-node`)
+
+`.github/workflows/release-sdk-node.yml` publishes `sdk-node/` to npm with
+[npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) and provenance on a
+`node-v*` tag: bump `version` in `sdk-node/package.json`, add a `## x.y.z — YYYY-MM-DD`
+section to `sdk-node/CHANGELOG.md`, merge, then `git tag node-vX.Y.Z && git push origin node-vX.Y.Z`.
+
+**One-time setup:** npm only lets a package that exists add a trusted publisher, so publish
+0.1.0 by hand (`cd sdk-node && npm login && npm publish --access public`), then on
+npmjs.com → reqly-node → Settings → Trusted publishing add GitHub Actions with owner
+`tanisheesh`, repository `reqly`, workflow `release-sdk-node.yml`.
+
 ## Contributing
 
 1. Fork → branch from `main`
