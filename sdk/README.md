@@ -84,6 +84,8 @@ In the Reqly dashboard and collector:
 - **Deploy markers and per-release health** — each release's error rate and p95
 - **Hourly alerts** to Slack, Discord or a webhook when a route breaks from its usual
   weekday-hour pattern, with **root-cause hints**
+- **API surface vs your OpenAPI spec** — undocumented endpoints that get traffic, documented
+  ones nobody calls, and deprecated ones still in use (`push_openapi=True`)
 - **Weekly AI report** — statistics find the anomalies, Groq (gpt-oss-120b) writes the
   summary; plain-text fallback without an API key
 
@@ -117,6 +119,7 @@ Resolution order: **argument → environment variable → default**.
 | `max_batch_size` | `REQLY_MAX_BATCH_SIZE` | `200` |
 | `max_queue_size` | `REQLY_MAX_QUEUE_SIZE` | `2000` |
 | `ignore_routes` | `REQLY_IGNORE_ROUTES` (comma-separated) | `/health,/metrics` |
+| `push_openapi` | `REQLY_PUSH_OPENAPI` | `False` — upload the app's OpenAPI spec (FastAPI, Litestar) on the first request |
 | `capture_request_body` | `REQLY_CAPTURE_REQUEST_BODY` | `False` (not implemented yet) |
 
 With `sample_rate` below 1.0, request counts in the dashboard are the sampled volume;
@@ -154,7 +157,7 @@ are shipped instead of silently queuing forever.
 | Litestar | 2.0+ |
 | Flask | 2.3+ |
 | Django | 4.2+, sync and async views; DRF and Django Ninja |
-| Collector | any version; `release`, `environment` and body sizes are stored by collector 0.3.0+ and ignored by older ones |
+| Collector | any version; `release`, `environment` and body sizes are stored by collector 0.3.0+ and ignored by older ones; `push_openapi` needs 0.7.0+ |
 
 ## Self-hosting the collector
 
