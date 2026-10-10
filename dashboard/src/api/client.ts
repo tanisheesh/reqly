@@ -1,3 +1,5 @@
+import { clearSession, SessionUser, sessionToken } from "./auth";
+
 // Settings written at container start (public/config.js) win over the ones
 // baked in at build time, so one image works for any collector.
 const runtimeConfig: { collectorUrl?: string; readKey?: string } =
@@ -14,7 +16,32 @@ if (!runtimeConfig.readKey && !import.meta.env.VITE_READ_KEY) {
   );
 }
 
-const AUTH_HEADERS = { "X-Reqly-Key": READ_KEY };
+// A signed-in user's session wins; otherwise the read key (accepted while
+// the collector's PUBLIC_DASHBOARD is on).
+function authHeaders(): Record<string, string> {
+  const token = sessionToken();
+  return token ? { Authorization: `Bearer ${token}` } : { "X-Reqly-Key": READ_KEY };
+}
+
+async function request(path: string, init: RequestInit = {}): Promise<Response> {
+  const usedSession = sessionToken() !== null;
+  const response = await fetch(`${COLLECTOR_URL}${path}`, {
+    ...init,
+    headers: { ...authHeaders(), ...(init.headers as Record<string, string> | undefined) },
+  });
+  // An expired or revoked session: drop it and go back to the sign-in page.
+  if (response.status === 401 && usedSession) clearSession();
+  return response;
+}
+
+async function errorDetail(response: Response, fallback: string): Promise<string> {
+  try {
+    const detail = (await response.json()).detail;
+    return typeof detail === "string" && detail ? detail : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export type TimeWindow = "1h" | "6h" | "24h" | "7d";
 
@@ -272,9 +299,7 @@ export class HttpError extends Error {
 }
 
 async function getJSON<T>(path: string): Promise<T> {
-  const response = await fetch(`${COLLECTOR_URL}${path}`, {
-    headers: AUTH_HEADERS,
-  });
+  const response = await request(path);
   if (!response.ok) {
     throw new HttpError(`GET ${path} failed: ${response.status}`, response.status);
   }
@@ -282,10 +307,7 @@ async function getJSON<T>(path: string): Promise<T> {
 }
 
 async function postJSON<T>(path: string): Promise<T> {
-  const response = await fetch(`${COLLECTOR_URL}${path}`, {
-    method: "POST",
-    headers: AUTH_HEADERS,
-  });
+  const response = await request(path, { method: "POST" });
   if (!response.ok) {
     throw new HttpError(`POST ${path} failed: ${response.status}`, response.status);
   }
@@ -293,22 +315,64 @@ async function postJSON<T>(path: string): Promise<T> {
 }
 
 async function sendJSON<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(`${COLLECTOR_URL}${path}`, {
+  const response = await request(path, {
     method: "POST",
-    headers: { ...AUTH_HEADERS, "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    let detail = "";
-    try {
-      detail = (await response.json()).detail ?? "";
-    } catch {
-      // not JSON
-    }
-    throw new HttpError(typeof detail === "string" && detail ? detail : `POST ${path} failed: ${response.status}`, response.status);
+    throw new HttpError(await errorDetail(response, `POST ${path} failed: ${response.status}`), response.status);
   }
   return response.json();
 }
+
+export interface AuthConfig {
+  public_dashboard: boolean;
+  login: boolean;
+}
+
+export interface LoginResult {
+  token: string;
+  expires_at: string;
+  user: SessionUser;
+}
+
+export const authApi = {
+  /** Collectors before 0.9 have no auth endpoints: treat them as public, no login. */
+  config: async (): Promise<AuthConfig> => {
+    try {
+      const response = await fetch(`${COLLECTOR_URL}/v1/auth/config`);
+      if (!response.ok) return { public_dashboard: true, login: false };
+      return response.json();
+    } catch {
+      return { public_dashboard: true, login: false };
+    }
+  },
+
+  login: async (username: string, password: string): Promise<LoginResult> => {
+    const response = await fetch(`${COLLECTOR_URL}/v1/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    if (!response.ok) {
+      const fallback = response.status === 429 ? "Too many attempts; wait a minute." : "Sign-in failed.";
+      throw new HttpError(await errorDetail(response, fallback), response.status);
+    }
+    return response.json();
+  },
+
+  logout: async (): Promise<void> => {
+    const token = sessionToken();
+    if (token) {
+      try {
+        await fetch(`${COLLECTOR_URL}/v1/auth/logout`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      } catch {
+        // signing out locally is what matters
+      }
+    }
+  },
+};
 
 export const api = {
   listServices: () => getJSON<{ services: string[] }>("/v1/services"),

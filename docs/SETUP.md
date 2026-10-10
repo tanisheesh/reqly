@@ -47,6 +47,9 @@ cp .env.example .env
 | `GROQ_API_KEY` | *(empty)* | [console.groq.com/keys](https://console.groq.com/keys) — free tier; leave empty to use plain-text fallback for AI insights |
 | `GROQ_MODEL` | `openai/gpt-oss-120b` | See Groq docs for available models |
 | `ASK_MODEL` | `GROQ_MODEL` | Model for Ask Reqly; needs tool calling |
+| `PUBLIC_DASHBOARD` | `true` | `true`: anyone with the dashboard can read (public demo). `false`: sign-in required |
+| `REQLY_ADMIN_USERNAME` / `REQLY_ADMIN_PASSWORD` | `admin` / *(empty)* | First admin, created at start-up when there are no users (password 12+ characters) |
+| `SESSION_TTL_HOURS` | `168` | How long a sign-in lasts |
 | `LLM_PRICES_FILE` | *(empty)* | YAML price table that overrides/extends `collector/app/llm/llm_prices.yaml` (USD per 1M tokens) |
 | `ASK_DAILY_LIMIT` | `200` | Ask Reqly questions per day per collector (the read key is public to dashboard viewers); `0` turns Ask off |
 | `CORS_ORIGINS` | `*` | Comma-separated list of allowed origins; restrict in production |
