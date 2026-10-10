@@ -176,6 +176,12 @@ export function reqlyFastify(clientOrOptions?: ClientOrOptions) {
   const client = toClient(clientOrOptions);
 
   const plugin = (fastify: FastifyLike, _opts: unknown, done: Done) => {
+    // pushOpenapi: true -> the spec from @fastify/swagger, read on the first request
+    client.useOpenapiSource(() => {
+      const swagger = (fastify as unknown as { swagger?: () => unknown }).swagger;
+      if (typeof swagger !== "function") throw new Error("@fastify/swagger is not registered");
+      return swagger.call(fastify);
+    });
     fastify.addHook("onRequest", (req, _reply, next) => {
       if (!claim(req)) return next();
       req[OWNER] = plugin;

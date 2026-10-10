@@ -29,6 +29,13 @@ export interface ReqlyOptions {
   consumerSalt?: string;
   /** Hash consumer ids before they leave the app. Default true (REQLY_HASH_CONSUMER). */
   hashConsumer?: boolean;
+  /**
+   * Upload the app's OpenAPI spec once, on the first request, for API drift:
+   * the spec object (e.g. NestJS `SwaggerModule.createDocument(...)`), a
+   * function returning it (sync or async), or `true` to take it from the
+   * framework (Fastify with @fastify/swagger). Default: REQLY_PUSH_OPENAPI.
+   */
+  pushOpenapi?: boolean | object | (() => unknown);
 }
 
 export interface ResolvedConfig {
@@ -46,6 +53,7 @@ export interface ResolvedConfig {
   consumer?: (info: RequestInfo) => string | null | undefined;
   consumerSalt?: string;
   hashConsumer: boolean;
+  pushOpenapi: boolean | object | (() => unknown);
 }
 
 // Commit SHA variables set by common CI/CD and hosting platforms (same list
@@ -105,5 +113,6 @@ export function resolveConfig(options: ReqlyOptions = {}): ResolvedConfig {
     consumer: options.consumer,
     consumerSalt: options.consumerSalt ?? env("REQLY_CONSUMER_SALT"),
     hashConsumer: options.hashConsumer ?? envBool("REQLY_HASH_CONSUMER") ?? true,
+    pushOpenapi: options.pushOpenapi ?? envBool("REQLY_PUSH_OPENAPI") ?? false,
   };
 }
