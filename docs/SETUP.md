@@ -58,6 +58,7 @@ cp .env.example .env
 | `ALERTS_ENABLED` | `true` | Hourly anomaly check (open alerts appear on the dashboard) |
 | `ALERT_SLACK_WEBHOOK_URL` / `ALERT_DISCORD_WEBHOOK_URL` / `ALERT_WEBHOOK_URL` | *(empty)* | Where alert notifications go; unset channels are skipped |
 | `ALERT_RENOTIFY_HOURS` | `6` | Reminder interval while an alert keeps firing |
+| `LLM_COST_ALERT_MIN_USD` | `1.0` (`0.4` in Compose) | Smallest extra LLM spend per route-hour (USD) worth an alert; `0` turns LLM cost alerts off |
 | `DASHBOARD_URL` | `http://localhost:5173` | Linked from Slack alerts |
 | `LATE_DATA_REFRESH_SECONDS` | `60` | How often late-arriving events (older than 1h) are materialized into the aggregates |
 | `FORWARDED_ALLOW_IPS` | `127.0.0.1` | Behind a proxy, the proxy's IP — lets rate limiting see the real client IP |

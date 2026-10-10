@@ -44,7 +44,7 @@ Endpoints about one service check it against the caller's projects; list endpoin
 
 | Method | Path | Access | Description |
 |---|---|---|---|
-| `GET` | `/v1/alerts?service_name=&status=` | Read | Open alerts, or recent ones with `status=all`: hourly anomalies and SLO burn |
+| `GET` | `/v1/alerts?service_name=&status=` | Read | Open alerts, or recent ones with `status=all`: hourly anomalies, SLO burn and LLM cost spikes |
 | `GET` | `/v1/slos?service_name=` | Read | SLOs with SLI, budget left, burn rates and state |
 | `PUT` | `/v1/slos` | Admin | Create or update an SLO. [Fields](../features/slos.md#define-an-slo) |
 | `DELETE` | `/v1/slos/{id}` | Admin | Delete an SLO |

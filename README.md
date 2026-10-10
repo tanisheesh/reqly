@@ -49,7 +49,7 @@ reqly.instrument(app, service_name="checkout-api")   # FastAPI, Flask, Django, S
 - **Metrics that are right** — p50/p95/p99 per route and per service from mergeable percentile sketches, error rates, status codes, deploy markers and per-release health
 - **It explains what broke** — hourly alerts to Slack/Discord/webhooks against a weekday × hour baseline, with the release that was running, root-cause leads (*"92% of errors came from pod-7"*) and the clients that were hit; a weekly AI report narrates the findings
 - **Ask Reqly** — *"why did /orders start failing?"* answered from the collector's own data through read-only query tools, with every query shown and any number not found in the results flagged
-- **API-level depth** — SLOs with burn-rate alerts, OpenAPI drift (undocumented, unused and deprecated-but-used endpoints), API consumers, and LLM token cost per route
+- **API-level depth** — SLOs with burn-rate alerts, OpenAPI drift (undocumented, unused and deprecated-but-used endpoints), API consumers, and LLM token cost per route with alerts when it spikes
 - **Any stack, small footprint** — Python SDK, Node.js SDK (Express, Fastify, Hono) or OTLP from any language; the SDKs add ~5–33 µs per request ([benchmark](bench/README.md)) and never crash your app; projects, per-team API keys and sign-in for shared collectors
 
 

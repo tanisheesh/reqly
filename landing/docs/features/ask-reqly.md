@@ -11,6 +11,7 @@ Ask a question about one service in plain English, for example:
 - *"Was checkout slower yesterday afternoon than last week?"*
 - *"Which clients still call deprecated endpoints?"*
 - *"What did the LLM calls on /summarize cost this week?"*
+- *"Why did our LLM bill jump today?"*
 
 The answer comes from your own data, and the dashboard shows every query the model ran next to it.
 
@@ -24,7 +25,7 @@ The read key ships in the dashboard, so letting a model write SQL would turn it 
 | `compare_periods` | The same stats for two periods side by side, optionally per route |
 | `get_breakdown` | Traffic and errors by host, environment, release, status code, error type, method or consumer |
 | `list_releases` | Releases with first/last seen, volume, error rate and p95 |
-| `get_alerts` | Open and recent alerts |
+| `get_alerts` | Open and recent alerts: anomalies, SLO burn and LLM cost spikes |
 | `get_slos` | SLOs with SLI, budget left and burn rates |
 | `get_api_drift` | Undocumented, unused and deprecated-but-called endpoints |
 | `get_consumers` | Top API consumers |
@@ -52,4 +53,4 @@ curl -X POST http://localhost:8000/v1/ask \
 
 The response contains the answer, every tool call with its arguments and result, and `unverified_numbers`.
 
-An eval set of 18 questions over the demo scenarios lives in [`collector/tests/ask_eval/`](https://github.com/tanisheesh/reqly/tree/main/collector/tests/ask_eval). It's run by hand after prompt or model changes and needs a Groq key.
+An eval set of 19 questions over the demo scenarios lives in [`collector/tests/ask_eval/`](https://github.com/tanisheesh/reqly/tree/main/collector/tests/ask_eval). It's run by hand after prompt or model changes and needs a Groq key.

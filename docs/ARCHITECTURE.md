@@ -79,6 +79,8 @@ The SDK tags each request with a consumer id (from a header or a callable), HMAC
 
 Requests carry the model and token counts recorded with `reqly.record_llm_usage()` (a request that called several models is attributed to the one with the most tokens, with all tokens summed). `llm_usage_1hour` rolls them up per route and model for 90 days. Cost is computed at query time from a price table (`app/llm/llm_prices.yaml`, USD per 1M tokens, longest-prefix model match; `LLM_PRICES_FILE` overrides and extends it), so a price edit applies to past usage, and models without a price are listed as unpriced rather than guessed.
 
+Right after the hourly anomaly check, `app/alerts/llm_cost.py` refreshes the last hour of `llm_usage_1hour` and `app/llm/anomalies.py` compares each route's cost with the same weekday-hour over 8 weeks: median and MAD of cost per request, and of requests. It flags a **unit-cost** spike (≥ 2× the usual cost per request and ≥ 4 robust deviations) or a **volume** spike (≥ 3× the usual requests at a normal cost per request) when the extra spend clears `LLM_COST_ALERT_MIN_USD` (default $1). Each finding lists the factors that rose (requests, share of requests calling a model, tokens per call, blended price per 1M tokens) and the model that now carries the cost if it changed. Alerts use the shared alerts table (`kind = 'llm_cost'`) and lifecycle.
+
 ### OpenAPI drift
 
 A service's spec (`api_specs`, one per service, uploaded with the ingest key or by the SDK's `push_openapi`) is compared with the (method, route) pairs seen in the last 30 days of `api_latency_1min` (14 days of raw events without the Toolkit) by `app/openapi/drift.py`. Paths are compared by shape, so every framework's parameter syntax lines up — `{user_id}`, `{id}`, `:id` and `<int:id>` are all `{}` — and an un-templated route such as `/users/42` from an OTLP exporter still matches `/users/{}`; a literal spec segment beats a parameter (`/users/me` over `/users/{id}`). The report lists **undocumented** operations (traffic, not in the spec; HEAD/OPTIONS and `__unmatched__` 404s are left out), **unused** ones (in the spec, no traffic) and **deprecated** ones still being called, plus coverage and the share of traffic that is undocumented. The dashboard shows it when a spec exists, and Ask Reqly can query it (`get_api_drift`).
@@ -114,7 +116,7 @@ A service's spec (`api_specs`, one per service, uploaded with the ingest key or 
 [Dashboard] --GET /v1/metrics/summary, /consumers, /llm-usage, ...------+--> charts, tables, panels
 [Dashboard] --POST /v1/ask--> Groq tool calls --> read-only queries --> answer + verified numbers
 
-[Scheduler] :15 hourly   --> last hour vs 8 weekday-hours --> alerts table --> Slack / Discord / webhook
+[Scheduler] :15 hourly   --> last hour vs 8 weekday-hours (errors, p95, LLM cost) --> alerts table --> Slack / Discord / webhook
             every 5 min  --> SLO burn rates               --> alerts table --> same channels
             Sunday 23:00 --> week vs baseline --> Groq narrative --> insight_reports
 ```
@@ -135,7 +137,7 @@ A service's spec (`api_specs`, one per service, uploaded with the ingest key or 
 - `consumer_usage_1hour`, `llm_usage_1hour` — hourly rollups by consumer / by LLM model (90 days).
 - `deployments` — first and last seen per service, environment and release.
 - `insight_reports` — one weekly report per service (`anomalies_json`, `report_text`).
-- `alerts` — `kind` (`anomaly` or `slo`), service, route, first/last hour, resolved time, details JSON; at most one open alert per service, route and kind.
+- `alerts` — `kind` (`anomaly`, `slo` or `llm_cost`), service, route, first/last hour, resolved time, details JSON; at most one open alert per service, route and kind.
 - `slos` — objective (`availability` / `latency`), target, threshold, window per service or route.
 - `api_specs` — one OpenAPI spec (JSONB) and base path per service.
 - `users`, `sessions` — argon2id password hashes; SHA-256 of session tokens with expiry.

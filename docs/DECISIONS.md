@@ -137,6 +137,18 @@ the tradeoff each answer cost.
 
 ---
 
+## Decision 12 — LLM cost alerts: median and MAD per route-hour, a dollar floor, and a cause
+
+**Context:** Routes that call LLMs can get expensive overnight: a prompt change that pastes more context, a switch to a bigger model, a client retrying in a loop. Cost per route was visible on the dashboard, but nothing said when it jumped.
+
+**Decision:** The hourly job compares each route's LLM cost with the same weekday-hour over 8 weeks using the median and the median absolute deviation (not the Poisson test, since cost isn't count data). It splits the change into cost per request vs request volume, alerts only when the extra spend clears `LLM_COST_ALERT_MIN_USD` (default $1/hour), and lists which factor rose: requests, share calling a model, tokens per call, price per token, or a different model carrying the cost.
+
+**Reason:** Median and MAD aren't thrown off by one odd hour in the baseline. The dollar floor keeps cheap routes from alerting over cents, and the cause tells you whether to look at a prompt or a client.
+
+**Tradeoff:** Unpriced models count tokens but no cost, so a spike on one isn't alerted. A route needs 3 baseline weekday-hours with traffic before it can alert. And because the floor is absolute, a 10× jump on a $0.05/hour route stays quiet by design.
+
+---
+
 ## What I'd do differently in v2
 
 - **Configurable anomaly threshold per service** — the global z > 4.0 threshold (with count-based error tests and minimum effect sizes) keeps false positives near one every ~20 weeks, but low-volume services need large shifts to clear it. Per-service thresholds or adaptive thresholds based on historical false-positive rates would improve signal quality.

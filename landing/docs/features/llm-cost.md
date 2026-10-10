@@ -43,6 +43,10 @@ models:
 
 Model names match by the longest prefix, case-insensitive, after dropping a provider prefix: `openai/gpt-4o-2024-08-06` matches `gpt-4o`. Models with no match are listed as **unpriced**, never guessed.
 
+## Alerts
+
+When a route's LLM spend jumps, an hourly alert tells you whether it was **cost per request** (prompt, model, output length) or **request volume**, and which factor moved. See [LLM cost alerts](alerts.md#llm-cost-alerts).
+
 ## API
 
 ```bash

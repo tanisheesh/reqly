@@ -56,10 +56,36 @@ Set any combination. Channels that aren't set are skipped.
 | `ALERT_WEBHOOK_URL` | any URL, as JSON: `{"event": "alert.opened" \| "alert.still_firing" \| "alert.resolved", "text": "...", "alert": {...}}` |
 | `DASHBOARD_URL` | linked from Slack messages |
 
-Set `ALERTS_ENABLED=false` to turn the hourly check off. [SLO burn-rate alerts](slos.md#burn-rate-alerts) go to the same channels.
+Set `ALERTS_ENABLED=false` to turn the hourly check off. [SLO burn-rate alerts](slos.md#burn-rate-alerts) and [LLM cost alerts](#llm-cost-alerts) go to the same channels.
 
 !!! note "Run one collector"
     The scheduler runs inside the collector process. With two collector instances, every check runs twice.
+
+## LLM cost alerts
+
+Right after the error check, the same hourly job looks at what each route spent on LLM calls (from [recorded token usage](llm-cost.md)) and compares it with the same weekday-hour over the previous 8 weeks. Cost isn't count data, so it uses the median of those hours and a robust spread (MAD) instead of the Poisson test.
+
+It tells two causes apart, because they need different fixes:
+
+| Cause | Fires when | Typical reason |
+|---|---|---|
+| **Cost per request** | the route's cost per request is at least 2× the usual (and ≥ 4 robust deviations above it) | a longer prompt, more output, a pricier model, retries |
+| **Request volume** | cost per request is normal, but there are at least 3× the usual requests | a client stuck in a loop, a bot, a launch |
+
+Either way the extra spend in that hour has to be at least **`LLM_COST_ALERT_MIN_USD`** (default $1), so cheap routes don't page anyone over cents. Set it to `0` to turn LLM cost alerts off.
+
+The alert says **what drove the cost**: which of the request count, the share of requests that call a model, tokens per model call and the blended price per token went up, plus a note when a different model now carries most of the cost.
+
+```
+💸 LLM cost spike — checkout-api /assistant/chat (Monday 14:00-15:00 UTC)
+• $1.53 this hour vs $0.405 usual (+$1.12) · $1.53 vs $0.405 per 1k requests
+• driven by cost per request
+• tokens per model call 5.2× (1,800 → 9,300)
+```
+
+A switch to a pricier model reads *"price per 1M tokens 16.7× ($0.23 → $3.75)"* and *"100% of the cost is on gpt-4o (usually gpt-4o-mini)"*; a traffic surge reads *"driven by request volume · requests 6.0×"*.
+
+LLM cost alerts follow the same lifecycle as anomaly alerts: one open alert per route, reminders while it fires, resolved after 2 clean hours.
 
 ## Weekly report
 
