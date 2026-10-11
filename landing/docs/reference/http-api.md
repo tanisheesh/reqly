@@ -49,7 +49,7 @@ Endpoints about one service check it against the caller's projects; list endpoin
 | `PUT` | `/v1/slos` | Admin | Create or update an SLO. [Fields](../features/slos.md#define-an-slo) |
 | `DELETE` | `/v1/slos/{id}` | Admin | Delete an SLO |
 | `GET` | `/v1/insights/latest?service_name=` | Read | Latest weekly report |
-| `POST` | `/v1/insights/generate?service_name=` | Read | Generate the report now. 5/min; cached for 10 minutes |
+| `POST` | `/v1/insights/generate?service_name=` | Read | Generate the report now. 5/min; cached for 10 minutes; 404 for a service with no data |
 
 ## API depth
 

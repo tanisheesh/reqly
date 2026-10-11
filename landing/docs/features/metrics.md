@@ -23,7 +23,7 @@ Reqly keeps a **mergeable latency sketch** (UddSketch, from the TimescaleDB Tool
 
 ## Errors
 
-A request counts as an error when the status is 5xx or the app raised an unhandled exception. The SDK records the exception's class name as the **error type**, which feeds the [root-cause hints](alerts.md#root-cause-hints) and the breakdowns in [Ask Reqly](ask-reqly.md).
+A request counts as an error when the status is 5xx or the app raised an unhandled exception. A request the client abandoned before the response finished is recorded as `499` and is not an error. The SDK records the exception's class name as the **error type**, which feeds the [root-cause hints](alerts.md#root-cause-hints) and the breakdowns in [Ask Reqly](ask-reqly.md).
 
 ## Releases
 

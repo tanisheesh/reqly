@@ -17,6 +17,9 @@ endpoint that touches a database takes milliseconds. Numbers are from a Windows 
 [benchmark workflow](../.github/workflows/bench.yml) reruns them on GitHub's Linux runners
 on every SDK change (results in each run's summary).
 
+Re-checked for reqly 0.5.5 and reqly-node 0.3.2 by running them back to back with the releases
+these numbers were first measured on (0.5.2 and 0.1.2): the same within noise.
+
 ## How it is measured
 
 - **The SDK's own cost, not the network's.** Apps are called directly — ASGI apps through
