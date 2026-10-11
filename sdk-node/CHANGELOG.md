@@ -2,6 +2,18 @@
 
 All notable changes to `reqly-node`.
 
+## 0.3.2 — 2026-10-11
+
+### Fixed
+- `await client.shutdown()` could take over 90 s when the collector accepted connections but
+  never answered, and a script's natural exit waited the same way. Shutdown now makes one
+  attempt per batch, stops at the first failure and takes at most 5 s; the rest is counted in
+  `stats.dropped`. A flush in progress stops retrying once shutdown starts.
+- A request the client abandoned was recorded with the status the handler had set so far
+  (usually 200) in Express, Koa and `reqlyHttp`; it is now 499 (client closed request).
+- `maxBatchSize` below 1 made the flush loop forever, sending empty batches. Settings are now
+  kept in range: `maxBatchSize` 1-1,000, `maxQueueSize` at least 1, `flushIntervalMs` at least 100.
+
 ## 0.3.1 — 2026-10-11
 
 ### Changed

@@ -98,6 +98,7 @@ interface ExpressRequest {
 }
 interface ExpressResponse {
   statusCode: number;
+  writableFinished?: boolean;
   locals: Record<string, unknown>;
   getHeader(name: string): unknown;
   once(event: "finish" | "close", listener: () => void): unknown;
@@ -119,6 +120,15 @@ const EXPRESS_ERROR = "__reqlyErrorType";
  */
 export function reqlyExpress(clientOrOptions?: ClientOrOptions) {
   return expressMiddleware(toClient(clientOrOptions));
+}
+
+/** nginx's "client closed request": the client went away before the response
+ * was finished. Recorded as is (not an error), instead of the status the
+ * handler had set so far. */
+const CLIENT_CLOSED_REQUEST = 499;
+
+function finalStatus(res: { writableFinished?: boolean }, status: number): number {
+  return res.writableFinished === false ? CLIENT_CLOSED_REQUEST : status;
 }
 
 function expressMiddleware(client: ReqlyClient, isUnmatched?: (route: string, statusCode: number) => boolean) {
@@ -156,7 +166,7 @@ function expressMiddleware(client: ReqlyClient, isUnmatched?: (route: string, st
         client.record({
           method: req.method,
           route: route === "" ? "/" : route,
-          statusCode: res.statusCode,
+          statusCode: finalStatus(res, res.statusCode),
           durationMs: elapsedMs(start),
           errorType: res.locals?.[EXPRESS_ERROR] as string | undefined,
           requestBytes: intOrUndefined(req.headers["content-length"]),
@@ -428,7 +438,7 @@ export function reqlyKoa(clientOrOptions?: ClientOrOptions) {
           client.record({
             method: ctx.method,
             route: typeof route === "string" ? route : undefined,
-            statusCode: statusCode ?? ctx.status,
+            statusCode: finalStatus(ctx.res as { writableFinished?: boolean }, statusCode ?? ctx.status),
             durationMs: elapsedMs(start),
             errorType,
             requestBytes: intOrUndefined(ctx.headers["content-length"]),
@@ -562,6 +572,7 @@ interface NodeRequestLike {
 }
 interface NodeResponseLike {
   statusCode: number;
+  writableFinished?: boolean;
   getHeader(name: string): unknown;
   once(event: "finish" | "close", listener: () => void): unknown;
 }
@@ -620,7 +631,7 @@ export function reqlyHttp<Req extends NodeRequestLike, Res extends NodeResponseL
         client.record({
           method,
           route,
-          statusCode: res.statusCode,
+          statusCode: finalStatus(res, res.statusCode),
           durationMs: elapsedMs(start),
           errorType,
           requestBytes: intOrUndefined(req.headers["content-length"]),

@@ -12,6 +12,9 @@ from .shipper import Shipper
 
 logger = logging.getLogger("reqly")
 
+# Longest the flush at exit may take.
+SHUTDOWN_FLUSH_SECONDS = 5.0
+
 
 class EventBuffer:
     """Bounded in-memory queue + background flush thread.
@@ -121,9 +124,31 @@ class EventBuffer:
         self._stop_event.set()
         self._wake.set()  # let the thread exit now instead of at the next interval
         try:
-            self.flush()
+            self._final_flush()
         finally:
             self._shipper.close()
+
+    def _final_flush(self) -> None:
+        """The flush at exit, bounded: one attempt per batch, no backoff,
+        and it gives up at the first failure or after SHUTDOWN_FLUSH_SECONDS
+        -- a down collector must not hold up a deploy or a worker restart.
+        Whatever is left counts as dropped."""
+        deadline = time.monotonic() + SHUTDOWN_FLUSH_SECONDS
+        try:
+            while time.monotonic() < deadline:
+                batch = self._drain_batch()
+                if not batch:
+                    return
+                if not self._shipper.send_batch(batch, retries=1):
+                    break
+        except Exception:
+            logger.warning("reqly: unexpected error during the final flush", exc_info=True)
+        with self._lock:
+            left = len(self._queue)
+            self._queue.clear()
+            self._dropped_events += left
+        if left:
+            logger.warning("reqly: dropped %d unsent events at shutdown", left)
 
     def stats(self) -> dict:
         with self._lock:

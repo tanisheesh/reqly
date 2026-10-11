@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from urllib.parse import quote
 from typing import Callable
 
 import httpx
@@ -28,7 +29,7 @@ class OpenAPIPusher:
         service_name: str,
     ) -> None:
         self._spec_factory = spec_factory
-        self._url = f"{collector_url.rstrip('/')}/v1/services/{service_name}/openapi"
+        self._url = f"{collector_url.rstrip('/')}/v1/services/{quote(service_name, safe='')}/openapi"
         self._api_key = api_key
         self._started = False
         self._lock = threading.Lock()

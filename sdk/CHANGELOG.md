@@ -2,6 +2,19 @@
 
 All notable changes to the `reqly` Python SDK.
 
+## 0.5.5 — 2026-10-11
+
+### Fixed
+- Exit could take 20-50 s when the collector was down or unresponsive: the flush at shutdown
+  retried every queued batch with backoff. It now makes one attempt per batch, stops at the
+  first failure and takes at most 5 s; what's left is counted in `dropped_events`.
+- A request the client abandoned (or the server cancelled) before the app answered was recorded
+  as a 500 error; it is now 499 (client closed request) and not an error.
+- Out-of-range settings no longer break shipping: `max_batch_size` is kept within 1-1,000 (the
+  collector rejects larger batches whole), `max_queue_size` at least 1, and
+  `flush_interval_seconds` at least 0.1 (0 made the flush thread spin a CPU core).
+- The OpenAPI upload URL escapes the service name.
+
 ## 0.5.4 — 2026-10-11
 
 ### Changed

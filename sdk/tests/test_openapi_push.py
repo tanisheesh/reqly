@@ -168,3 +168,10 @@ def test_flask_warns_instead(caplog):
     assert "push_openapi needs an app that generates its own spec" in caplog.text
     assert client is not None
     client.shutdown()
+
+
+def test_service_name_is_escaped_in_the_upload_url():
+    from reqly.core.openapi_push import OpenAPIPusher
+
+    pusher = OpenAPIPusher(spec_factory=dict, collector_url="http://c/", api_key=None, service_name="team a/api")
+    assert pusher._url == "http://c/v1/services/team%20a%2Fapi/openapi"

@@ -87,6 +87,17 @@ function envBool(name: string): boolean | undefined {
   return value === undefined ? undefined : ["1", "true", "yes", "on"].includes(value.toLowerCase());
 }
 
+/** The collector's per-request limit. */
+const MAX_BATCH_SIZE = 1000;
+const MIN_FLUSH_INTERVAL_MS = 100;
+
+// Out-of-range values would quietly break shipping: a batch above the
+// collector's limit is rejected whole, a batch size below 1 makes the flush
+// loop forever, and a 0 ms interval is a busy timer.
+function clampInt(value: number, min: number, max = Infinity): number {
+  return Math.min(Math.max(Math.floor(value), min), max);
+}
+
 export function resolveConfig(options: ReqlyOptions = {}): ResolvedConfig {
   const release = options.release ?? RELEASE_ENV_VARS.map(env).find((v) => v !== undefined);
   const sampleRate = options.sampleRate ?? envNumber("REQLY_SAMPLE_RATE") ?? 1;
@@ -99,12 +110,14 @@ export function resolveConfig(options: ReqlyOptions = {}): ResolvedConfig {
     sampleRate: Math.min(1, Math.max(0, sampleRate)),
     // REQLY_FLUSH_INTERVAL_SECONDS is the Python SDK's name; accepted too, so
     // one environment configures both SDKs.
-    flushIntervalMs:
+    flushIntervalMs: Math.max(
       options.flushIntervalMs ??
-      envNumber("REQLY_FLUSH_INTERVAL_MS") ??
-      (envNumber("REQLY_FLUSH_INTERVAL_SECONDS") !== undefined ? envNumber("REQLY_FLUSH_INTERVAL_SECONDS")! * 1000 : 5000),
-    maxBatchSize: options.maxBatchSize ?? envNumber("REQLY_MAX_BATCH_SIZE") ?? 200,
-    maxQueueSize: options.maxQueueSize ?? envNumber("REQLY_MAX_QUEUE_SIZE") ?? 2000,
+        envNumber("REQLY_FLUSH_INTERVAL_MS") ??
+        (envNumber("REQLY_FLUSH_INTERVAL_SECONDS") !== undefined ? envNumber("REQLY_FLUSH_INTERVAL_SECONDS")! * 1000 : 5000),
+      MIN_FLUSH_INTERVAL_MS,
+    ),
+    maxBatchSize: clampInt(options.maxBatchSize ?? envNumber("REQLY_MAX_BATCH_SIZE") ?? 200, 1, MAX_BATCH_SIZE),
+    maxQueueSize: clampInt(options.maxQueueSize ?? envNumber("REQLY_MAX_QUEUE_SIZE") ?? 2000, 1),
     ignoreRoutes: new Set(
       options.ignoreRoutes ??
         (env("REQLY_IGNORE_ROUTES") ?? "/health,/metrics").split(",").map((r) => r.trim()).filter(Boolean),

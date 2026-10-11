@@ -56,6 +56,8 @@ _RELEASE_ENV_VARS = (
     "SOURCE_VERSION",  # Heroku buildpacks
     "K_REVISION",  # Cloud Run / Knative revision name
 )
+MAX_BATCH_SIZE = 1000  # the collector's per-request limit
+MIN_FLUSH_INTERVAL_SECONDS = 0.1
 _MAX_RELEASE_LEN = 128
 _MAX_ENVIRONMENT_LEN = 32
 
@@ -93,6 +95,15 @@ class Config:
     consumer_salt: str | None = None
     hash_consumer: bool = True
     sdk_version: str = field(default_factory=_get_sdk_version)
+
+    def __post_init__(self) -> None:
+        # Out-of-range values would quietly break shipping: a batch above the
+        # collector's 1,000-event limit is rejected whole, an empty batch
+        # size never drains the queue, and a zero interval spins the flush
+        # thread at 100% CPU.
+        self.max_batch_size = min(max(int(self.max_batch_size), 1), MAX_BATCH_SIZE)
+        self.max_queue_size = max(int(self.max_queue_size), 1)
+        self.flush_interval_seconds = max(float(self.flush_interval_seconds), MIN_FLUSH_INTERVAL_SECONDS)
 
     @classmethod
     def resolve(

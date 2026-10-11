@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from typing import Callable, Optional
@@ -9,6 +10,8 @@ from ..core.client import ReqlyClient
 from ..core.request_context import LazyHeaders, RequestInfo, begin_request, end_request
 
 logger = logging.getLogger("reqly")
+
+CLIENT_CLOSED_REQUEST = 499
 
 RouteResolver = Callable[[dict], Optional[str]]
 
@@ -81,6 +84,7 @@ class ReqlyASGIMiddleware:
         entry_root_path = scope.get("root_path") or ""
         start = time.perf_counter()
         status_code = 500
+        response_started = False
         error = False
         error_type = None
         # Counted from the actual ASGI messages rather than Content-Length,
@@ -96,9 +100,10 @@ class ReqlyASGIMiddleware:
             return message
 
         async def send_wrapper(message):
-            nonlocal status_code, response_bytes
+            nonlocal status_code, response_bytes, response_started
             if message["type"] == "http.response.start":
                 status_code = message["status"]
+                response_started = True
             elif message["type"] == "http.response.body":
                 response_bytes += len(message.get("body", b""))
             await send(message)
@@ -106,6 +111,13 @@ class ReqlyASGIMiddleware:
         usage_token = begin_request()
         try:
             await self.app(scope, receive_wrapper, send_wrapper)
+        except asyncio.CancelledError:
+            # The client went away (or the server is shutting down) before
+            # the app answered: 499 Client Closed Request, as nginx logs it,
+            # not a 500 -- nothing failed on the app's side.
+            if not response_started:
+                status_code = CLIENT_CLOSED_REQUEST
+            raise
         except Exception as exc:
             error = True
             error_type = type(exc).__name__
