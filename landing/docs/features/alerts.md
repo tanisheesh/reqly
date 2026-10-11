@@ -101,5 +101,3 @@ curl -X POST "http://localhost:8000/v1/insights/generate?service_name=checkout-a
 ```
 
 On-demand generation is limited to 5 per minute. A report generated in the last 10 minutes is returned as is, so the button can't run up LLM cost.
-
-The weekly job can also run as an AWS Lambda ([`infra/sam`](https://github.com/tanisheesh/reqly/tree/main/infra/sam)). Set `INSIGHTS_SCHEDULER_ENABLED=false` on the collector then, so it doesn't run twice. The Lambda's report has the anomalies but not the API surface line.

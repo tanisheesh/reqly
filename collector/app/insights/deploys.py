@@ -6,8 +6,7 @@ the anomaly, i.e. after at least part of the baseline), and how did the
 route behave on it compared with the release before it?
 
 Deterministic and LLM-free; the LLM only gets the resulting numbers. Pure
-module (asyncpg only, no app imports) so the SAM Lambda vendors it as-is --
-see infra/sam/sync_insights.py.
+module (asyncpg only, no app imports).
 
 Reads raw request_events, so it covers the raw retention window (14 days),
 which comfortably includes the 7-day "recent" window anomalies come from.

@@ -14,6 +14,11 @@ Python SDK 0.5.6
 - Python SDK: `push_openapi` takes the spec (a dict or a function returning it), so Flask, Django
   and generic WSGI/ASGI apps can upload it for API drift, as the Node SDK already could
 
+### 💀 Removed
+- The optional AWS Lambda for the weekly report (`infra/sam`) and the collector's unused Lambda
+  adapter (`mangum`). The Lambda had fallen behind the collector's report (no affected consumers,
+  no API drift); the collector runs the weekly report itself. The EC2 database setup stays
+
 ### ♻️ Changed
 - Python SDK: `capture_request_body`, which never did anything, logs that it is ignored and will be removed
 

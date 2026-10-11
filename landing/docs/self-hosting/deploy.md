@@ -81,10 +81,6 @@ Check it with `GET /v1/health`, which returns `{"status": "ok"}`.
 
 Add the dashboard's URL to the collector's `CORS_ORIGINS`.
 
-## Optional: weekly report on AWS Lambda
-
-The collector runs the weekly report itself. To run it as a Lambda instead (EventBridge schedule, S3 archive), deploy [`infra/sam`](https://github.com/tanisheesh/reqly/tree/main/infra/sam) with `sam build && sam deploy --guided`, then set `INSIGHTS_SCHEDULER_ENABLED=false` on the collector.
-
 ## Verify
 
 - [ ] `GET /v1/health` returns 200
