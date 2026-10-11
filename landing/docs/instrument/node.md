@@ -137,9 +137,9 @@ Options passed to `reqlyExpress()` / `reqlyFastify()` / `reqlyHono()` (or to a s
 | `release` | `REQLY_RELEASE`, then `GITHUB_SHA`, `CI_COMMIT_SHA`, `RENDER_GIT_COMMIT`, `VERCEL_GIT_COMMIT_SHA`, … | auto-detected |
 | `environment` | `REQLY_ENVIRONMENT` | none |
 | `sampleRate` | `REQLY_SAMPLE_RATE` | `1` |
-| `flushIntervalMs` | `REQLY_FLUSH_INTERVAL_MS` (or `REQLY_FLUSH_INTERVAL_SECONDS`) | `5000`; a full batch is sent at once |
-| `maxBatchSize` | `REQLY_MAX_BATCH_SIZE` | `200` |
-| `maxQueueSize` | `REQLY_MAX_QUEUE_SIZE` | `2000` |
+| `flushIntervalMs` | `REQLY_FLUSH_INTERVAL_MS` (or `REQLY_FLUSH_INTERVAL_SECONDS`) | `5000` (at least `100`); a full batch is sent at once |
+| `maxBatchSize` | `REQLY_MAX_BATCH_SIZE` | `200` (kept within 1–1,000, the collector's limit) |
+| `maxQueueSize` | `REQLY_MAX_QUEUE_SIZE` | `2000` (at least `1`) |
 | `ignoreRoutes` | `REQLY_IGNORE_ROUTES` (comma-separated) | `/health,/metrics` |
 | `consumerHeader` | `REQLY_CONSUMER_HEADER` | none |
 | `consumer` | — | none: `(info) => string | undefined` |
@@ -158,12 +158,15 @@ process.on("SIGTERM", async () => {
 });
 ```
 
+`shutdown()` is bounded so a collector outage can't hold up a deploy: it makes one attempt per batch, stops at the first failure and returns within 5 seconds. Events it couldn't send are counted in `client.stats.dropped`.
+
 ## Guarantees
 
 - **Small overhead:** about 6 µs per request on Hono, 10 µs on Fastify and 27 µs on Express ([benchmark](../reference/benchmarks.md)).
 - **Fail-open:** nothing the SDK does can throw into your request path. An internal error disables instrumentation and logs once.
 - **Non-blocking:** events are queued in memory and sent in batches by a timer that never keeps the process alive. The queue is bounded, and the oldest events are dropped first.
 - **Retries:** 408, 429, 5xx and network errors are retried with backoff. Other 4xx responses drop the batch.
+- **Abandoned requests:** a request the client gives up on before the response finishes is recorded as `499` (client closed request), not as an error.
 
 ## Runtimes
 

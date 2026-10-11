@@ -153,6 +153,7 @@ or before `process.exit()`, `await reqly.client.shutdown()` first.
 - 🧵 **Off the request path:** events are batched in memory and sent by a timer that never keeps your process alive
 - 📦 **Bounded:** a fixed-size queue (oldest dropped first) and route templates only
 - 🔁 **Safe retries** on 408, 429, 5xx and network errors, deduplicated by the collector
+- ⏱️ **Bounded exit:** `shutdown()` returns within 5 s, so a collector outage never holds up a deploy
 - 📏 **Streamed responses measured:** server-sent events and LLM token streams get their real size (Express, Fastify, Koa, NestJS, node:http)
 
 ## Compatibility

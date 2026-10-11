@@ -129,6 +129,7 @@ Every option, explained: [Python SDK docs](https://reqly.tanisheesh.in/docs/inst
 - 🧵 **Off the request path:** a background thread ships batches with strict timeouts, so a slow collector never blocks a request
 - 📦 **Bounded:** a fixed-size queue (oldest dropped first) and route templates only
 - 🔁 **Safe retries** on 408, 429 and 5xx, deduplicated by the collector
+- ⏱️ **Bounded exit:** queued events are sent on shutdown in at most 5 s, so a collector outage never holds up a deploy
 - 🍴 **Pre-fork servers** (gunicorn `--preload`, uWSGI) restart the shipper in each worker
 
 ## Compatibility

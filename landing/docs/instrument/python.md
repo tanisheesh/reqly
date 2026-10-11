@@ -138,9 +138,9 @@ Every option can be passed to `instrument()` or set as an environment variable. 
 | `release` | `REQLY_RELEASE`, then CI variables | auto-detected, else `None` |
 | `environment` | `REQLY_ENVIRONMENT` | `None` |
 | `sample_rate` | `REQLY_SAMPLE_RATE` | `1.0` |
-| `flush_interval_seconds` | `REQLY_FLUSH_INTERVAL_SECONDS` (or `REQLY_FLUSH_INTERVAL_MS`) | `5.0`; a full batch is sent at once |
-| `max_batch_size` | `REQLY_MAX_BATCH_SIZE` | `200` |
-| `max_queue_size` | `REQLY_MAX_QUEUE_SIZE` | `2000` |
+| `flush_interval_seconds` | `REQLY_FLUSH_INTERVAL_SECONDS` (or `REQLY_FLUSH_INTERVAL_MS`) | `5.0` (at least `0.1`); a full batch is sent at once |
+| `max_batch_size` | `REQLY_MAX_BATCH_SIZE` | `200` (kept within 1–1,000, the collector's limit) |
+| `max_queue_size` | `REQLY_MAX_QUEUE_SIZE` | `2000` (at least `1`) |
 | `ignore_routes` | `REQLY_IGNORE_ROUTES` (comma-separated) | `/health,/metrics` |
 | `consumer_header` | `REQLY_CONSUMER_HEADER` | `None`, e.g. `X-API-Key` |
 | `consumer` | — | `None`: `callable(RequestInfo) -> str | None` |
@@ -158,6 +158,8 @@ With `sample_rate` below 1.0, request counts in the dashboard are the sampled vo
 - **Bounded cardinality:** route templates only. Unmatched paths (404s, scanners) collapse into one `__unmatched__` bucket.
 - **Bounded memory:** a fixed-size queue. Under backpressure the oldest events are dropped and counted.
 - **Safe retries:** batches are retried with exponential backoff on `408`, `429` and `5xx`. Other `4xx` responses are dropped. Every event carries an `event_id` the collector deduplicates on, so a retry never double-counts.
+- **Bounded exit:** queued events are sent when the process exits, with one attempt per batch and at most 5 seconds in total, so a collector outage never holds up a deploy or a worker restart. What couldn't be sent is counted as dropped.
+- **Abandoned requests:** a request cancelled before the app answered (the client disconnected, or the server is shutting down) is recorded as `499` (client closed request), not as a `500`.
 - **Pre-fork servers:** under gunicorn `--preload` (or uWSGI without lazy-apps), each worker restarts its own flush thread and connection pool.
 
 ## Compatibility
