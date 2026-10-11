@@ -47,6 +47,9 @@ async def latest_insight(service_name: str):
 @limiter.limit(_INSIGHTS_RATE_LIMIT)
 async def generate_insight(request: Request, service_name: str):
     """Demo-convenience endpoint: bypasses the weekly scheduler."""
+    if service_name not in await queries.list_services(get_pool()):
+        # the read key is public: no report rows for made-up service names
+        raise HTTPException(status_code=404, detail="unknown service")
     now = datetime.now(timezone.utc)
     latest = await queries.get_latest_insight_report(get_pool(), service_name)
     if (
