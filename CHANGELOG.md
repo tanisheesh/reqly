@@ -8,7 +8,11 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 
 ## [Unreleased]
 
-Collector 0.12.1 · Python SDK 0.5.5 · reqly-node 0.3.2
+---
+
+## [0.12.1] — 2026-10-11
+
+Collector 0.12.1 · Python SDK 0.5.5 · reqly-node 0.3.2 · Helm chart 0.12.1
 
 ### 🔒 Security
 - A `backfill` batch rebuilt every aggregate hour from its oldest event up to now, for every
@@ -206,7 +210,8 @@ Python SDK 0.1.5
 
 ---
 
-[Unreleased]: https://github.com/tanisheesh/reqly/compare/collector-v0.12.0...HEAD
+[Unreleased]: https://github.com/tanisheesh/reqly/compare/collector-v0.12.1...HEAD
+[0.12.1]: https://github.com/tanisheesh/reqly/tree/collector-v0.12.1
 [0.12.0]: https://github.com/tanisheesh/reqly/tree/collector-v0.12.0
 [0.11.0]: https://github.com/tanisheesh/reqly/tree/collector-v0.11.0
 [0.10.0]: https://github.com/tanisheesh/reqly/commit/0d3fc17
