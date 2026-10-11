@@ -84,9 +84,10 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
+          cache-dependency-path: collector/pyproject.toml
       - name: Install dependencies
         working-directory: collector
-        run: pip install -r requirements.txt pytest
+        run: pip install . pytest
       - name: Run tests
         working-directory: collector
         run: pytest tests -v
