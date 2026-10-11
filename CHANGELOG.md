@@ -8,7 +8,7 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 
 ## [Unreleased]
 
-Collector 0.12.1 · Python SDK 0.5.4 · reqly-node 0.3.1
+Collector 0.12.1 · Python SDK 0.5.5 · reqly-node 0.3.2
 
 ### 🔒 Security
 - A `backfill` batch rebuilt every aggregate hour from its oldest event up to now, for every
@@ -19,6 +19,14 @@ Collector 0.12.1 · Python SDK 0.5.4 · reqly-node 0.3.1
   ingested values, so they can't carry Slack mentions or links; Discord alerts can't ping
   `@everyone`
 - `POST /v1/insights/generate` returns 404 for a service with no data instead of storing a report
+
+### 🐛 Fixed
+- SDKs: with the collector down or not answering, app shutdown could wait 20-90+ s; the flush at
+  exit now takes at most 5 s
+- SDKs: a request the client abandoned is recorded as 499 instead of a 500 error (Python) or the
+  handler's 200 (Node)
+- SDKs: out-of-range batch size, queue size and flush interval are clamped (a Node batch size
+  of 0 looped forever; a Python interval of 0 spun a CPU core)
 
 ### ♻️ Changed
 - **License split:** the SDKs (`reqly`, `reqly-node`) are now **MIT**, so they can go into any
