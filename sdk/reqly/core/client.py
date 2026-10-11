@@ -60,6 +60,11 @@ class ReqlyClient:
                 exc_info=True,
             )
             self._disabled = True
+        if config.capture_request_body:
+            logger.warning(
+                "reqly: capture_request_body is ignored and will be removed: Reqly never "
+                "records request bodies"
+            )
 
     def record_request(
         self,
@@ -118,6 +123,17 @@ class ReqlyClient:
             # A failing consumer= callable costs the consumer id, not the event.
             logger.warning("reqly: consumer lookup failed", exc_info=True)
             return None
+
+    def spec_source(self):
+        """A callable returning the spec when push_openapi was given one (a
+        dict, or a function returning it), else None (True: the framework's
+        own spec, or nothing)."""
+        spec = self.config.push_openapi
+        if callable(spec):
+            return spec
+        if isinstance(spec, dict):
+            return lambda: spec
+        return None
 
     def enable_openapi_push(self, spec_factory) -> None:
         """Upload ``spec_factory()`` (the app's OpenAPI document) to the

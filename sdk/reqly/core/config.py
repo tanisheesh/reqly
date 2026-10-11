@@ -89,7 +89,7 @@ class Config:
     capture_request_body: bool = False
     release: str | None = None
     environment: str | None = None
-    push_openapi: bool = False
+    push_openapi: Any = False  # True (auto), a spec dict, or a callable returning one
     consumer_header: str | None = None
     consumer: Any = None  # callable(RequestInfo) -> str | None
     consumer_salt: str | None = None
@@ -119,7 +119,7 @@ class Config:
         capture_request_body: bool | None,
         release: str | None = None,
         environment: str | None = None,
-        push_openapi: bool | None = None,
+        push_openapi: Any = None,
         consumer_header: str | None = None,
         consumer: Any = None,
         consumer_salt: str | None = None,

@@ -2,6 +2,17 @@
 
 All notable changes to the `reqly` Python SDK.
 
+## 0.5.6 — 2026-10-11
+
+### Added
+- `push_openapi` takes the spec itself, as a dict or a function returning one, so Flask, Django
+  (`REQLY = {"push_openapi": ...}`) and any `instrument_wsgi` / `instrument_asgi` app can upload
+  it, like the Node SDK's `pushOpenapi`. `True` still uses FastAPI's and Litestar's own spec.
+
+### Deprecated
+- `capture_request_body` never did anything; it now logs that it is ignored, from every entry
+  point, and will be removed. Reqly doesn't record request bodies.
+
 ## 0.5.5 — 2026-10-11
 
 ### Fixed

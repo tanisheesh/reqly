@@ -44,6 +44,7 @@ _CONFIG_KEYS = (
     "service_name", "collector_url", "api_key", "sample_rate", "flush_interval_seconds",
     "max_batch_size", "max_queue_size", "ignore_routes", "capture_request_body",
     "release", "environment", "consumer_header", "consumer", "consumer_salt", "hash_consumer",
+    "push_openapi",
 )
 
 # <int:pk>, <slug:slug>, <pk>  ->  {pk}
@@ -81,6 +82,9 @@ def _get_client() -> ReqlyClient | None:
                 logger.warning("reqly: ignoring unknown REQLY settings %s", sorted(unknown))
             config = Config.resolve(**{key: options.get(key) for key in _CONFIG_KEYS})
             _client = ReqlyClient(config)
+            from .. import enable_spec_push
+
+            enable_spec_push(_client, "Django")
     return _client
 
 
