@@ -51,7 +51,7 @@ batch that actually landed never double-counts.
 | `sdk_version` | string | no | — | Informational. |
 | `release` | string | no | ≤ 128 chars | **v2.** Default for events that don't set their own. Git SHA or version. |
 | `environment` | string | no | ≤ 32 chars | **v2.** Default for events that don't set their own (`prod`, `staging`, …). |
-| `backfill` | bool | no | default `false` | Historical import: allows events older than 13 days. Each hour you send is rebuilt in the aggregates from exactly what you send, so only send complete hours. |
+| `backfill` | bool | no | default `false` | Historical import: allows events older than 13 days. Each hour you send is rebuilt in the aggregates from exactly what you send, for every service, so only send complete hours. Needs the collector's `REQLY_INGEST_KEY`; a project key gets `403`. |
 | `events` | array | yes | 1–1,000 | Each event is validated independently. |
 
 Unknown top-level fields are ignored, so newer SDKs can talk to older collectors.
@@ -126,6 +126,8 @@ meet all of them.
 
 ## Changelog
 
+- **collector 0.12.1:** a `backfill` batch needs the collector's `REQLY_INGEST_KEY`, and rebuilds
+  only the hours it contains (it used to rebuild every hour from its oldest event to now).
 - **collector 0.8.1:** events older than 13 days (unless the batch sets `backfill`) or more than
   15 minutes in the future are rejected, with `reasons` in the response. OTLP spans follow the
   same rule (reported as `partialSuccess.rejectedSpans`).

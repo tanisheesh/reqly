@@ -16,6 +16,10 @@ history with that single event. So events older than MAX_EVENT_AGE are
 rejected at ingest unless the batch is an explicit backfill (the sender
 vouches for complete data, e.g. the load generator's history), and the
 refresh never reaches further back than that for anything else.
+
+A backfill rebuilds exactly the hours it contains, not the range from its
+oldest event to now: between those hours lies other history, of every
+service, whose raw rows are gone.
 """
 
 from __future__ import annotations
@@ -91,6 +95,36 @@ def refresh_windows(
     return windows
 
 
+def hour_runs(hours) -> list[tuple[datetime, datetime]]:
+    """Hour starts -> [(start, end)] runs of consecutive hours."""
+    runs: list[list[datetime]] = []
+    for hour in sorted(set(hours)):
+        if runs and runs[-1][1] == hour:
+            runs[-1][1] = hour + timedelta(hours=1)
+        else:
+            runs.append([hour, hour + timedelta(hours=1)])
+    return [(start, end) for start, end in runs]
+
+
+def backfill_windows(
+    hours,
+    now: datetime,
+    aggregates: tuple[tuple[str, timedelta], ...] = AGGREGATES,
+) -> list[tuple[str, datetime, datetime]]:
+    """(view, start, end) refresh calls covering exactly the given hours
+    (cut at each view's end offset), in REFRESH_SLICE-sized pieces."""
+    windows = []
+    for run_start, run_end in hour_runs(hours):
+        for view, end_offset in aggregates:
+            view_end = min(run_end, now - end_offset)
+            slice_start = run_start
+            while slice_start < view_end:
+                slice_end = min(slice_start + REFRESH_SLICE, view_end)
+                windows.append((view, slice_start, slice_end))
+                slice_start = slice_end
+    return windows
+
+
 class LateDataTracker:
     """Tracks the oldest late event seen since the last refresh. All access
     happens on the event loop thread, so no lock is needed: note() has no
@@ -98,10 +132,18 @@ class LateDataTracker:
 
     def __init__(self) -> None:
         self._oldest: datetime | None = None
+        self._backfill_hours: set[datetime] = set()
 
     @property
     def pending_since(self) -> datetime | None:
         return self._oldest
+
+    def note_backfill(self, event_times, now: datetime | None = None) -> None:
+        """The hours of a backfill batch, rebuilt exactly (see module doc)."""
+        now = now or datetime.now(timezone.utc)
+        self._backfill_hours.update(
+            _floor_to_hour(t) for t in event_times if t < now - LATE_THRESHOLD
+        )
 
     def note(self, oldest_event_time: datetime, now: datetime | None = None, backfill: bool = False) -> None:
         now = now or datetime.now(timezone.utc)
@@ -117,17 +159,20 @@ class LateDataTracker:
         """Refreshes every aggregate over the pending range. Returns the
         number of refresh calls made. On failure the range is put back so
         the next tick retries it."""
-        oldest = self._oldest
-        if oldest is None:
+        oldest, backfill_hours = self._oldest, self._backfill_hours
+        if oldest is None and not backfill_hours:
             return 0
-        self._oldest = None
+        self._oldest, self._backfill_hours = None, set()
         now = now or datetime.now(timezone.utc)
 
         started = asyncio.get_running_loop().time()
         windows: list = []
         try:
             async with pool.acquire() as conn:
-                windows = refresh_windows(oldest, now, await existing_aggregates(conn))
+                aggregates = await existing_aggregates(conn)
+                if oldest is not None:
+                    windows += refresh_windows(oldest, now, aggregates)
+                windows += backfill_windows(backfill_hours, now, aggregates)
                 for view, start, end in windows:
                     # CALL refresh_continuous_aggregate can't run inside a
                     # transaction block; a bare execute() is autocommit.
@@ -138,13 +183,17 @@ class LateDataTracker:
                         end,
                     )
         except Exception:
-            self.note(oldest, now=now, backfill=True)  # already vetted when first noted
+            # put both back for the next tick (already vetted when first noted)
+            if oldest is not None:
+                self.note(oldest, now=now, backfill=True)
+            self._backfill_hours |= backfill_hours
             raise
 
         logger.info(
             "Reqly collector: refreshed aggregates for late data since %s "
-            "(%d calls, %.1fs)",
-            oldest.isoformat(),
+            "and %d backfilled hours (%d calls, %.1fs)",
+            oldest.isoformat() if oldest else "-",
+            len(backfill_hours),
             len(windows),
             asyncio.get_running_loop().time() - started,
         )

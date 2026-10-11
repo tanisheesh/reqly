@@ -8,7 +8,17 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 
 ## [Unreleased]
 
-Python SDK 0.5.4 · reqly-node 0.3.1
+Collector 0.12.1 · Python SDK 0.5.4 · reqly-node 0.3.1
+
+### 🔒 Security
+- A `backfill` batch rebuilt every aggregate hour from its oldest event up to now, for every
+  service. Hours older than the 14-day raw retention were rebuilt from nothing, so one old
+  event could erase weeks of history, and any project key could do it to other projects. A
+  backfill now rebuilds only the hours it contains and needs the collector's `REQLY_INGEST_KEY`
+- Alert messages neutralize `<`, `>` and backticks in service names, routes, hosts and other
+  ingested values, so they can't carry Slack mentions or links; Discord alerts can't ping
+  `@everyone`
+- `POST /v1/insights/generate` returns 404 for a service with no data instead of storing a report
 
 ### ♻️ Changed
 - **License split:** the SDKs (`reqly`, `reqly-node`) are now **MIT**, so they can go into any

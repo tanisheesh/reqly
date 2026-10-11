@@ -30,6 +30,23 @@ class Channels:
         return bool(self.slack_webhook_url or self.discord_webhook_url or self.webhook_url)
 
 
+# Characters a sender could use to break out of `code` spans or to write
+# Slack control sequences (<!channel>, <https://...|label>) into a message.
+_UNSAFE = str.maketrans({"`": "'", "<": "‹", ">": "›"})
+
+
+def _clean(value):
+    """Service names, routes, releases, hosts, consumer ids and models come
+    from whoever holds an ingest key: neutralized before they reach chat."""
+    if isinstance(value, str):
+        return value.translate(_UNSAFE)
+    if isinstance(value, dict):
+        return {k: _clean(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_clean(v) for v in value]
+    return value
+
+
 def _ms(value) -> str:
     return "—" if value is None else f"{value:.0f}ms"
 
@@ -92,6 +109,7 @@ def _format_llm_cost(event: str, service_name: str, route: str, details: dict) -
 def format_text(event: str, service_name: str, route: str, details: dict, dashboard_url: str | None = None) -> str:
     """One plain-text message used for Slack and Discord (both render the
     *bold* / `code` subset the same way closely enough)."""
+    service_name, route, details = _clean(service_name), _clean(route), _clean(details)
     if details.get("kind") in ("slo", "llm_cost"):
         if details["kind"] == "slo":
             text = _format_slo(event, service_name, details)
@@ -142,7 +160,10 @@ def build_payloads(channels: Channels, event: str, alert: dict) -> list[tuple[st
         payloads.append((channels.slack_webhook_url, {"text": text}))
     if channels.discord_webhook_url:
         # Discord has no <url|label> links; drop that line.
-        payloads.append((channels.discord_webhook_url, {"content": text.split("\n<")[0]}))
+        payloads.append((channels.discord_webhook_url, {
+            "content": text.split("\n<")[0],
+            "allowed_mentions": {"parse": []},  # no @everyone / role pings from data
+        }))
     if channels.webhook_url:
         payloads.append((channels.webhook_url, {"event": f"alert.{event}", "text": text, "alert": alert}))
     return payloads

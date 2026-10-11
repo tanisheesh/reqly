@@ -22,11 +22,16 @@ def api(monkeypatch):
 
     monkeypatch.setattr(insights_router, "get_pool", lambda: None)
     monkeypatch.setattr(insights_router.queries, "get_latest_insight_report", latest)
+    monkeypatch.setattr(insights_router.queries, "list_services", lambda pool: _services())
     monkeypatch.setattr(insights_router, "run_insights_for_service", generate)
     insights_router.limiter.reset()
     client = TestClient(app)
     client.state = state
     return client
+
+
+async def _services():
+    return ["svc"]
 
 
 def _report(generated_at, week_start=None):
@@ -55,3 +60,9 @@ def test_older_or_last_weeks_report_is_regenerated(api):
     api.state["latest"] = None
     assert _generate(api).json()["report_text"] == "fresh"
     assert api.state["generated"] == 3
+
+
+def test_unknown_service_is_404_and_nothing_is_generated(api):
+    r = api.post("/v1/insights/generate?service_name=made-up", headers={"X-Reqly-Key": settings.read_key})
+    assert r.status_code == 404
+    assert api.state["generated"] == 0

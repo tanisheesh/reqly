@@ -84,6 +84,9 @@ def test_projects_keys_and_scoping():
             # another project's service is off limits
             r = client.post("/v1/ingest", headers=_key(beta_rw["key"]), json=_batch(alpha_svc))
             assert r.status_code == 403 and "another project" in r.json()["detail"]
+            # a backfill rebuilds aggregates every project shares: env key only
+            r = client.post("/v1/ingest", headers=_key(alpha_rw["key"]), json={**_batch(alpha_svc), "backfill": True})
+            assert r.status_code == 403 and "REQLY_INGEST_KEY" in r.json()["detail"]
             # OTLP: spans of a foreign service are rejected, the rest accepted
             r = client.post("/otlp/v1/traces", headers={**_key(beta_rw["key"]), "Content-Type": "application/json"},
                             content=_otlp(alpha_svc))
