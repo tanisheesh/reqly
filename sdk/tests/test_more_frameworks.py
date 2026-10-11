@@ -268,3 +268,38 @@ def test_normalize_django_route(route, expected):
     from reqly.integrations.django import normalize_django_route
 
     assert normalize_django_route(route) == expected
+
+
+def test_asgi_request_cancelled_before_responding_is_499_not_an_error():
+    import asyncio
+
+    from reqly.core.client import ReqlyClient
+    from reqly.core.config import Config
+    from reqly.integrations.fastapi import ReqlyASGIMiddleware
+
+    recorded = []
+
+    class Client(ReqlyClient):
+        def record_request(self, **kw):
+            recorded.append(kw)
+
+    async def slow_app(scope, receive, send):
+        await asyncio.sleep(60)
+
+    client = Client(Config(service_name="t", collector_url="http://127.0.0.1:9", flush_interval_seconds=999))
+    middleware = ReqlyASGIMiddleware(slow_app, client=client)
+
+    async def run():
+        task = asyncio.create_task(middleware({"type": "http", "method": "GET", "path": "/x"}, None, None))
+        await asyncio.sleep(0.01)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    try:
+        asyncio.run(run())
+    finally:
+        client.shutdown()
+    assert recorded[0]["status_code"] == 499 and recorded[0]["error"] is False

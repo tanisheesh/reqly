@@ -246,3 +246,22 @@ test("hono: app.all routes are recorded; 404s behind a wildcard middleware are u
   ]);
   await middleware.client.shutdown();
 });
+
+test("express: a request the client abandons is 499, not the handler's 200 or an error", async () => {
+  collector.batches.length = 0;
+  const reqly = reqlyExpress(options(collector.url));
+  const app = express();
+  app.use(reqly);
+  app.get("/slow", () => {}); // never answers
+  const { base, close } = await listen(app);
+  const ac = new AbortController();
+  const pending = fetch(`${base}/slow`, { signal: ac.signal }).catch(() => {});
+  await new Promise((r) => setTimeout(r, 50));
+  ac.abort();
+  await pending;
+  await new Promise((r) => setTimeout(r, 50));
+  await close();
+  await reqly.client.flush();
+  assert.deepEqual(summary(collector.events()), [["GET", "/slow", 499, false]]);
+  await reqly.client.shutdown();
+});
