@@ -75,19 +75,6 @@
     :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 
     /* ── nav ────────────────────────────────────────────────── */
-    .nav {
-      position: fixed; top: 0; inset-inline: 0; z-index: 100;
-      height: var(--nav-h);
-      border-bottom: 1px solid var(--border);
-      background: color-mix(in srgb, var(--bg) 85%, transparent);
-      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-      display: flex; align-items: center;
-    }
-    .nav-inner {
-      width: 100%; max-width: var(--max-w); margin: 0 auto;
-      padding: 0 var(--gutter);
-      display: flex; align-items: center; gap: 0.5rem;
-    }
     .nav-logo {
       display: flex; align-items: center; gap: 8px;
       font-weight: 700; font-size: 1.05rem; color: var(--text);
@@ -111,14 +98,6 @@
       transition: border-color .15s, color .15s;
     }
     .nav-gh:hover { border-color: var(--border-hi); color: var(--text); }
-    .nav-pip {
-      padding: 0.375rem 0.75rem; white-space: nowrap;
-      font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.01em;
-      color: var(--accent); border: 1px solid var(--accent-mid);
-      border-radius: 6px; background: var(--accent-glow);
-      transition: background .15s;
-    }
-    .nav-pip:hover { background: var(--accent-mid); }
 
     /* ── layout utility ─────────────────────────────────────── */
     .container { width: 100%; max-width: var(--max-w); margin: 0 auto; padding: 0 var(--gutter); }
@@ -432,6 +411,200 @@
     .footer-copy a:hover { color: var(--text); }
     .footer-copy .heart { color: var(--red); }
 
+    /* ── liquid glass ───────────────────────────────────────────
+       Apple-style glass: translucent, blurred, saturated surfaces with a
+       bright rim, floating over soft colour light that runs down the page. */
+    :root {
+      --glass-bg:     rgba(16, 28, 46, .42);
+      --glass-bg-hi:  rgba(24, 40, 64, .55);
+      --glass-border: rgba(255, 255, 255, .10);
+      --glass-rim:    rgba(255, 255, 255, .16);
+      --glass-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 24px 48px -24px rgba(0,0,0,.65);
+      --glass-blur:   blur(22px) saturate(170%);
+      --radius-lg:    22px;
+      --nav-tint:     rgba(12, 22, 38, .62);
+      --nav-rim:      rgba(255, 255, 255, .16);
+      --nav-active:   rgba(255, 255, 255, .12);
+      --radius:       14px;
+      --aurora-a:     rgba(6, 182, 212, .38);
+      --aurora-b:     rgba(139, 92, 246, .36);
+      --aurora-c:     rgba(16, 217, 160, .24);
+      --aurora-d:     rgba(59, 130, 246, .32);
+    }
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]) {
+        --glass-bg:     rgba(255, 255, 255, .55);
+        --glass-bg-hi:  rgba(255, 255, 255, .75);
+        --glass-border: rgba(255, 255, 255, .75);
+        --glass-rim:    rgba(255, 255, 255, .95);
+        --glass-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 24px 48px -28px rgba(15,40,70,.35);
+        --nav-tint: rgba(255,255,255,.7); --nav-rim: rgba(255,255,255,.85); --nav-active: rgba(255,255,255,.9);
+        --aurora-a:     rgba(6, 182, 212, .28);
+        --aurora-b:     rgba(139, 92, 246, .22);
+        --aurora-c:     rgba(16, 217, 160, .20);
+        --aurora-d:     rgba(59, 130, 246, .22);
+      }
+    }
+    :root[data-theme="light"] {
+      --glass-bg: rgba(255,255,255,.55); --glass-bg-hi: rgba(255,255,255,.75);
+      --glass-border: rgba(255,255,255,.75); --glass-rim: rgba(255,255,255,.95);
+      --glass-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 24px 48px -28px rgba(15,40,70,.35);
+      --nav-tint: rgba(255,255,255,.7); --nav-rim: rgba(255,255,255,.85); --nav-active: rgba(255,255,255,.9);
+      --aurora-a: rgba(6,182,212,.28); --aurora-b: rgba(139,92,246,.22);
+      --aurora-c: rgba(16,217,160,.20); --aurora-d: rgba(59,130,246,.22);
+    }
+
+    body { overflow-x: clip; }
+
+    /* soft colour light behind everything: what the glass refracts */
+    /* main slides up under the floating nav, so the glass has colour behind it from the start */
+    main { position: relative; isolation: isolate; margin-top: calc(-1 * (var(--nav-h) + 12px)); }
+    @media (max-width: 480px) { main { margin-top: calc(-1 * (var(--nav-h) + 8px)); } }
+    .aurora { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+    .aurora i {
+      position: absolute; display: block; border-radius: 50%;
+      width: clamp(420px, 55vw, 860px); aspect-ratio: 1;
+      background: radial-gradient(closest-side, var(--c), transparent);
+    }
+    .aurora i:nth-child(1)  { --c: var(--aurora-a); top: -4%;  left: -16%; }
+    .aurora i:nth-child(2)  { --c: var(--aurora-b); top: 1%;   right: -18%; }
+    .aurora i:nth-child(3)  { --c: var(--aurora-d); top: 14%;  left: 34%; }
+    .aurora i:nth-child(4)  { --c: var(--aurora-c); top: 26%;  left: -22%; }
+    .aurora i:nth-child(5)  { --c: var(--aurora-b); top: 38%;  right: -20%; }
+    .aurora i:nth-child(6)  { --c: var(--aurora-a); top: 50%;  left: 18%; }
+    .aurora i:nth-child(7)  { --c: var(--aurora-d); top: 62%;  left: -18%; }
+    .aurora i:nth-child(8)  { --c: var(--aurora-c); top: 72%;  right: -16%; }
+    .aurora i:nth-child(9)  { --c: var(--aurora-b); top: 84%;  left: 26%; }
+
+    /* the floating nav pill: frosted, saturated glass with a bright rim and
+       a top glint; in Chromium the backdrop is also refracted through an SVG
+       displacement filter (#liquid-refract), elsewhere it stays frosted */
+    .nav-wrap {
+      position: sticky; top: 0; z-index: 100;
+      padding-top: 12px; height: calc(var(--nav-h) + 12px);
+      pointer-events: none;
+    }
+    .nav {
+      position: relative; isolation: isolate; pointer-events: auto;
+      width: min(calc(100% - 2 * var(--gutter)), 1040px); margin: 0 auto;
+      height: var(--nav-h); border-radius: 999px;
+      display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 0.75rem;
+      padding: 0 6px 0 1.125rem;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.02) 60%),
+        var(--nav-tint);
+      border: 1px solid var(--nav-rim);
+      -webkit-backdrop-filter: blur(20px) saturate(190%);
+      backdrop-filter: blur(20px) saturate(190%);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.30),
+        inset 0 -1px 0 rgba(255,255,255,.05),
+        0 16px 40px -18px rgba(0,0,0,.7);
+    }
+    html.refract .nav { backdrop-filter: url(#liquid-refract) blur(12px) saturate(190%); }
+    .nav::before { /* the glint along the top-left curve */
+      content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1;
+      background: radial-gradient(120% 140% at 12% -40%, rgba(255,255,255,.22), transparent 45%);
+    }
+    .nav-logo { margin-right: 0; justify-self: start; }
+    .nav-tabs {
+      justify-self: center; margin: 0; gap: 2px; padding: 4px;
+      border-radius: 999px; background: rgba(127,127,127,.10);
+      box-shadow: inset 0 1px 2px rgba(0,0,0,.25);
+    }
+    .nav-tab {
+      height: 32px; padding: 0 1rem; border: none; border-radius: 999px;
+      color: var(--text-2); transition: color .15s, background .15s;
+    }
+    .nav-tab:hover { color: var(--heading); }
+    .nav-tab.active {
+      color: var(--heading); background: var(--nav-active);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 2px 10px -3px rgba(0,0,0,.45);
+    }
+    .nav-right { justify-self: end; gap: 6px; }
+    .nav-gh {
+      width: 40px; height: 40px; padding: 0; justify-content: center; border-radius: 50%;
+      border: 1px solid var(--nav-rim); background: rgba(127,127,127,.08);
+    }
+    .nav-gh svg { width: 17px; height: 17px; }
+    .nav-cta {
+      display: inline-flex; align-items: center; height: 40px; padding: 0 1.1rem; border-radius: 999px;
+      font-size: 0.8125rem; font-weight: 600; white-space: nowrap; color: #061019;
+      background: linear-gradient(180deg, #ffffff, #d6e7f5);
+      box-shadow: inset 0 1px 0 #fff, 0 6px 18px -8px rgba(6,182,212,.7);
+      transition: transform .15s, box-shadow .15s;
+    }
+    .nav-cta:hover { transform: translateY(-1px); box-shadow: inset 0 1px 0 #fff, 0 10px 24px -8px rgba(6,182,212,.8); }
+    /* light theme: the white buttons would vanish on white glass */
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]) .nav-cta, :root:not([data-theme="dark"]) .btn-primary {
+        background: linear-gradient(180deg, #16314b, #0a1a2b); color: #fff;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 8px 20px -10px rgba(10,26,43,.7);
+      }
+    }
+    :root[data-theme="light"] .nav-cta, :root[data-theme="light"] .btn-primary {
+      background: linear-gradient(180deg, #16314b, #0a1a2b); color: #fff;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 8px 20px -10px rgba(10,26,43,.7);
+    }
+
+    .hero { padding-top: calc(var(--nav-h) + 12px + clamp(2.5rem, 7vw, 5rem)); }
+    .hero h1 em {
+      background: linear-gradient(100deg, var(--accent), #8b5cf6 55%, #3b82f6);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .hero-badge {
+      background: var(--glass-bg); border-color: var(--glass-rim);
+      backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+    }
+    .btn-primary, .btn-ghost { border-radius: 999px; padding: 0.625rem 1.35rem; }
+    .btn-primary {
+      background: linear-gradient(180deg, #ffffff, #dbe9f5); color: #061019;
+      box-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 10px 24px -10px rgba(6,182,212,.55);
+    }
+    .btn-ghost {
+      background: var(--glass-bg); border: 1px solid var(--glass-rim); color: var(--text);
+      backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+    }
+    .btn-ghost:hover { border-color: var(--accent-mid); background: var(--glass-bg-hi); }
+
+    /* glass surfaces */
+    .metrics-panel, .bento-card, .pipe-card, .bench-card, .ai-callout,
+    .tbl-wrap, .arch-terminal, .stats-strip, .code-tabs {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+      box-shadow: var(--glass-shadow);
+    }
+    .metrics-panel, .ai-callout, .arch-terminal { border-radius: var(--radius-lg); border-color: var(--glass-rim); }
+    .pipe-card, .bench-card, .tbl-wrap, .code-tabs { border-radius: var(--radius); }
+
+    .stats-strip { width: min(calc(100% - 2 * var(--gutter)), var(--max-w)); margin: 0 auto; border-radius: var(--radius-lg); }
+    .stat-item, .stat-item:last-child { border-color: var(--glass-border); }
+
+    .bento { gap: 0.875rem; border: none; }
+    .bento-card { border-radius: var(--radius-lg); transition: background .2s, transform .2s, border-color .2s; }
+    .bento-card:hover { background: var(--glass-bg-hi); border-color: var(--glass-rim); transform: translateY(-2px); }
+    .card-icon { border-radius: 12px; border-color: var(--glass-rim); background: var(--glass-bg-hi); }
+
+    .card-code, .ai-json { background: rgba(4, 9, 15, .82); }
+    .card-code { border-radius: 12px; border-color: var(--glass-border); }
+    .code-tabs .card-code { background: rgba(4, 9, 15, .82); }
+    .code-tabs-bar, .arch-bar, .tbl-wrap th { background: rgba(127,127,127,.06); }
+    .arch-terminal .arch-body { background: rgba(4, 9, 15, .82); }
+    .ai-callout { background: color-mix(in srgb, #8b5cf6 7%, var(--glass-bg)); }
+    .chat-q, .chat-a { border-radius: 18px 18px 6px 18px; }
+    .chat-a { border-radius: 18px 18px 18px 6px; }
+    .stack-table tbody tr:hover td { background: var(--glass-bg-hi); }
+    .section-sm { border-top: none; }
+    footer { border-top: 1px solid var(--glass-border); }
+
+    @media (max-width: 480px) {
+      .nav-wrap { padding-top: 8px; height: calc(var(--nav-h) + 8px); }
+      .nav { width: calc(100% - 16px); padding: 0 5px 0 0.75rem; }
+      .nav-cta { height: 36px; }
+      .nav-tab { height: 30px; }
+    }
+
     /* ── responsive ─────────────────────────────────────────── */
     @media (min-width: 1440px) {
       :root { --max-w: 1280px; }
@@ -452,15 +625,16 @@
     @media (max-width: 768px) {
       :root { --gutter: 1.25rem; }
       .nav-tabs { margin: 0 0.25rem; }
-      .nav-tab { padding: 0 0.625rem; }
-      .nav-gh span { display: none; }
+      .nav-tab { padding: 0 0.75rem; }
+      .nav-tab-demo { display: none; }
       .pipe-grid, .grid-2, .bench { grid-template-columns: minmax(0, 1fr); }
       .arch-body { padding: 1.125rem 1.25rem; font-size: 0.75rem; }
       .scroll-hint { display: block; }
       .footer-inner { flex-direction: column; align-items: flex-start; }
     }
     @media (max-width: 640px) {
-      .nav-pip { display: none; }
+      .nav { padding-left: 0.875rem; gap: 0.5rem; }
+      .nav-gh { display: none; }
       .bento { grid-template-columns: minmax(0, 1fr); }
       .bento-card.wide { grid-column: auto; }
       .bento-card.tall { grid-row: auto; }
@@ -482,7 +656,8 @@
     }
     @media (max-width: 360px) {
       .nav-logo span { display: none; }
-      .nav-tab { padding: 0 0.5rem; font-size: 0.8125rem; }
+      .nav-tab { padding: 0 0.6rem; font-size: 0.8125rem; }
+      .nav-cta { padding: 0 0.8rem; }
       .hero h1 { font-size: 1.9rem; }
     }
     @media (prefers-reduced-motion: reduce) {
@@ -494,8 +669,16 @@
 <body>
 
 <!-- ══ NAV ════════════════════════════════════════════════════ -->
-<nav class="nav">
-  <div class="nav-inner">
+<!-- SVG filter for the nav's refraction (Chromium applies it through backdrop-filter) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <filter id="liquid-refract" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.006 0.018" numOctaves="2" seed="11" result="noise"/>
+    <feGaussianBlur in="noise" stdDeviation="2.5" result="soft"/>
+    <feDisplacementMap in="SourceGraphic" in2="soft" scale="34" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</svg>
+<header class="nav-wrap">
+  <nav class="nav" aria-label="Main">
     <a class="nav-logo" href="/" aria-label="Reqly home">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l3-8 4 16 3-10 2 2h5"/></svg>
       <span>Reqly</span>
@@ -503,19 +686,20 @@
     <div class="nav-tabs">
       <a class="nav-tab active" href="/" aria-current="page">Product</a>
       <a class="nav-tab" href="/docs/">Docs</a>
+      <a class="nav-tab nav-tab-demo" href="https://reqly-eventflow-dashboard.onrender.com" target="_blank" rel="noopener">Live demo</a>
     </div>
     <div class="nav-right">
-      <a href="https://github.com/tanisheesh/reqly" target="_blank" rel="noopener" class="nav-gh" aria-label="GitHub">
+      <a href="https://github.com/tanisheesh/reqly" target="_blank" rel="noopener" class="nav-gh" aria-label="Reqly on GitHub">
         <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
-        <span>GitHub</span>
       </a>
-      <a href="/docs/quickstart/" class="nav-pip">pip · npm · OTLP</a>
+      <a href="/docs/quickstart/" class="nav-cta">Get started</a>
     </div>
-  </div>
-</nav>
+  </nav>
+</header>
 
 <!-- ══ PRODUCT VIEW ═══════════════════════════════════════════ -->
 <main>
+  <div class="aurora" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
 
   <!-- HERO -->
   <section class="hero">
@@ -1009,6 +1193,11 @@ app.<span class="fn">use</span>(<span class="fn">reqlyExpress</span>({ serviceNa
 
 
 <script>
+  /* ── liquid glass: Chromium can refract the backdrop through the SVG filter ── */
+  if (navigator.userAgentData?.brands?.some(b => /Chromium/.test(b.brand))) {
+    document.documentElement.classList.add('refract');
+  }
+
   /* ── year ── */
   const y = new Date().getFullYear();
   document.querySelectorAll('.year').forEach(el => { el.textContent = y; });
@@ -1075,6 +1264,7 @@ app.<span class="fn">use</span>(<span class="fn">reqlyExpress</span>({ serviceNa
   tick();
   if (!matchMedia('(prefers-reduced-motion: reduce)').matches) setInterval(tick, 2500);
 </script>
+
 
 </body>
 </html>
