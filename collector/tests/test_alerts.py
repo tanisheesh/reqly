@@ -81,3 +81,15 @@ def test_one_failing_channel_does_not_stop_the_others():
 
     assert asyncio.run(run()) == 1
     assert seen == ["hooks.slack.test", "example.test"]
+
+
+def test_ingested_values_cannot_inject_mentions_or_links():
+    evil_route = "/x` <!channel> <https://evil.test|Reset your password> `"
+    details = {**DETAILS, "hints": [{"text": "100% of errors from host <!here>"}]}
+    text = notifier.format_text(notifier.OPENED, "svc`<@U1>", evil_route, details, "https://dash.test")
+    body, _, link = text.rpartition("\n")
+    assert "<" not in body and ">" not in body and body.count("`") % 2 == 0
+    assert link == "<https://dash.test|Open dashboard>"  # our own link survives
+    channels = notifier.Channels(discord_webhook_url="https://discord.test/y")
+    (_, payload), = notifier.build_payloads(channels, notifier.OPENED, {**ALERT, "route": "@everyone"})
+    assert payload["allowed_mentions"] == {"parse": []}
