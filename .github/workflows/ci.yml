@@ -101,6 +101,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: azure/setup-helm@v4
+      - name: Chart version matches the collector
+        # Installing from a clone uses appVersion as the image tag; a stale
+        # one silently deploys an older collector.
+        run: |
+          collector=$(python3 -c "import tomllib; print(tomllib.load(open('collector/pyproject.toml', 'rb'))['project']['version'])")
+          chart=$(grep -oP '^appVersion: "\K[^"]+' deploy/helm/reqly/Chart.yaml)
+          if [ "$chart" != "$collector" ]; then
+            echo "::error::deploy/helm/reqly/Chart.yaml appVersion is $chart, collector is $collector"
+            exit 1
+          fi
       - name: Lint and render
         run: |
           helm lint deploy/helm/reqly

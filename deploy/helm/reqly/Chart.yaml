@@ -4,8 +4,8 @@ description: Self-hosted API monitoring that tells you what broke, when, and whi
 type: application
 # Released with the collector: version and appVersion are both the collector's
 # version (github-packages.yml sets them from collector/pyproject.toml).
-version: 0.11.0
-appVersion: "0.11.0"
+version: 0.12.1
+appVersion: "0.12.1"
 home: https://reqly.tanisheesh.in
 icon: https://reqly.tanisheesh.in/docs/assets/logo.svg
 sources:
