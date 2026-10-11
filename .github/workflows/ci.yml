@@ -101,7 +101,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
       - name: Chart version matches the collector
         # Installing from a clone uses appVersion as the image tag; a stale
         # one silently deploys an older collector.
