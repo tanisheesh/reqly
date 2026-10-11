@@ -84,6 +84,10 @@ async def ingest(request: Request, body: IngestRequest, principal: Principal = D
     """
     if not body.service_name:
         raise HTTPException(status_code=422, detail="service_name is required")
+    if body.backfill and not principal.all_projects:
+        # A backfill rebuilds its hours in aggregates shared by every
+        # service and project, so only the collector's own key may send one.
+        raise HTTPException(status_code=403, detail="backfill batches need the collector's REQLY_INGEST_KEY")
     if not await writable_service(principal, body.service_name):
         raise HTTPException(status_code=403, detail="this service belongs to another project")
 
@@ -140,7 +144,10 @@ async def ingest(request: Request, body: IngestRequest, principal: Principal = D
     await insert_events(pool, rows)
     if rows:
         await record_deployments(pool, rows)
-        late_data_tracker.note(min(row_time(r) for r in rows), backfill=body.backfill)
+        if body.backfill:
+            late_data_tracker.note_backfill(row_time(r) for r in rows)
+        else:
+            late_data_tracker.note(min(row_time(r) for r in rows))
     response = {"accepted": len(rows), "rejected": rejected}
     if reasons:
         response["reasons"] = reasons

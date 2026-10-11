@@ -71,3 +71,27 @@ def test_failed_refresh_restores_watermark():
     with pytest.raises(RuntimeError):
         asyncio.run(t.refresh(_FailingPool(), now=NOW))
     assert t.pending_since == oldest
+
+
+def test_backfill_windows_cover_only_the_given_hours():
+    h = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    hours = [h, h + timedelta(hours=1), h + timedelta(days=10)]  # a run of two, and one alone
+    windows = late_data.backfill_windows(hours, NOW, (("v", timedelta(minutes=1)),))
+    assert windows == [
+        ("v", h, h + timedelta(hours=2)),
+        ("v", h + timedelta(days=10), h + timedelta(days=10, hours=1)),
+    ]
+
+
+def test_backfill_hours_are_kept_on_failure():
+    t = late_data.LateDataTracker()
+    hour = NOW - timedelta(days=30)
+    t.note_backfill([hour.replace(minute=0, second=0, microsecond=0) + timedelta(minutes=5)], now=NOW)
+
+    class Boom:
+        def acquire(self):
+            raise RuntimeError("db down")
+
+    with pytest.raises(RuntimeError):
+        asyncio.run(t.refresh(Boom(), now=NOW))
+    assert t._backfill_hours == {hour.replace(minute=0, second=0, microsecond=0)}

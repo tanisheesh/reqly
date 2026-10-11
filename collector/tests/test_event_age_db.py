@@ -67,3 +67,46 @@ def test_old_late_event_does_not_wipe_aggregates(backfill):
         assert after == 1
     else:
         assert after == 30  # history kept
+
+
+def test_backfill_only_rebuilds_the_hours_it_sends():
+    """A backfill of one hour 40 days back must not rebuild every hour from
+    there to now: service B's 20-day-old history (raw chunks already dropped)
+    would be replaced by nothing."""
+    service_a = f"test-bf-a-{uuid.uuid4().hex[:8]}"
+    service_b = f"test-bf-b-{uuid.uuid4().hex[:8]}"
+    now = datetime.now(timezone.utc)
+    hour_b = (now - timedelta(days=20)).replace(minute=0, second=0, microsecond=0)
+    hour_a = (now - timedelta(days=40)).replace(minute=0, second=0, microsecond=0)
+
+    async def count(pool, service):
+        return await pool.fetchval(
+            "SELECT coalesce(sum(request_count), 0) FROM route_latency_1min WHERE service_name = $1", service
+        )
+
+    async def run():
+        pool = await pool_module.create_pool()
+        tracker = late_data.LateDataTracker()
+        try:
+            await queries.insert_events(pool, [_event(service_b, hour_b + timedelta(minutes=i)) for i in range(30)])
+            await _refresh_all(pool)
+            await pool.execute("DELETE FROM request_events WHERE service_name = $1", service_b)
+            rows = [_event(service_a, hour_a + timedelta(minutes=i)) for i in range(5)]
+            await queries.insert_events(pool, rows)
+            tracker.note_backfill([queries.row_time(r) for r in rows], now=now)
+            await tracker.refresh(pool, now=now)
+            return await count(pool, service_b), await count(pool, service_a)
+        finally:
+            await pool.execute("DELETE FROM request_events WHERE service_name = ANY($1::text[])", [service_a, service_b])
+            async with pool.acquire() as conn:
+                for view, _ in await late_data.existing_aggregates(conn):
+                    for h in (hour_a, hour_b):
+                        await conn.execute(
+                            "CALL refresh_continuous_aggregate($1::regclass, $2::timestamptz, $3::timestamptz)",
+                            view, h, h + timedelta(hours=1),
+                        )
+            await pool_module.close_pool()
+
+    b_after, a_after = asyncio.run(run())
+    assert a_after == 5  # the backfilled hour is materialized
+    assert b_after == 30  # other history untouched
