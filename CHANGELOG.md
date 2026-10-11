@@ -8,6 +8,15 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 
 ## [Unreleased]
 
+Python SDK 0.5.6
+
+### ✨ Added
+- Python SDK: `push_openapi` takes the spec (a dict or a function returning it), so Flask, Django
+  and generic WSGI/ASGI apps can upload it for API drift, as the Node SDK already could
+
+### ♻️ Changed
+- Python SDK: `capture_request_body`, which never did anything, logs that it is ignored and will be removed
+
 ---
 
 ## [0.12.1] — 2026-10-11
