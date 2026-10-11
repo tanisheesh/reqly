@@ -12,7 +12,7 @@ class FakeShipper:
         self.shipped_events = 0
         self._lock = threading.Lock()
 
-    def send_batch(self, events):
+    def send_batch(self, events, retries=3):
         with self._lock:
             self.batches.append(list(events))
             self.shipped_events += len(events)
@@ -125,3 +125,29 @@ def test_heavy_traffic_is_not_dropped_between_intervals():
         assert shipper.shipped_events == 5000
     finally:
         buf.shutdown()
+
+
+class DownShipper(FakeShipper):
+    def send_batch(self, events, retries=3):
+        self.batches.append(len(events))
+        return False
+
+
+def test_shutdown_ships_everything_when_the_collector_is_up():
+    shipper = FakeShipper()
+    buf = EventBuffer(shipper=shipper, max_queue_size=100, max_batch_size=10, flush_interval_seconds=999)
+    for i in range(25):
+        buf.add(_event(i))
+    buf.shutdown()
+    assert shipper.shipped_events == 25 and buf.stats()["dropped_events"] == 0
+
+
+def test_shutdown_gives_up_at_the_first_failure():
+    shipper = DownShipper()
+    buf = EventBuffer(shipper=shipper, max_queue_size=100, max_batch_size=10, flush_interval_seconds=999)
+    buf._queue.extend(_event(i) for i in range(25))  # without waking the flush thread
+    started = time.monotonic()
+    buf.shutdown()
+    assert time.monotonic() - started < 1
+    assert shipper.batches == [10]  # one attempt, then stop
+    assert buf.stats()["dropped_events"] == 15  # the rest, counted

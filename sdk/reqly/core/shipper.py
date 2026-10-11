@@ -70,7 +70,9 @@ class Shipper:
         it, so a forked child must open its own connections."""
         self._client = self._make_client()
 
-    def send_batch(self, events: list[RequestEvent]) -> bool:
+    def send_batch(self, events: list[RequestEvent], retries: int = _MAX_RETRIES) -> bool:
+        """retries: attempts before the batch is dropped (1 at shutdown,
+        where waiting out backoffs would hold up the app's exit)."""
         if not events:
             return True
 
@@ -81,7 +83,7 @@ class Shipper:
             "events": [e.to_dict() for e in events],
         }
 
-        for attempt in range(_MAX_RETRIES):
+        for attempt in range(retries):
             try:
                 response = self._client.post("/v1/ingest", json=payload)
                 if response.status_code < 400:
@@ -99,32 +101,32 @@ class Shipper:
                     "reqly: collector returned %s, attempt %d/%d",
                     response.status_code,
                     attempt + 1,
-                    _MAX_RETRIES,
+                    retries,
                 )
             except httpx.HTTPError as exc:
                 logger.debug(
                     "reqly: shipper error %s, attempt %d/%d",
                     exc,
                     attempt + 1,
-                    _MAX_RETRIES,
+                    retries,
                 )
             except Exception as exc:
                 logger.warning(
                     "reqly: unexpected shipper error %s, attempt %d/%d",
                     exc,
                     attempt + 1,
-                    _MAX_RETRIES,
+                    retries,
                 )
 
-            if attempt < _MAX_RETRIES - 1:
+            if attempt < retries - 1:
                 backoff = _BACKOFF_BASE_SECONDS * (2**attempt)
                 time.sleep(backoff + random.uniform(0, 0.1))
 
         self.dropped_batches += 1
         logger.warning(
-            "reqly: dropped a batch of %d events after %d retries",
+            "reqly: dropped a batch of %d events after %d attempts",
             len(events),
-            _MAX_RETRIES,
+            retries,
         )
         return False
 
