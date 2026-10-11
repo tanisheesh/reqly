@@ -27,6 +27,8 @@ Collector 0.12.1 · Python SDK 0.5.5 · reqly-node 0.3.2
   handler's 200 (Node)
 - SDKs: out-of-range batch size, queue size and flush interval are clamped (a Node batch size
   of 0 looped forever; a Python interval of 0 spun a CPU core)
+- Helm: installing the chart from a clone of the repository deployed 0.11.0 images (a stale
+  `appVersion`); it now matches the collector, and CI fails if it falls behind
 
 ### ♻️ Changed
 - **License split:** the SDKs (`reqly`, `reqly-node`) are now **MIT**, so they can go into any
