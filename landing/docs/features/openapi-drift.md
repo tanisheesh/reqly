@@ -17,10 +17,13 @@ It also shows the spec's coverage and the share of traffic that goes to undocume
 
 === "From the app (Python)"
 
-    FastAPI and Litestar generate their own spec:
-
     ```python
+    # FastAPI and Litestar generate their own spec
     reqly.instrument(app, push_openapi=True)   # or REQLY_PUSH_OPENAPI=true
+
+    # Flask, Django, any WSGI/ASGI app: pass the spec, or a function returning it
+    reqly.instrument(app, push_openapi=lambda: swagger.get_apispecs())   # Flask (flasgger)
+    REQLY = {"service_name": "checkout-api", "push_openapi": load_schema}  # Django settings
     ```
 
     The SDK uploads it on the first request.

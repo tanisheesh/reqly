@@ -118,7 +118,7 @@ Pass options to `instrument()` or set environment variables (argument → enviro
 | `ignore_routes` | `REQLY_IGNORE_ROUTES` | `/health,/metrics` |
 | `consumer_header` / `consumer` | `REQLY_CONSUMER_HEADER` / — | `None` |
 | `consumer_salt` / `hash_consumer` | `REQLY_CONSUMER_SALT` / `REQLY_HASH_CONSUMER` | `None` / `True` |
-| `push_openapi` | `REQLY_PUSH_OPENAPI` | `False` (FastAPI, Litestar) |
+| `push_openapi` | `REQLY_PUSH_OPENAPI` | `False`; `True` on FastAPI/Litestar, or the spec (dict or function) on any app |
 
 Every option, explained: [Python SDK docs](https://reqly.tanisheesh.in/docs/instrument/python/#configuration).
 

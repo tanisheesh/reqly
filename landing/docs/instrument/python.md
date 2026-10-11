@@ -120,10 +120,15 @@ See [LLM cost](../features/llm-cost.md).
 
 ## Upload your OpenAPI spec
 
-FastAPI and Litestar generate their own spec. `push_openapi=True` uploads it on the first request, so the dashboard can compare it with real traffic ([OpenAPI drift](../features/openapi-drift.md)).
+The SDK uploads your spec on the first request, so the dashboard can compare it with real traffic ([OpenAPI drift](../features/openapi-drift.md)). FastAPI and Litestar generate their own; any other app passes it, as a dict or a function returning one:
 
 ```python
-reqly.instrument(app, push_openapi=True)
+reqly.instrument(app, push_openapi=True)                    # FastAPI, Litestar
+reqly.instrument(app, push_openapi=lambda: swagger.get_apispecs())  # Flask (flasgger)
+app = reqly.instrument_wsgi(app, push_openapi=spec_dict, route_resolver=...)
+
+# Django settings.py (e.g. drf-spectacular's generated schema)
+REQLY = {"service_name": "checkout-api", "push_openapi": load_schema}
 ```
 
 ## Configuration
@@ -146,7 +151,7 @@ Every option can be passed to `instrument()` or set as an environment variable. 
 | `consumer` | — | `None`: `callable(RequestInfo) -> str | None` |
 | `consumer_salt` | `REQLY_CONSUMER_SALT` | `None`: set it |
 | `hash_consumer` | `REQLY_HASH_CONSUMER` | `True`. `False` sends ids unhashed (only for non-secret ids) |
-| `push_openapi` | `REQLY_PUSH_OPENAPI` | `False` (FastAPI, Litestar) |
+| `push_openapi` | `REQLY_PUSH_OPENAPI` | `False`. `True` on FastAPI and Litestar, or the spec (a dict or a function returning it) on any app |
 
 With `sample_rate` below 1.0, request counts in the dashboard are the sampled volume; latency percentiles and error rates stay unbiased.
 
