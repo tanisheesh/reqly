@@ -303,3 +303,16 @@ def test_asgi_request_cancelled_before_responding_is_499_not_an_error():
     finally:
         client.shutdown()
     assert recorded[0]["status_code"] == 499 and recorded[0]["error"] is False
+
+
+def test_django_push_openapi_takes_the_spec_from_settings(django_app):
+    from django.conf import settings
+
+    from reqly.integrations import django as reqly_django
+
+    spec = {"openapi": "3.0.0", "info": {"title": "d", "version": "1"}, "paths": {}}
+    settings.REQLY = {**settings.REQLY, "push_openapi": spec}
+    reqly_django._client = None
+    client = reqly_django._get_client()
+    assert client._openapi_pusher is not None
+    assert client._openapi_pusher._spec_factory() == spec

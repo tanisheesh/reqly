@@ -165,7 +165,8 @@ def test_flask_warns_instead(caplog):
     app = flask.Flask(__name__)
     with caplog.at_level(logging.WARNING, logger="reqly"):
         client = reqly.instrument(app, service_name="f", collector_url="http://127.0.0.1:1", push_openapi=True)
-    assert "push_openapi needs an app that generates its own spec" in caplog.text
+    assert "push_openapi=True needs an app that generates its own spec" in caplog.text
+    assert "push_openapi=spec_dict" in caplog.text  # says how to pass it
     assert client is not None
     client.shutdown()
 
@@ -175,3 +176,66 @@ def test_service_name_is_escaped_in_the_upload_url():
 
     pusher = OpenAPIPusher(spec_factory=dict, collector_url="http://c/", api_key=None, service_name="team a/api")
     assert pusher._url == "http://c/v1/services/team%20a%2Fapi/openapi"
+
+
+SPEC = {"openapi": "3.0.0", "info": {"title": "Flask shop", "version": "1"},
+        "paths": {"/orders/{id}": {"get": {}}}}
+
+
+def test_flask_uploads_a_spec_dict(spec_collector):
+    from flask import Flask
+
+    url, uploads = spec_collector
+    app = Flask(__name__)
+
+    @app.get("/orders/<int:id>")
+    def order(id):
+        return {"id": id}
+
+    client = reqly.instrument(app, service_name="flask-shop", collector_url=url, push_openapi=SPEC,
+                              flush_interval_seconds=999)
+    app.test_client().get("/orders/1")
+    _wait_for(uploads)
+    assert uploads[0][0] == "/v1/services/flask-shop/openapi" and uploads[0][2] == SPEC
+    client.shutdown()
+
+
+def test_wsgi_uploads_the_spec_a_function_returns(spec_collector):
+    url, uploads = spec_collector
+
+    def app(environ, start_response):
+        start_response("200 OK", [("Content-Type", "text/plain")])
+        return [b"ok"]
+
+    wrapped = reqly.instrument_wsgi(app, service_name="wsgi-shop", collector_url=url,
+                                    push_openapi=lambda: SPEC, flush_interval_seconds=999)
+    body = wrapped({"REQUEST_METHOD": "GET", "PATH_INFO": "/"}, lambda *a: None)
+    list(body)
+    body.close()
+    _wait_for(uploads)
+    assert uploads[0][2] == SPEC
+    wrapped.client.shutdown()
+
+
+def test_push_openapi_true_without_a_spec_source_warns(caplog):
+    caplog.set_level(logging.WARNING, logger="reqly")
+
+    def app(environ, start_response):
+        return []
+
+    wrapped = reqly.instrument_wsgi(app, service_name="s", collector_url="http://127.0.0.1:1",
+                                    push_openapi=True, flush_interval_seconds=999)
+    assert "push_openapi=True needs the spec" in caplog.text
+    wrapped.client.shutdown()
+
+
+def test_capture_request_body_is_ignored_with_a_warning(caplog):
+    caplog.set_level(logging.WARNING, logger="reqly")
+
+    def app(environ, start_response):
+        return []
+
+    wrapped = reqly.instrument_wsgi(app, service_name="s", collector_url="http://127.0.0.1:1",
+                                    capture_request_body=True, flush_interval_seconds=999)
+    assert "capture_request_body is ignored" in caplog.text
+    wrapped.client.shutdown()

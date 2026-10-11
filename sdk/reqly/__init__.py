@@ -54,8 +54,8 @@ def _enable_openapi_push(app, framework: str, client: ReqlyClient) -> None:
         client.enable_openapi_push(lambda: app.openapi_schema.to_schema())
     else:
         logger.warning(
-            "reqly: push_openapi needs an app that generates its own spec (FastAPI, Litestar); "
-            "for %s, upload the spec with PUT /v1/services/<service>/openapi instead",
+            "reqly: push_openapi=True needs an app that generates its own spec (FastAPI, "
+            "Litestar); for %s, pass the spec: push_openapi=spec_dict or a function returning it",
             framework,
         )
 
@@ -74,7 +74,7 @@ def instrument(
     capture_request_body: bool | None = None,
     release: str | None = None,
     environment: str | None = None,
-    push_openapi: bool | None = None,
+    push_openapi=None,
     consumer_header: str | None = None,
     consumer=None,
     consumer_salt: str | None = None,
@@ -95,7 +95,8 @@ def instrument(
     ``push_openapi=True`` (or REQLY_PUSH_OPENAPI=true) uploads the app's
     OpenAPI spec (FastAPI, Litestar) to the collector on the first request,
     so the dashboard can show undocumented, unused and deprecated-but-used
-    endpoints.
+    endpoints. Any other app passes the spec itself: a dict, or a function
+    returning one (e.g. Flask with flasgger, or a generated openapi.json).
 
     This function itself is guarded: a failure to detect the framework or
     initialize the client is logged and the app is returned uninstrumented
@@ -131,14 +132,10 @@ def instrument(
             hash_consumer=hash_consumer,
         )
         client = ReqlyClient(config)
-        if config.push_openapi:
+        if client.spec_source() is not None:
+            client.enable_openapi_push(client.spec_source())
+        elif config.push_openapi:
             _enable_openapi_push(app, framework, client)
-
-        if config.capture_request_body:
-            logger.warning(
-                "reqly: capture_request_body=True is set but body capture is not yet "
-                "implemented — request bodies will not be captured"
-            )
 
         if framework == "fastapi":
             from .integrations.fastapi import instrument_fastapi
@@ -171,6 +168,7 @@ _GENERIC_OPTIONS = (
     "service_name", "collector_url", "api_key", "sample_rate", "flush_interval_seconds",
     "max_batch_size", "max_queue_size", "ignore_routes", "capture_request_body",
     "release", "environment", "consumer_header", "consumer", "consumer_salt", "hash_consumer",
+    "push_openapi",
 )
 
 
@@ -180,12 +178,25 @@ def _generic_client(kind: str, route_resolver, options: dict) -> ReqlyClient:
             "reqly: instrument_%s() without route_resolver records every request as "
             "__unmatched__; pass a function that returns the route template", kind,
         )
-    if options.pop("push_openapi", None):
-        logger.warning("reqly: push_openapi is not available for generic %s apps", kind.upper())
     unknown = set(options) - set(_GENERIC_OPTIONS)
     if unknown:
         logger.warning("reqly: instrument_%s() ignoring unknown options %s", kind, sorted(unknown))
-    return ReqlyClient(Config.resolve(**{key: options.get(key) for key in _GENERIC_OPTIONS}))
+    client = ReqlyClient(Config.resolve(**{key: options.get(key) for key in _GENERIC_OPTIONS}))
+    enable_spec_push(client, kind.upper())
+    return client
+
+
+def enable_spec_push(client: ReqlyClient, kind: str) -> None:
+    """push_openapi for apps that can't produce their own spec: it must be
+    the spec (or a function returning it); True alone has nothing to send."""
+    source = client.spec_source()
+    if source is not None:
+        client.enable_openapi_push(source)
+    elif client.config.push_openapi:
+        logger.warning(
+            "reqly: push_openapi=True needs the spec for %s apps: pass push_openapi=spec_dict "
+            "or a function returning it", kind,
+        )
 
 
 def instrument_wsgi(app, *, route_resolver=None, **options):
