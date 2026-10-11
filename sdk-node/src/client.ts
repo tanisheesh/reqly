@@ -10,6 +10,8 @@ export const UNMATCHED_ROUTE = "__unmatched__";
 const HOST = hostname();
 const MAX_RETRIES = 3;
 const REQUEST_TIMEOUT_MS = 3000;
+/** Longest `shutdown()` may take: a down collector must not hold up a deploy. */
+const SHUTDOWN_FLUSH_MS = 5000;
 
 export interface RecordedRequest {
   method: string;
@@ -51,9 +53,11 @@ let exitHookInstalled = false;
 function installExitHook(): void {
   if (exitHookInstalled) return;
   exitHookInstalled = true;
+  // The event loop is empty, so the process is about to exit: send what is
+  // queued the bounded way (shutdown), not with a flush's retries.
   process.on("beforeExit", () => {
     for (const client of liveClients) {
-      if (client.hasQueued()) void client.flush();
+      if (client.hasQueued()) void client.shutdown();
     }
   });
 }
@@ -73,6 +77,7 @@ export class ReqlyClient {
   private timer: NodeJS.Timeout | undefined;
   private flushing: Promise<void> | undefined;
   private disabled = false;
+  private stopping = false; // shutdown() started: flushes stop retrying
   // The same few API keys / tenants call over and over: hash each once.
   private readonly hashedConsumers = new Map<string, string>();
   private openapiSource: (() => unknown) | undefined;
@@ -190,7 +195,7 @@ export class ReqlyClient {
     // is empty would send each event that arrives during the sends as its
     // own one-event batch -- an HTTP call per request under steady traffic.
     let remaining = this.queue.length;
-    while (remaining > 0) {
+    while (remaining > 0 && !this.stopping) {
       const batch = this.queue.splice(0, Math.min(this.config.maxBatchSize, remaining));
       remaining -= batch.length;
       if (!(await this.send(batch))) {
@@ -200,7 +205,7 @@ export class ReqlyClient {
     }
   }
 
-  private async send(events: WireEvent[]): Promise<boolean> {
+  private async send(events: WireEvent[], retries = MAX_RETRIES, timeoutMs = REQUEST_TIMEOUT_MS): Promise<boolean> {
     const body = JSON.stringify({
       service_name: this.config.serviceName,
       sdk_version: `node-${SDK_VERSION}`,
@@ -210,13 +215,13 @@ export class ReqlyClient {
     });
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (this.config.apiKey) headers["X-Reqly-Key"] = this.config.apiKey;
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    for (let attempt = 0; attempt < retries; attempt++) {
       try {
         const response = await fetch(`${this.config.collectorUrl}/v1/ingest`, {
           method: "POST",
           headers,
           body,
-          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+          signal: AbortSignal.timeout(timeoutMs),
         });
         if (response.ok) {
           this.stats.shipped += events.length;
@@ -233,7 +238,8 @@ export class ReqlyClient {
       // with the collector down) the process must not exit mid-retry. The
       // waits are short (200 + 400 ms); the flush *interval* stays unref'd.
       // Jitter, so many processes don't retry against a restarting collector in lockstep.
-      if (attempt < MAX_RETRIES - 1) {
+      if (this.stopping) break; // shutdown() takes over, without retries
+      if (attempt < retries - 1) {
         await new Promise((resolve) => setTimeout(resolve, 200 * 2 ** attempt + Math.random() * 100));
       }
     }
@@ -272,10 +278,24 @@ export class ReqlyClient {
     if (this.timer) clearInterval(this.timer);
     this.timer = undefined;
     liveClients.delete(this);
-    // A flush sends what was queued when it started; keep going until the
-    // queue is empty (failed batches are dropped, so this ends).
-    do {
-      await this.flush();
-    } while (this.queue.length > 0);
+    // Bounded: one attempt per batch, no backoff, stop at the first failure
+    // or after SHUTDOWN_FLUSH_MS. What is left counts as dropped.
+    const deadline = Date.now() + SHUTDOWN_FLUSH_MS;
+    this.stopping = true;
+    await this.flushing; // a flush in flight ends after its current request
+    while (this.queue.length > 0 && Date.now() < deadline) {
+      const batch = this.queue.splice(0, this.config.maxBatchSize);
+      const sent = await this.send(batch, 1, Math.max(1, Math.min(REQUEST_TIMEOUT_MS, deadline - Date.now())));
+      if (!sent) {
+        this.stats.failedBatches += 1;
+        this.stats.dropped += batch.length;
+        break;
+      }
+    }
+    if (this.queue.length > 0) {
+      console.warn(`reqly: dropped ${this.queue.length} unsent events at shutdown`);
+      this.stats.dropped += this.queue.length;
+      this.queue.length = 0;
+    }
   }
 }

@@ -196,3 +196,18 @@ test("out-of-range shipping settings are clamped (a batch size of 0 would loop f
   await big.shutdown();
   await collector.close();
 });
+
+test("shutdown is bounded when the collector accepts connections but never answers", async () => {
+  const { createServer } = await import("node:net");
+  const sockets = [];
+  const server = createServer((socket) => sockets.push(socket)); // accept, never answer
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const client = new ReqlyClient({ serviceName: "t", collectorUrl: `http://127.0.0.1:${server.address().port}`, flushIntervalMs: 3_600_000 });
+  for (let i = 0; i < 2000; i++) client.record(request());
+  const started = Date.now();
+  await client.shutdown();
+  assert.ok(Date.now() - started < 6000, `shutdown took ${Date.now() - started} ms`);
+  assert.equal(client.stats.dropped, 2000); // nothing got through, all counted
+  for (const s of sockets) s.destroy();
+  await new Promise((resolve) => server.close(resolve));
+});
