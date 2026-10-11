@@ -181,3 +181,18 @@ test("the flush interval reads either SDK's environment variable", () => {
     delete process.env.REQLY_FLUSH_INTERVAL_MS;
   }
 });
+
+test("out-of-range shipping settings are clamped (a batch size of 0 would loop forever)", async () => {
+  const collector = await fakeCollector();
+  const client = new ReqlyClient(options(collector.url, { maxBatchSize: 0, flushIntervalMs: 0, maxQueueSize: 0 }));
+  assert.equal(client.config.maxBatchSize, 1);
+  assert.equal(client.config.flushIntervalMs, 100);
+  assert.equal(client.config.maxQueueSize, 1);
+  client.record(request());
+  await client.shutdown(); // returns instead of looping
+  assert.equal(collector.events().length, 1);
+  const big = new ReqlyClient(options(collector.url, { maxBatchSize: 5000 }));
+  assert.equal(big.config.maxBatchSize, 1000);
+  await big.shutdown();
+  await collector.close();
+});

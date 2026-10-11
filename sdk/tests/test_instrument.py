@@ -47,3 +47,13 @@ def test_flush_interval_from_either_sdks_env_var(monkeypatch):
     assert resolve() == 2.5
     monkeypatch.setenv("REQLY_FLUSH_INTERVAL_SECONDS", "1")  # Python's own name wins
     assert resolve() == 1.0
+
+
+def test_out_of_range_shipping_settings_are_clamped(monkeypatch):
+    monkeypatch.setenv("REQLY_MAX_BATCH_SIZE", "5000")
+    monkeypatch.setenv("REQLY_FLUSH_INTERVAL_SECONDS", "0")
+    config = _resolve()
+    assert config.max_batch_size == 1000  # the collector rejects larger batches whole
+    assert config.flush_interval_seconds == 0.1  # 0 would spin the flush thread
+    config = _resolve(max_batch_size=0, max_queue_size=0)
+    assert config.max_batch_size == 1 and config.max_queue_size == 1
