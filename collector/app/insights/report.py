@@ -1,7 +1,6 @@
 """LLM prompt and plain-text fallback for the insights report.
 
-Pure module (no app config, no I/O) so the SAM Lambda can vendor it as-is;
-see infra/sam/sync_insights.py.
+Pure module (no app config, no I/O).
 """
 
 from __future__ import annotations

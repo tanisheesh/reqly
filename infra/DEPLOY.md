@@ -1,27 +1,24 @@
 # Reqly — AWS Production Deployment
 
-Full production setup: EC2 (TimescaleDB) + Collector + SAM (Lambda weekly insights).
+Production setup on AWS: TimescaleDB on EC2, then the collector and dashboard (on the same instance or anywhere else).
 
 ---
 
 ## What gets deployed
 
 ```
-EC2 (t3.small)                     AWS SAM Stack
-──────────────                     ─────────────────────────────
-TimescaleDB (Docker)   ◄───────    Lambda (reqly-weekly-insights)
-                                   EventBridge (every Sunday 23:00 UTC)
-                                   S3 (insight report archive)
+your app ──► collector ──► EC2 (t3.small): TimescaleDB in Docker
+                 │
+                 └── weekly report, hourly alerts, SLOs (inside the collector)
 ```
 
-Your app ships data to the collector, which writes to EC2 TimescaleDB. Lambda reads from the same DB weekly.
+Your app ships data to the collector, which writes to TimescaleDB on EC2 and runs the weekly report and alerts itself.
 
 ---
 
 ## Prerequisites
 
 - AWS account with CLI configured (`aws configure`)
-- SAM CLI installed (`pip install aws-sam-cli`)
 - Groq API key (free at https://console.groq.com/keys) — optional, skip for plain-text insights
 
 ---
@@ -37,10 +34,10 @@ aws ec2 create-security-group \
 # Get the security group ID from output, then open ports
 aws ec2 authorize-security-group-ingress --group-id <sg-id> \
   --protocol tcp --port 5432 --cidr 0.0.0.0/0
-# ^ Open to the internet because the Lambda (no VPC) and an off-box collector
-#   have no fixed IP. If the collector runs on this instance and you skip the
-#   Lambda, restrict this to your own IP instead. Either way, set a strong
-#   POSTGRES_PASSWORD in ec2-userdata.sh -- the script refuses the placeholder.
+# ^ Open to the internet because an off-box collector (e.g. on Render) has no
+#   fixed IP. If the collector runs on this instance, restrict this to your own
+#   IP instead. Either way, set a strong POSTGRES_PASSWORD in ec2-userdata.sh --
+#   the script refuses the placeholder.
 
 aws ec2 authorize-security-group-ingress --group-id <sg-id> \
   --protocol tcp --port 22 --cidr 0.0.0.0/0
@@ -76,36 +73,7 @@ aws ec2 associate-address --instance-id <instance-id> --allocation-id <eip-alloc
 
 ---
 
-## Step 2 — Deploy the SAM Stack (Lambda insights)
-
-```bash
-cd infra/sam
-sam build
-
-sam deploy --parameter-overrides \
-  "DatabaseUrl=postgresql://reqly:your_password@<ec2-ip>:5432/reqly?sslmode=require" \
-  "GroqApiKey=gsk_your_key_here" \
-  "Environment=production"
-```
-
-SAM creates:
-- `reqly-weekly-insights` Lambda function
-- EventBridge schedule (Sunday 23:00 UTC)
-- S3 bucket for JSON report archive
-
-Because the Lambda now owns the weekly run, start the collector with
-`INSIGHTS_SCHEDULER_ENABLED=false` (Step 3) so the report isn't generated twice.
-
-With `Environment=demo` (the default) SAM also creates an **unauthenticated**
-Function URL — anyone who has it can trigger a run (Groq calls + DB load).
-Use it only for walkthroughs; get the URL from the output:
-```bash
-curl -X POST <lambda-url>
-```
-
----
-
-## Step 3 — Run the Collector
+## Step 2 — Run the Collector
 
 The collector is a FastAPI app that receives SDK data and serves the dashboard.
 
@@ -126,7 +94,6 @@ docker run -d \
   -e REQLY_READ_KEY="your_read_key" \
   -e GROQ_API_KEY="gsk_your_key_here" \
   -e CORS_ORIGINS="*" \
-  -e INSIGHTS_SCHEDULER_ENABLED=false \
   -p 8000:8000 \
   ghcr.io/tanisheesh/reqly-collector:latest
 ```
@@ -143,16 +110,15 @@ REQLY_INGEST_KEY=your_ingest_key
 REQLY_READ_KEY=your_read_key
 GROQ_API_KEY=gsk_your_key_here
 CORS_ORIGINS=*
-INSIGHTS_SCHEDULER_ENABLED=false   # the SAM Lambda runs the weekly job
 FORWARDED_ALLOW_IPS=*              # only if the collector is reachable solely via the platform's proxy
 ```
 
-`REQLY_READ_KEY` ends up in the dashboard's JavaScript (Step 4), so it must be
+`REQLY_READ_KEY` ends up in the dashboard's JavaScript (Step 3), so it must be
 different from `REQLY_INGEST_KEY`.
 
 ---
 
-## Step 4 — Run the Dashboard
+## Step 3 — Run the Dashboard
 
 The dashboard is a static React SPA. Build it:
 
@@ -173,7 +139,7 @@ docker run -d --name reqly-dashboard -p 5173:5173   -e REQLY_COLLECTOR_URL=https
 
 ---
 
-## Step 5 — Instrument your app
+## Step 4 — Instrument your app
 
 ```bash
 pip install reqly
@@ -202,9 +168,6 @@ docker exec -it timescaledb psql -U reqly -d reqly
 curl -X POST "https://your-collector-url/v1/insights/generate?service_name=my-api" \
   -H "X-Reqly-Key: your_read_key"
 
-# Or via the Lambda URL (Environment=demo stacks only)
-curl -X POST <lambda-url>
-
 # Stop EC2 when not in use (saves cost — only EBS charges remain)
 aws ec2 stop-instances --instance-ids <instance-id>
 aws ec2 start-instances --instance-ids <instance-id>
@@ -218,7 +181,6 @@ aws ec2 start-instances --instance-ids <instance-id>
 |---|---|
 | EC2 t3.small | ~$15/month |
 | EBS 20GB gp3 | ~$1.60/month |
-| Lambda + EventBridge + S3 | $0/month (permanent free tier) |
 | **Total** | **~$17/month** |
 
 Stop EC2 when not in use → only ~$1.60/month (EBS only).

@@ -92,8 +92,7 @@ class Settings:
             db_pool_min_size=int(os.environ.get("DB_POOL_MIN_SIZE", "2")),
             db_pool_max_size=int(os.environ.get("DB_POOL_MAX_SIZE", "10")),
             rate_limit_per_minute=int(os.environ.get("RATE_LIMIT_PER_MINUTE", "600")),
-            # Set to false when the SAM Lambda owns the weekly run, otherwise
-            # both fire every Sunday and the report is generated twice.
+            # false turns off the weekly insights report.
             insights_scheduler_enabled=_env_flag("INSIGHTS_SCHEDULER_ENABLED", True),
             late_data_refresh_seconds=float(os.environ.get("LATE_DATA_REFRESH_SECONDS", "60")),
             # Hourly anomaly alerts. The check always runs (open alerts show on

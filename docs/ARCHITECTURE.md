@@ -37,7 +37,7 @@ reqly/
   load_generator/        demo traffic with deliberate incidents (bad deploy, bad pod, Monday spike)
   bench/                 SDK overhead benchmarks
   demo/                  EventFlow, the instrumented demo app
-  infra/                 EC2 user-data, optional AWS SAM stack for the weekly report, deploy guide
+  infra/                 EC2 user-data for the database, AWS deploy guide
 ```
 
 ### SDKs (`sdk/`, `sdk-node/`)
@@ -257,7 +257,7 @@ Groq call has a 30 s timeout. On any exception (timeout, rate limit, provider ou
 3. The dashboard on Render, built with `VITE_COLLECTOR_URL` and `VITE_READ_KEY`.
 4. Releases: PyPI (`sdk-v*` tags) and npm (`node-v*` tags) via trusted publishing; container images on GHCR (`collector-v*` tags).
 
-**Optional:** an AWS SAM stack (`infra/sam`) can run the weekly report as a Lambda with EventBridge and an S3 archive; set `INSIGHTS_SCHEDULER_ENABLED=false` on the collector then. Step-by-step in [infra/DEPLOY.md](../infra/DEPLOY.md).
+Step-by-step AWS setup in [infra/DEPLOY.md](../infra/DEPLOY.md).
 
 ---
 

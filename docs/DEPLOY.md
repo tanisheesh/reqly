@@ -2,7 +2,7 @@
 
 > **Live:** [dashboard](https://reqly-eventflow-dashboard.onrender.com) · [collector](https://reqly-eventflow-collector.onrender.com/v1/health) · [website](https://reqly.tanisheesh.in) · **Hosts:** Render, AWS EC2, Vercel · **Auto-deploy:** on push to `main`
 
-For local development, see [SETUP.md](SETUP.md). Command-by-command AWS steps (EC2 database, optional Lambda) are in [infra/DEPLOY.md](../infra/DEPLOY.md).
+For local development, see [SETUP.md](SETUP.md). Command-by-command AWS steps (EC2 database) are in [infra/DEPLOY.md](../infra/DEPLOY.md).
 
 ---
 
@@ -13,7 +13,6 @@ For local development, see [SETUP.md](SETUP.md). Command-by-command AWS steps (E
 | Collector | Render web service | FastAPI on uvicorn, port 8000. Applies migrations on start-up. Run **one** instance: the scheduler, rate limits and caches are per process |
 | Dashboard | Render | React SPA built with `VITE_COLLECTOR_URL` / `VITE_READ_KEY` |
 | Database | AWS EC2 t3.micro | `timescale/timescaledb-ha:pg16` in Docker (includes the Toolkit), TLS with a self-signed certificate, set up by `infra/ec2-userdata.sh` |
-| Weekly report (optional) | AWS Lambda + EventBridge + S3 | `infra/sam`. The demo runs the report inside the collector instead |
 | Website and docs | Vercel | `landing/build.sh` puts `landing/index.html` at `/` and builds the MkDocs site from `landing/docs/` into `/docs/`. The project's root directory is `landing/`, so nothing else in the repo is served |
 | Packages | PyPI, npm, GHCR | `reqly`, `reqly-node`, `ghcr.io/tanisheesh/reqly-collector`, `reqly-dashboard` (see section 6) |
 | DNS | GoDaddy | `reqly.tanisheesh.in` → CNAME to Vercel |
@@ -37,7 +36,7 @@ Set these in the host dashboard (never commit them). Every variable, its default
 | `PUBLIC_DASHBOARD` | ❌ | `true` for the public demo; `false` requires sign-in |
 | `REQLY_ADMIN_PASSWORD` | ❌ | Creates the first admin when there are no users (12+ characters) |
 | `ALERT_SLACK_WEBHOOK_URL` / `ALERT_DISCORD_WEBHOOK_URL` / `ALERT_WEBHOOK_URL` | ❌ | Where alerts go |
-| `INSIGHTS_SCHEDULER_ENABLED` | ❌ | `false` only if the SAM Lambda runs the weekly report |
+| `INSIGHTS_SCHEDULER_ENABLED` | ❌ | `false` turns off the weekly report |
 
 **Dashboard:** `VITE_COLLECTOR_URL` and `VITE_READ_KEY` at build time, or `REQLY_COLLECTOR_URL` and `REQLY_READ_KEY` at run time with the prebuilt image.
 

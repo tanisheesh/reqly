@@ -11,8 +11,7 @@ Answers "is this concentrated somewhere?" from raw events, without an LLM:
   absent in the previous week -> "88% of errors are TimeoutError (not seen in
   the previous 7 days)".
 
-Pure module (asyncpg only, no app imports) so the SAM Lambda vendors it
-as-is -- see infra/sam/sync_insights.py. Reads raw request_events (14-day
+Pure module (asyncpg only, no app imports). Reads raw request_events (14-day
 retention), which covers the anomaly hour plus the 7-day comparison.
 """
 

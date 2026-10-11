@@ -55,7 +55,7 @@ cp .env.example .env
 | `LLM_PRICES_FILE` | *(empty)* | YAML price table that overrides/extends `collector/app/llm/llm_prices.yaml` (USD per 1M tokens) |
 | `ASK_DAILY_LIMIT` | `200` | Ask Reqly questions per day per collector (the read key is public to dashboard viewers); `0` turns Ask off |
 | `CORS_ORIGINS` | `*` | Comma-separated list of allowed origins; restrict in production |
-| `INSIGHTS_SCHEDULER_ENABLED` | `true` | Set `false` when the SAM Lambda runs the weekly job, so it doesn't run twice |
+| `INSIGHTS_SCHEDULER_ENABLED` | `true` | `false` turns off the weekly insights report |
 | `ALERTS_ENABLED` | `true` | Hourly anomaly check (open alerts appear on the dashboard) |
 | `ALERT_SLACK_WEBHOOK_URL` / `ALERT_DISCORD_WEBHOOK_URL` / `ALERT_WEBHOOK_URL` | *(empty)* | Where alert notifications go; unset channels are skipped |
 | `ALERT_RENOTIFY_HOURS` | `6` | Reminder interval while an alert keeps firing |
