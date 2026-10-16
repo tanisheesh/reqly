@@ -10,7 +10,7 @@ blank_issues_enabled: false
 contact_links:
   - name: 🔒 Report a security vulnerability
     url: https://tanisheesh.in
-    about: Please don't open a public issue. Use the repo's Security tab → "Report a vulnerability", or email hey@tanisheesh.in.
+    about: Please don't open a public issue. Use the repo's Security tab → "Report a vulnerability", or email hi@tanisheesh.in.
   - name: 💬 Get in touch
     url: https://tanisheesh.in
     about: Questions, collaboration or anything else. Reach out via tanisheesh.in.
@@ -20,5 +20,5 @@ contact_links:
 #  Website   https://tanisheesh.in
 #  LinkedIn  https://linkedin.com/in/tanisheesh
 #  GitHub    https://github.com/tanisheesh
-#  Email     hey@tanisheesh.in
+#  Email     hi@tanisheesh.in
 # ──────────────────────────────────────────────────────────────────────────

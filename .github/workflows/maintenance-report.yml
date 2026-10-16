@@ -113,7 +113,7 @@ jobs:
               echo "<p style=\"margin:24px 0 0;color:#888;font-size:13px\">🔒 Security alerts not included (add an ALERTS_TOKEN secret to enable).</p>"
             fi
             echo "<hr style=\"border:none;border-top:1px solid #eee;margin:28px 0 12px\">"
-            echo "<p style=\"font-size:12px;color:#888;margin:0\">Tanish Poddar · <a href=\"https://tanisheesh.in\">tanisheesh.in</a> · <a href=\"https://github.com/tanisheesh\">GitHub</a> · <a href=\"https://linkedin.com/in/tanisheesh\">LinkedIn</a> · <a href=\"mailto:hey@tanisheesh.in\">hey@tanisheesh.in</a></p>"
+            echo "<p style=\"font-size:12px;color:#888;margin:0\">Tanish Poddar · <a href=\"https://tanisheesh.in\">tanisheesh.in</a> · <a href=\"https://github.com/tanisheesh\">GitHub</a> · <a href=\"https://linkedin.com/in/tanisheesh\">LinkedIn</a> · <a href=\"mailto:hi@tanisheesh.in\">hi@tanisheesh.in</a></p>"
             echo "</div>"
           } > report.html
 
@@ -143,5 +143,5 @@ jobs:
 #  Website   https://tanisheesh.in
 #  LinkedIn  https://linkedin.com/in/tanisheesh
 #  GitHub    https://github.com/tanisheesh
-#  Email     hey@tanisheesh.in
+#  Email     hi@tanisheesh.in
 # ──────────────────────────────────────────────────────────────────────────
