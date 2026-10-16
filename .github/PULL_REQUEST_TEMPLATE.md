@@ -45,5 +45,5 @@ Closes #
 
 <!--
   Tanish Poddar · https://tanisheesh.in · https://linkedin.com/in/tanisheesh
-  https://github.com/tanisheesh · hey@tanisheesh.in
+  https://github.com/tanisheesh · hi@tanisheesh.in
 -->
