@@ -66,3 +66,24 @@ def test_unknown_service_is_404_and_nothing_is_generated(api):
     r = api.post("/v1/insights/generate?service_name=made-up", headers={"X-Reqly-Key": settings.read_key})
     assert r.status_code == 404
     assert api.state["generated"] == 0
+
+
+def test_ready_reports_database_reachability(monkeypatch):
+    from app import main
+
+    class Pool:
+        def __init__(self, ok):
+            self.ok = ok
+
+        async def fetchval(self, sql):
+            if not self.ok:
+                raise ConnectionError("db down")
+            return 1
+
+    client = TestClient(main.app)
+    monkeypatch.setattr(main, "get_pool", lambda: Pool(True))
+    assert client.get("/v1/ready").json() == {"status": "ready", "database": "ok"}
+    monkeypatch.setattr(main, "get_pool", lambda: Pool(False))
+    r = client.get("/v1/ready")
+    assert r.status_code == 503 and r.json()["database"] == "unreachable"
+    assert client.get("/v1/health").status_code == 200  # liveness doesn't depend on the db

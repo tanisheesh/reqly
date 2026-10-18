@@ -55,7 +55,7 @@ Endpoints about one service check it against the caller's projects; list endpoin
 
 | Method | Path | Access | Description |
 |---|---|---|---|
-| `PUT` | `/v1/services/{service}/openapi` | Admin | Upload an OpenAPI 3 / Swagger 2 spec, JSON or YAML. `?base_path=` prefixes its paths |
+| `PUT` | `/v1/services/{service}/openapi` | Ingest or Admin | Upload an OpenAPI 3 / Swagger 2 spec, JSON or YAML. `?base_path=` prefixes its paths |
 | `GET` | `/v1/services/{service}/openapi/drift` | Read | Undocumented, unused and deprecated-but-called operations |
 | `DELETE` | `/v1/services/{service}/openapi` | Admin | Remove the spec |
 | `GET` | `/v1/services/{service}/consumers?window=` | Read | Top consumers. `window`: `24h`, `7d` (default), `30d` |
@@ -89,7 +89,8 @@ Endpoints about one service check it against the caller's projects; list endpoin
 
 | Method | Path | Access | Description |
 |---|---|---|---|
-| `GET` | `/v1/health` | none | Returns `{"status": "ok"}` |
+| `GET` | `/v1/health` | none | Liveness: `{"status": "ok"}` while the process is up |
+| `GET` | `/v1/ready` | none | Readiness: `{"status": "ready"}`, or `503` when the database doesn't answer |
 
 ## Limits
 

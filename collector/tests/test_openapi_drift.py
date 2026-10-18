@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import pytest
 from fastapi.testclient import TestClient
 
+from app import auth as auth_module
 from app.config import settings
 from app.main import app
 from app.openapi import drift
@@ -102,8 +103,12 @@ def api(monkeypatch):
         saved.update(service=service, spec=spec, base_path=base_path)
         return {"uploaded_at": T.isoformat()}
 
+    async def writable_service(principal, service):
+        return True  # project claims are covered by test_projects_db
+
     monkeypatch.setattr(openapi_router, "get_pool", lambda: None)
     monkeypatch.setattr(openapi_router.store, "save_spec", save_spec)
+    monkeypatch.setattr(auth_module, "writable_service", writable_service)
     client = TestClient(app)
     client.saved = saved
     return client

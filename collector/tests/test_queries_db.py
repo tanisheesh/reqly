@@ -233,3 +233,16 @@ def _sketches():
             await pool_module.close_pool()
 
     return asyncio.run(check())
+
+
+def test_concurrent_migration_runs_apply_each_migration_once():
+    """Two collectors starting together: the advisory lock serializes them."""
+    async def run():
+        pool = await pool_module.create_pool()
+        try:
+            await asyncio.gather(pool_module._run_migrations(pool), pool_module._run_migrations(pool))
+            return await pool.fetchval("SELECT count(*) FROM schema_migrations")
+        finally:
+            await pool_module.close_pool()
+
+    assert asyncio.run(run()) == len(list(pool_module._MIGRATIONS_DIR.glob("*.sql")))
