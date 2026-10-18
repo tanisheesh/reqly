@@ -4,7 +4,7 @@ import json
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from ..auth import verify_admin, verify_read_key
+from ..auth import verify_admin, verify_read_key, verify_spec_upload
 from ..db.pool import get_pool
 from ..openapi import store
 from ..openapi.drift import SpecError, spec_base_path, spec_operations, validate_spec
@@ -31,9 +31,9 @@ def parse_spec(body: bytes, content_type: str) -> dict:
         raise SpecError(f"invalid JSON: {exc}") from exc
 
 
-# Uploading needs the ingest key (the SDK and CI hold it); the read key ships
-# in the dashboard bundle.
-@router.put("/v1/services/{service_name}/openapi", dependencies=[Depends(verify_admin)])
+# Uploading takes a key with the ingest (or admin) scope -- what the SDK and CI
+# hold; the read key ships in the dashboard bundle. Deleting a spec is admin only.
+@router.put("/v1/services/{service_name}/openapi", dependencies=[Depends(verify_spec_upload)])
 async def put_spec(
     service_name: str,
     request: Request,

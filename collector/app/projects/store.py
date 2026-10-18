@@ -60,11 +60,14 @@ class _TTLCache:
 _key_cache = _TTLCache()
 _service_cache = _TTLCache()
 _last_used: dict[int, datetime] = {}
+_default_project_id: int | None = None
 
 
 def clear_caches() -> None:
+    global _default_project_id
     _key_cache.clear()
     _service_cache.clear()
+    _default_project_id = None
 
 
 # --- projects ------------------------------------------------------------------
@@ -106,7 +109,12 @@ async def get_project(pool: asyncpg.Pool, project_id: int) -> dict | None:
 
 
 async def default_project_id(pool: asyncpg.Pool) -> int:
-    return await pool.fetchval("SELECT id FROM projects WHERE slug = $1", DEFAULT_PROJECT_SLUG)
+    """Cached: ingest with the env key asks for it on every batch, and the
+    default project (created by migration 009) never changes."""
+    global _default_project_id
+    if _default_project_id is None:
+        _default_project_id = await pool.fetchval("SELECT id FROM projects WHERE slug = $1", DEFAULT_PROJECT_SLUG)
+    return _default_project_id
 
 
 # --- services --------------------------------------------------------------------
