@@ -194,3 +194,53 @@ def test_old_and_future_events_are_rejected_unless_backfill(client):
         "events": [_valid_event(timestamp=(now - timedelta(days=20)).isoformat()), future],
     }).json()
     assert (body["accepted"], body["rejected"]) == (1, 1)
+
+
+def test_ingest_is_rate_limited_per_key_not_per_ip(client, monkeypatch):
+    """Two services behind one IP each get their own budget; the env key has
+    its own (larger) one. Requests here all come from the same test client IP."""
+    from app import auth, rate_limit
+    from app.config import settings
+
+    async def no_cap(pool, service, pairs, limit):
+        return [consumer for _, consumer in pairs]
+
+    env_principal = auth._key_principal
+
+    async def key_principal(key):  # any rqk_ key is a valid project key here
+        if key and key.startswith("rqk_"):
+            return auth.Principal("project-key", frozenset({"ingest"}), frozenset({1}), key_project_id=1)
+        return await env_principal(key)
+
+    monkeypatch.setattr(ingest_module.consumer_cap, "apply", no_cap)
+    monkeypatch.setattr(auth, "_key_principal", key_principal)
+    monkeypatch.setattr(rate_limit, "RATE_LIMIT", "2/minute")
+    monkeypatch.setattr(rate_limit, "ENV_KEY_LIMIT", "3/minute")
+    rate_limit.limiter.reset()
+
+    def send(key):
+        body = {"service_name": "svc", "events": [_valid_event()]}
+        return client.post("/v1/ingest", json=body, headers={"X-Reqly-Key": key}).status_code
+
+    try:
+        assert [send("rqk_service_a") for _ in range(3)] == [200, 200, 429]  # key A: 2/minute
+        assert [send("rqk_service_b") for _ in range(2)] == [200, 200]       # key B: own budget, same IP
+        assert [send(settings.ingest_key) for _ in range(4)] == [200, 200, 200, 429]  # env key: 3/minute
+    finally:
+        rate_limit.limiter.reset()
+
+
+def test_ingest_bucket_never_holds_the_raw_key():
+    from starlette.requests import Request
+
+    from app.rate_limit import ENV_KEY_BUCKET, ingest_key
+    from app.config import settings
+
+    def req(key):
+        headers = [(b"x-reqly-key", key.encode())] if key else []
+        return Request({"type": "http", "headers": headers, "client": ("10.0.0.7", 1)})
+
+    assert ingest_key(req(settings.ingest_key)) == ENV_KEY_BUCKET
+    assert ingest_key(req("")) == "ingest:ip:10.0.0.7"
+    bucket = ingest_key(req("rqk_secret_value"))
+    assert bucket.startswith("ingest:key:") and "secret" not in bucket

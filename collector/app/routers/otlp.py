@@ -28,7 +28,7 @@ from ..db.late_data import tracker as late_data_tracker
 from ..db.pool import get_pool
 from ..db.queries import EVENT_COLUMNS, insert_events, record_deployments, row_time
 from ..otlp.mapping import map_resource_spans
-from ..rate_limit import RATE_LIMIT, limiter
+from ..rate_limit import INGEST_IP_LIMIT, ingest_key, ingest_limit, limiter
 
 router = APIRouter()
 
@@ -78,7 +78,8 @@ def _now() -> datetime:
 
 
 @router.post("/otlp/v1/traces")
-@limiter.limit(RATE_LIMIT)
+@limiter.limit(INGEST_IP_LIMIT)
+@limiter.limit(ingest_limit, key_func=ingest_key)
 async def export_traces(request: Request, principal: Principal = Depends(verify_ingest_key)) -> Response:
     content_type = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
     if content_type not in (_PROTOBUF, _JSON):
