@@ -18,6 +18,9 @@ The collector reads its settings from environment variables. Locally, copy `.env
 | `SESSION_TTL_HOURS` | `168` | How long a sign-in lasts |
 | `CORS_ORIGINS` | `*` locally | Comma-separated dashboard origins allowed to call the collector. Restrict it in production |
 | `FORWARDED_ALLOW_IPS` | `127.0.0.1` | Behind a proxy, the proxy's IP (or `*` if the collector is only reachable through it), so rate limits see real client IPs |
+| `RATE_LIMIT_PER_MINUTE` | `600` | Ingest requests (`/v1/ingest`, `/otlp/v1/traces`) per minute **per project key**, so services behind one IP don't share a budget. An SDK sends one request per batch, not per app request |
+| `RATE_LIMIT_ENV_KEY_PER_MINUTE` | `6000` | The same for `REQLY_INGEST_KEY`, which every service using it shares. For many services, give each project its own key |
+| `RATE_LIMIT_INGEST_PER_IP_PER_MINUTE` | `6000` | Outer ingest cap per client IP, so made-up keys can't get around the per-key limits. Ask Reqly, insights and sign-in stay limited per IP |
 
 The collector warns at start-up if the keys are the defaults or if the two keys are equal.
 

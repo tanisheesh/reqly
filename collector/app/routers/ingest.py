@@ -13,7 +13,7 @@ from ..db.late_data import event_time_problem
 from ..db.late_data import tracker as late_data_tracker
 from ..db.pool import get_pool
 from ..db.queries import event_row, insert_events, record_deployments, row_time
-from ..rate_limit import RATE_LIMIT, limiter
+from ..rate_limit import INGEST_IP_LIMIT, ingest_key, ingest_limit, limiter
 
 router = APIRouter()
 
@@ -76,7 +76,8 @@ class IngestRequest(BaseModel):
 
 
 @router.post("/v1/ingest")
-@limiter.limit(RATE_LIMIT)
+@limiter.limit(INGEST_IP_LIMIT)
+@limiter.limit(ingest_limit, key_func=ingest_key)
 async def ingest(request: Request, body: IngestRequest, principal: Principal = Depends(verify_ingest_key)):
     """Batch ingestion with true partial-batch acceptance: each event is
     validated independently, so one malformed event from a buggy SDK only
