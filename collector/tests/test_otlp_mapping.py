@@ -212,3 +212,30 @@ def test_genai_span_needs_a_model_and_sane_token_counts():
     huge = _child("3333333333333333", SERVER_ID, {"gen_ai.request.model": "m", "gen_ai.usage.input_tokens": 10**12})
     [event] = _events(map_resource_spans(_tree(server, no_model, huge)))
     assert event["llm_model"] is None
+
+
+def test_consumer_ids_are_hashed_like_the_sdks_and_dropped_without_a_salt():
+    from app.db.queries import EVENT_COLUMNS
+    from app.otlp.mapping import consumer_hash
+
+    consumer = EVENT_COLUMNS.index("consumer_id")
+    payload = _payload(_span({**HTTP_OK, "enduser.id": "alice@example.com"}))
+
+    hashed = map_resource_spans(payload, consumer_salt="s3cret").rows[0][consumer]
+    assert hashed == consumer_hash("alice@example.com", "s3cret") and "alice" not in hashed
+    assert len(hashed) == 16  # same shape as the SDKs' ids
+    assert map_resource_spans(payload).rows[0][consumer] is None  # no salt: never stored raw
+
+    both = _payload(_span({**HTTP_OK, "enduser.id": "alice", "reqly.consumer_id": "tenant-7"}))
+    assert map_resource_spans(both, consumer_salt="s").rows[0][consumer] == consumer_hash("tenant-7", "s")
+
+
+def test_consumer_hash_matches_the_python_sdk():
+    import hashlib
+    import hmac
+
+    from app.otlp.mapping import consumer_hash
+
+    # the formula in sdk/reqly/core/request_context.py (and the Node SDK)
+    sdk = hmac.new(b"salt", b"key_live_1", hashlib.sha256).hexdigest()[:16]
+    assert consumer_hash("key_live_1", "salt") == sdk
