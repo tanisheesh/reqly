@@ -51,6 +51,7 @@ def _otlp(service):
 def test_projects_keys_and_scoping():
     tag = uuid.uuid4().hex[:6]
     alpha_svc, beta_svc, legacy_svc = f"svc-a-{tag}", f"svc-b-{tag}", f"svc-legacy-{tag}"
+    spec_svc = f"svc-spec-{tag}"
     member, outsider = f"user-m-{tag}", f"user-o-{tag}"
 
     with TestClient(app) as client:
@@ -109,6 +110,16 @@ def test_projects_keys_and_scoping():
             projects_seen = client.get("/v1/projects", headers=_key(alpha_rw["key"])).json()["projects"]
             assert [p["id"] for p in projects_seen] == [alpha["id"]] and projects_seen[0]["services"] == [alpha_svc]
 
+            # --- OpenAPI upload: the ingest scope is enough, and a new service is claimed --
+            spec = {"openapi": "3.0.0", "info": {"title": "t", "version": "1"}, "paths": {"/a": {"get": {}}}}
+            r = client.put(f"/v1/services/{spec_svc}/openapi", headers=_key(alpha_ingest_only["key"]), json=spec)
+            assert r.status_code == 200, r.text  # brand-new service: uploaded before any event claimed it
+            assert call(store.project_of, pool, spec_svc) == alpha["id"]
+            assert client.put(f"/v1/services/{alpha_svc}/openapi", headers=_key(beta_rw["key"]),
+                              json=spec).status_code == 403  # another project's service
+            assert client.put(f"/v1/services/{alpha_svc}/openapi", headers=_key(settings.read_key),
+                              json=spec).status_code == 403  # the read key can't upload
+
             # --- a project admin key manages its own project only ---------------------
             admin_h = _key(alpha_admin["key"])
             assert client.get(f"/v1/projects/{alpha['id']}/keys", headers=admin_h).status_code == 200
@@ -148,7 +159,8 @@ def test_projects_keys_and_scoping():
             assert all("key" not in k and "key_hash" not in k for k in listed)
             assert [k["revoked_at"] is not None for k in listed if k["id"] == alpha_rw["id"]] == [True]
         finally:
-            services = [alpha_svc, beta_svc, legacy_svc]
+            services = [alpha_svc, beta_svc, legacy_svc, spec_svc]
+            call(pool.execute, "DELETE FROM api_specs WHERE service_name = ANY($1::text[])", services)
             call(pool.execute, "DELETE FROM request_events WHERE service_name = ANY($1::text[])", services)
             call(pool.execute, "DELETE FROM slos WHERE service_name = ANY($1::text[])", services)
             call(pool.execute, "DELETE FROM project_services WHERE service_name = ANY($1::text[])", services)

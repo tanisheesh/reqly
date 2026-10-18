@@ -13,29 +13,41 @@ _pool: asyncpg.Pool | None = None
 logger = logging.getLogger("reqly.collector")
 
 _MIGRATIONS_DIR = Path(__file__).parent.parent.parent / "migrations"
+# Session-level advisory lock held while migrating, so two collectors starting
+# at once (a rolling deploy, a scale-out) apply each migration exactly once:
+# the second waits, then finds them all recorded.
+_MIGRATION_LOCK_ID = 727_316_001
 
 
 async def _run_migrations(pool: asyncpg.Pool) -> None:
     async with pool.acquire() as conn:
-        await conn.execute("""
-            CREATE TABLE IF NOT EXISTS schema_migrations (
-                filename  TEXT PRIMARY KEY,
-                applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        await conn.execute("SELECT pg_advisory_lock($1)", _MIGRATION_LOCK_ID)
+        try:
+            await _apply_migrations(conn)
+        finally:
+            await conn.execute("SELECT pg_advisory_unlock($1)", _MIGRATION_LOCK_ID)
+
+
+async def _apply_migrations(conn: asyncpg.Connection) -> None:
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            filename  TEXT PRIMARY KEY,
+            applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    """)
+    for sql_file in sorted(_MIGRATIONS_DIR.glob("*.sql")):
+        already = await conn.fetchval(
+            "SELECT 1 FROM schema_migrations WHERE filename = $1", sql_file.name
+        )
+        if already:
+            logger.debug("Migration %s already applied, skipping", sql_file.name)
+            continue
+        async with conn.transaction():
+            await conn.execute(sql_file.read_text())
+            await conn.execute(
+                "INSERT INTO schema_migrations (filename) VALUES ($1)", sql_file.name
             )
-        """)
-        for sql_file in sorted(_MIGRATIONS_DIR.glob("*.sql")):
-            already = await conn.fetchval(
-                "SELECT 1 FROM schema_migrations WHERE filename = $1", sql_file.name
-            )
-            if already:
-                logger.debug("Migration %s already applied, skipping", sql_file.name)
-                continue
-            async with conn.transaction():
-                await conn.execute(sql_file.read_text())
-                await conn.execute(
-                    "INSERT INTO schema_migrations (filename) VALUES ($1)", sql_file.name
-                )
-            logger.info("Reqly collector: applied migration %s", sql_file.name)
+        logger.info("Reqly collector: applied migration %s", sql_file.name)
 
 
 async def create_pool() -> asyncpg.Pool:

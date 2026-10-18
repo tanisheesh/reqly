@@ -54,7 +54,7 @@ It also shows the spec's coverage and the share of traffic that goes to undocume
 
     OpenAPI 3 or Swagger 2, JSON or YAML. Add `?base_path=/api` if the app serves the spec's paths under a prefix; Swagger 2's `basePath` is used automatically.
 
-There is one spec per service; uploading again replaces it. `DELETE /v1/services/{service}/openapi` removes it. Uploading needs the ingest key, an admin session, or a project key with the `admin` scope.
+There is one spec per service; uploading again replaces it. `DELETE /v1/services/{service}/openapi` removes it. Uploading takes the same key the SDK sends events with: the ingest key, or a project key with the `ingest` (or `admin`) scope; an admin session works too. A service seen for the first time joins the uploader's project, as on ingest. Deleting needs `admin`.
 
 ## How paths are matched
 

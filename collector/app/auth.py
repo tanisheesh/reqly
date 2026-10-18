@@ -129,7 +129,8 @@ async def writable_service(principal: Principal, service_name: str) -> bool:
     project; the default project for the env key)."""
     pool = get_pool()
     if principal.key_project_id is None:
-        await projects.claim_service(pool, service_name, await projects.default_project_id(pool))
+        if await projects.project_of(pool, service_name) is None:  # cached for known services
+            await projects.claim_service(pool, service_name, await projects.default_project_id(pool))
         return True
     owner = await projects.claim_service(pool, service_name, principal.key_project_id)
     return owner == principal.key_project_id
@@ -169,6 +170,23 @@ async def verify_admin(
     if not principal.can("admin"):
         raise _forbidden("admins only")
     await check_service(principal, service_name)
+    return principal
+
+
+async def verify_spec_upload(
+    service_name: str,
+    x_REQLY_key: str | None = Header(default=None),
+    authorization: str | None = Header(default=None),
+) -> Principal:
+    """Uploading a service's OpenAPI spec: the SDKs push it with the same key
+    they send events with, so `ingest` is enough (`admin` too). Like ingest,
+    a service seen for the first time joins the uploader's project -- the
+    SDK uploads on the first request, before its first batch has claimed it."""
+    principal = await resolve(x_REQLY_key, authorization)
+    if not (principal.can("ingest") or principal.can("admin")):
+        raise _forbidden("uploading a spec needs a key with the ingest or admin scope")
+    if not await writable_service(principal, service_name):
+        raise _forbidden("this service belongs to a project you don't have access to")
     return principal
 
 

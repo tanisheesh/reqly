@@ -165,8 +165,6 @@ the tradeoff each answer cost.
 | Real-time streaming (WebSockets/SSE) | 30–60 s polling is enough for the observability use case; persistent connections add complexity to the collector and ops burden |
 | Trace views (span waterfalls) | OTLP spans are reduced to request events; a trace UI is a different product and storage model |
 | OIDC / SSO sign-in | Username + password covers self-hosted teams today; OIDC when a real deployment needs it |
-| Node SDK for Koa, NestJS, plain `http` | OpenTelemetry covers them; built when a real user asks |
-| Helm chart | Docker Compose and single-container deploys cover current users |
 
 ---
 
@@ -177,6 +175,6 @@ the tradeoff each answer cost.
 <a href="https://tanisheesh.in"><img src="https://img.shields.io/badge/Website-tanisheesh.in-111111?style=flat-square&logo=googlechrome&logoColor=white" alt="Website"></a>
 <a href="https://linkedin.com/in/tanisheesh"><img src="https://img.shields.io/badge/LinkedIn-tanisheesh-0A66C2?style=flat-square" alt="LinkedIn"></a>
 <a href="https://github.com/tanisheesh"><img src="https://img.shields.io/badge/GitHub-tanisheesh-181717?style=flat-square&logo=github&logoColor=white" alt="GitHub"></a>
-<a href="mailto:hi@tanisheesh.in"><img src="https://img.shields.io/badge/Email-hey%40tanisheesh.in-EA4335?style=flat-square&logo=gmail&logoColor=white" alt="Email"></a>
+<a href="mailto:hi@tanisheesh.in"><img src="https://img.shields.io/badge/Email-hi%40tanisheesh.in-EA4335?style=flat-square&logo=gmail&logoColor=white" alt="Email"></a>
 
 </div>

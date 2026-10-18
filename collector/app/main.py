@@ -5,6 +5,7 @@ import logging
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
@@ -12,7 +13,7 @@ from slowapi import _rate_limit_exceeded_handler
 from .body_limit import BodySizeLimitMiddleware
 from .config import settings
 from .db.late_data import run_refresh_loop
-from .db.pool import close_pool, create_pool
+from .db.pool import close_pool, create_pool, get_pool
 from .insights.scheduler import start_scheduler
 from .rate_limit import limiter
 from .users.accounts import bootstrap_admin
@@ -58,7 +59,7 @@ async def lifespan(app: FastAPI):
         await close_pool()
 
 
-app = FastAPI(title="Reqly Collector", version="0.12.1", lifespan=lifespan)
+app = FastAPI(title="Reqly Collector", version="0.12.2", lifespan=lifespan)
 
 app.state.limiter = limiter
 
@@ -88,4 +89,16 @@ app.include_router(projects.router)
 
 @app.get("/v1/health")
 async def health():
+    """Liveness: the process is up. Doesn't touch the database."""
     return {"status": "ok"}
+
+
+@app.get("/v1/ready")
+async def ready():
+    """Readiness: the database answers. For Kubernetes readiness probes and
+    load balancers; a 503 takes the instance out of rotation, not restarts it."""
+    try:
+        await asyncio.wait_for(get_pool().fetchval("SELECT 1"), timeout=2)
+    except Exception:
+        return JSONResponse({"status": "unavailable", "database": "unreachable"}, status_code=503)
+    return {"status": "ready", "database": "ok"}
