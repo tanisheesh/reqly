@@ -18,6 +18,9 @@ mapping path. Handles both the stable HTTP semantic conventions
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+
 import base64
 import binascii
 import uuid
@@ -190,7 +193,7 @@ def _llm_usage_by_server_span(payload: dict) -> dict[tuple[str, str], dict]:
     return out
 
 
-def map_resource_spans(payload: dict) -> MappingResult:
+def map_resource_spans(payload: dict, consumer_salt: str | None = None) -> MappingResult:
     """payload: an ExportTraceServiceRequest in OTLP/JSON shape."""
     result = MappingResult()
     llm_usage = _llm_usage_by_server_span(payload)
@@ -211,11 +214,28 @@ def map_resource_spans(payload: dict) -> MappingResult:
 
         for scope_spans in resource_spans.get("scopeSpans") or []:
             for span in scope_spans.get("spans") or []:
-                _map_span(span, service_name, release, environment, host, result, llm_usage)
+                _map_span(span, service_name, release, environment, host, result, llm_usage, consumer_salt)
     return result
 
 
-def _map_span(span, service_name, release, environment, host, result: MappingResult, llm_usage=None) -> None:
+def consumer_hash(value, salt: str) -> str:
+    """The SDKs' consumer id: HMAC-SHA256 with the salt, first 16 hex digits,
+    so one caller gets the same id whether it reaches Reqly via an SDK or OTLP."""
+    return hmac.new(salt.encode(), str(value).encode(), hashlib.sha256).hexdigest()[:16]
+
+
+def _consumer_id(attrs: dict, salt: str | None) -> str | None:
+    """reqly.consumer_id or enduser.id, hashed. OTLP exporters send them in
+    plain text, and a raw user id or email must never be stored: without
+    REQLY_CONSUMER_SALT the consumer is dropped instead."""
+    value = _first(attrs, "reqly.consumer_id", "enduser.id")
+    if value is None or not salt:
+        return None
+    return consumer_hash(value, salt)
+
+
+def _map_span(span, service_name, release, environment, host, result: MappingResult, llm_usage=None,
+              consumer_salt: str | None = None) -> None:
     if span.get("kind") not in _SPAN_KIND_SERVER:
         result.skipped += 1
         return
@@ -295,6 +315,7 @@ def _map_span(span, service_name, release, environment, host, result: MappingRes
             environment=environment,
             request_bytes=_byte_count(attrs, "http.request.body.size", "http.request_content_length"),
             response_bytes=_byte_count(attrs, "http.response.body.size", "http.response_content_length"),
+            consumer_id=_consumer_id(attrs, consumer_salt),
             **(llm_usage or {}).get((_hex_id(span.get("traceId")), _hex_id(span.get("spanId"))), {}),
         )
     )

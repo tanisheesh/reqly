@@ -93,6 +93,7 @@ Reqly is API-level monitoring, not a tracing backend. From each export it keeps 
 | error type | `error.type`, else the `exception.type` of the span's first exception event |
 | body sizes | `http.request.body.size` / `http.response.body.size` |
 | LLM model and tokens | GenAI spans under the request (see below) |
+| [API consumer](../features/consumers.md) | `reqly.consumer_id`, else `enduser.id`, HMAC-hashed by the collector with `REQLY_CONSUMER_SALT`. Without that salt the attribute is ignored, so a raw user id or email is never stored |
 
 !!! warning "The route matters"
     Reqly groups by route template (`/users/:id`), never by raw URL. If your instrumentation doesn't set `http.route`, every request lands in `__unmatched__`. Check your framework's instrumentation docs for how to turn on route reporting.
