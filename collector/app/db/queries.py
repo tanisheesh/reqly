@@ -138,28 +138,60 @@ async def sketches_available(pool: asyncpg.Pool) -> bool:
     return _sketches_available
 
 
+def _latency_view(sketches: bool) -> str:
+    return "api_latency_1min" if sketches else "route_latency_1min"
+
+
 async def list_services(pool: asyncpg.Pool) -> list[str]:
     # Query the 90-day aggregate instead of the 14-day raw events table so
     # services that have been quiet for >2 weeks remain visible in the dropdown.
-    rows = await pool.fetch(
-        "SELECT DISTINCT service_name FROM route_latency_1min ORDER BY service_name"
-    )
+    view = _latency_view(await sketches_available(pool))
+    rows = await pool.fetch(f"SELECT DISTINCT service_name FROM {view} ORDER BY service_name")
     return [r["service_name"] for r in rows]
 
 
 async def list_routes(pool: asyncpg.Pool, service_name: str) -> list[str]:
+    view = _latency_view(await sketches_available(pool))
     rows = await pool.fetch(
-        "SELECT DISTINCT route FROM route_latency_1min WHERE service_name = $1 ORDER BY route",
-        service_name,
+        f"SELECT DISTINCT route FROM {view} WHERE service_name = $1 ORDER BY route", service_name
     )
     return [r["route"] for r in rows]
 
 
+async def list_environments(pool: asyncpg.Pool, service_name: str) -> list[str]:
+    """Environments the service reported in the last 90 days. Needs the
+    sketch aggregate, which keeps the environment; none without it."""
+    if not await sketches_available(pool):
+        return []
+    rows = await pool.fetch(
+        """
+        SELECT DISTINCT environment FROM api_latency_1min
+        WHERE service_name = $1 AND environment IS NOT NULL AND environment <> ''
+        ORDER BY environment
+        """,
+        service_name,
+    )
+    return [r["environment"] for r in rows]
+
+
+class EnvironmentFilterUnavailable(Exception):
+    """Filtering by environment needs api_latency_1min (TimescaleDB Toolkit)."""
+
+
+async def _sketches_or_no_environment(pool: asyncpg.Pool, environment: str | None) -> bool:
+    """sketches_available(), refusing an environment filter without them:
+    the older views don't keep the environment."""
+    sketches = await sketches_available(pool)
+    if environment and not sketches:
+        raise EnvironmentFilterUnavailable()
+    return sketches
+
+
 async def get_latency_series(
-    pool: asyncpg.Pool, service_name: str, route: str | None, window: str
+    pool: asyncpg.Pool, service_name: str, route: str | None, window: str, environment: str | None = None
 ) -> list[dict]:
     interval = _interval_for_window(window)
-    if await sketches_available(pool):
+    if await _sketches_or_no_environment(pool, environment):
         # Real percentiles at any level: sketches roll up across routes (and
         # methods/environments) and across time into one distribution.
         rows = await pool.fetch(
@@ -171,11 +203,13 @@ async def get_latency_series(
                    approx_percentile(0.99, rollup(latency)) AS p99_ms
             FROM api_latency_1min
             WHERE service_name = $1 AND ($2::text IS NULL OR route = $2)
+              AND ($3::text IS NULL OR environment = $3)
               AND bucket > now() - interval '{interval}'
             GROUP BY 1 ORDER BY 1
             """,
             service_name,
             route,
+            environment,
         )
         return [dict(r) for r in rows]
 
@@ -210,9 +244,9 @@ async def get_latency_series(
 
 
 async def get_error_rate_series(
-    pool: asyncpg.Pool, service_name: str, route: str | None, window: str
+    pool: asyncpg.Pool, service_name: str, route: str | None, window: str, environment: str | None = None
 ) -> list[dict]:
-    if await sketches_available(pool):
+    if await _sketches_or_no_environment(pool, environment):
         # The 1-minute aggregate is current to the last minute, so every
         # window gets fresh error rates (the hourly view lags by up to 2h).
         interval = _interval_for_window(window)
@@ -224,11 +258,13 @@ async def get_error_rate_series(
                    sum(error_count)::float / nullif(sum(request_count), 0) AS error_rate
             FROM api_latency_1min
             WHERE service_name = $1 AND ($2::text IS NULL OR route = $2)
+              AND ($3::text IS NULL OR environment = $3)
               AND bucket > now() - interval '{interval}'
             GROUP BY 1 ORDER BY 1
             """,
             service_name,
             route,
+            environment,
         )
         return [dict(r) for r in rows]
 
@@ -305,8 +341,26 @@ async def get_error_rate_series(
 
 
 async def get_status_distribution(
-    pool: asyncpg.Pool, service_name: str, route: str | None, window: str
+    pool: asyncpg.Pool, service_name: str, route: str | None, window: str, environment: str | None = None
 ) -> list[dict]:
+    if environment:
+        # The hourly status view has no environment; raw events (kept 14 days)
+        # do, and the dashboard's windows are at most 7 days.
+        await _sketches_or_no_environment(pool, environment)
+        interval = _interval_for_window(window)
+        rows = await pool.fetch(
+            f"""
+            SELECT status_code, count(*) AS count
+            FROM request_events
+            WHERE service_name = $1 AND ($2::text IS NULL OR route = $2) AND environment = $3
+              AND time > now() - interval '{interval}'
+            GROUP BY status_code ORDER BY status_code
+            """,
+            service_name,
+            route,
+            environment,
+        )
+        return [dict(r) for r in rows]
     # Same end_offset gap as error rate — use raw events for the 1h window.
     if window == "1h":
         if route:
@@ -357,10 +411,34 @@ async def get_status_distribution(
     return [dict(r) for r in rows]
 
 
-async def get_top_routes(pool: asyncpg.Pool, service_name: str, window: str) -> list[dict]:
-    # For the 1h window, route_errors_1hour has no data (end_offset=1h gap) so the
-    # LEFT JOIN would zero out all error rates. Query raw events directly instead —
-    # this also gives an accurate per-route p95 from the full distribution.
+async def get_top_routes(
+    pool: asyncpg.Pool, service_name: str, window: str, environment: str | None = None
+) -> list[dict]:
+    interval = _interval_for_window(window)
+    if await _sketches_or_no_environment(pool, environment):
+        # Every window, 1h included: the 1-minute sketches are current to the
+        # minute and carry error counts, so there's no raw-table scan.
+        rows = await pool.fetch(
+            f"""
+            SELECT route,
+                   sum(request_count) AS request_count,
+                   approx_percentile(0.95, rollup(latency)) AS p95_ms,
+                   coalesce(sum(error_count)::float / nullif(sum(request_count), 0), 0) AS error_rate
+            FROM api_latency_1min
+            WHERE service_name = $1 AND ($2::text IS NULL OR environment = $2)
+              AND bucket > now() - interval '{interval}'
+            GROUP BY route
+            ORDER BY request_count DESC
+            LIMIT 20
+            """,
+            service_name,
+            environment,
+        )
+        return [dict(r) for r in rows]
+
+    # Without sketches, the 1h window reads raw events: route_errors_1hour has
+    # no data for it (end_offset=1h gap), so the LEFT JOIN would zero every
+    # error rate. Raw events also give an exact per-route p95.
     if window == "1h":
         rows = await pool.fetch(
             """
@@ -373,24 +451,6 @@ async def get_top_routes(pool: asyncpg.Pool, service_name: str, window: str) -> 
                      ELSE 0 END AS error_rate
             FROM request_events
             WHERE service_name = $1 AND time > now() - INTERVAL '1 hour'
-            GROUP BY route
-            ORDER BY request_count DESC
-            LIMIT 20
-            """,
-            service_name,
-        )
-        return [dict(r) for r in rows]
-
-    interval = _interval_for_window(window)
-    if await sketches_available(pool):
-        rows = await pool.fetch(
-            f"""
-            SELECT route,
-                   sum(request_count) AS request_count,
-                   approx_percentile(0.95, rollup(latency)) AS p95_ms,
-                   coalesce(sum(error_count)::float / nullif(sum(request_count), 0), 0) AS error_rate
-            FROM api_latency_1min
-            WHERE service_name = $1 AND bucket > now() - interval '{interval}'
             GROUP BY route
             ORDER BY request_count DESC
             LIMIT 20
@@ -487,7 +547,9 @@ async def list_releases(pool: asyncpg.Pool, service_name: str, limit: int = 20) 
     return releases
 
 
-async def get_release_markers(pool: asyncpg.Pool, service_name: str, window: str) -> list[dict]:
+async def get_release_markers(
+    pool: asyncpg.Pool, service_name: str, window: str, environment: str | None = None
+) -> list[dict]:
     """Releases first seen inside the window -- drawn as deploy markers on
     the dashboard's time-series charts."""
     interval = _interval_for_window(window)
@@ -495,17 +557,18 @@ async def get_release_markers(pool: asyncpg.Pool, service_name: str, window: str
         f"""
         SELECT release, min(first_seen_at) AS first_seen_at
         FROM deployments
-        WHERE service_name = $1
+        WHERE service_name = $1 AND ($2::text IS NULL OR environment = $2)
         GROUP BY release
         HAVING min(first_seen_at) > now() - interval '{interval}'
         ORDER BY first_seen_at
         """,
         service_name,
+        environment,
     )
     return [dict(r) for r in rows]
 
 
-async def get_request_rate(pool: asyncpg.Pool, service_name: str) -> dict:
+async def get_request_rate(pool: asyncpg.Pool, service_name: str, environment: str | None = None) -> dict:
     """Polls the raw events table directly (not the 1-minute aggregate) for
     the last 60 seconds, so this one tile feels more 'live' in a demo without
     needing a push transport for the whole dashboard.
@@ -514,9 +577,11 @@ async def get_request_rate(pool: asyncpg.Pool, service_name: str) -> dict:
         """
         SELECT count(*) AS request_count
         FROM request_events
-        WHERE service_name = $1 AND time > now() - interval '60 seconds'
+        WHERE service_name = $1 AND ($2::text IS NULL OR environment = $2)
+          AND time > now() - interval '60 seconds'
         """,
         service_name,
+        environment,
     )
     return {"requests_per_minute": row["request_count"] if row else 0}
 

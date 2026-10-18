@@ -37,7 +37,8 @@ Endpoints about one service check it against the caller's projects; list endpoin
 |---|---|---|---|
 | `GET` | `/v1/services` | Read | Services with recorded traffic |
 | `GET` | `/v1/services/{service}/routes` | Read | Route templates for a service |
-| `GET` | `/v1/metrics/summary?service_name=&window=&route=` | Read | Latency and error-rate series, status codes, top routes, requests/min and release markers. `window`: `1h` (default), `6h`, `24h`, `7d` |
+| `GET` | `/v1/services/{service}/environments` | Read | Environments the service reported in the last 90 days |
+| `GET` | `/v1/metrics/summary?service_name=&window=&route=&environment=` | Read | Latency and error-rate series, status codes, top routes, requests/min and release markers. `window`: `1h` (default), `6h`, `24h`, `7d` |
 | `GET` | `/v1/services/{service}/releases` | Read | Recent releases: first/last seen, volume, error rate, p95 |
 
 ## Alerts, SLOs and reports

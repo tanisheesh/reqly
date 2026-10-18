@@ -33,6 +33,10 @@ Every event carries the release it was served by. The SDKs detect it from your C
 - show each release's error rate and p95 in the releases table
 - tell you in every alert which release was running, and for a new release, how errors and p95 changed against the previous one
 
+## Environments
+
+When your apps send an environment (`environment=` / `REQLY_ENVIRONMENT` in the SDKs, `deployment.environment` over OpenTelemetry), the dashboard shows an **Environment** filter next to the service and route, so production and staging traffic aren't mixed in the charts. It filters latency, error rate, status codes, top routes, requests/min and release markers, and needs the TimescaleDB Toolkit (included in `timescale/timescaledb-ha`).
+
 ## Freshness and retention
 
 | Data | Kept for | Notes |

@@ -95,7 +95,8 @@ def test_projects_keys_and_scoping():
             default_id = call(store.default_project_id, pool)
             assert call(store.project_of, pool, legacy_svc) == default_id
             assert call(store.project_of, pool, alpha_svc) == alpha["id"]
-            call(pool.execute, "CALL refresh_continuous_aggregate('route_latency_1min', NULL, NULL)")
+            for view in ("route_latency_1min", "api_latency_1min"):  # the service list reads the latter
+                call(pool.execute, f"CALL refresh_continuous_aggregate('{view}', NULL, NULL)")
 
             # --- reading is scoped to the key's project ------------------------------
             seen = client.get("/v1/services", headers=_key(alpha_rw["key"])).json()["services"]
