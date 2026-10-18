@@ -473,9 +473,17 @@ export const api = {
       `/v1/services/${encodeURIComponent(serviceName)}/routes`
     ),
 
-  getMetricsSummary: (serviceName: string, route: string | null, window: TimeWindow) => {
+  listEnvironments: (serviceName: string) =>
+    getJSON<{ environments: string[] }>(
+      `/v1/services/${encodeURIComponent(serviceName)}/environments`
+    ),
+
+  getMetricsSummary: (
+    serviceName: string, route: string | null, window: TimeWindow, environment: string | null = null,
+  ) => {
     const params = new URLSearchParams({ service_name: serviceName, window });
     if (route) params.set("route", route);
+    if (environment) params.set("environment", environment);
     return getJSON<MetricsSummary>(`/v1/metrics/summary?${params.toString()}`);
   },
 

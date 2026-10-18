@@ -13,7 +13,7 @@ import { AlertsBanner } from "../components/AlertsBanner";
 import { SloPanel } from "../components/SloPanel";
 import { InsightsPanel } from "../components/InsightsPanel";
 import { AskPanel } from "../components/AskPanel";
-import { useMetricsSummary, useProjects } from "../hooks/useMetrics";
+import { useEnvironments, useMetricsSummary, useProjects } from "../hooks/useMetrics";
 import { COLLECTOR_URL, TimeWindow } from "../api/client";
 import { SessionUser } from "../api/auth";
 import { SettingsPage } from "./SettingsPage";
@@ -146,6 +146,9 @@ export function Dashboard({
 } = {}) {
   const [serviceName, setServiceName] = useState<string | null>(null);
   const [route, setRoute] = useState<string | null>(null);
+  const [environment, setEnvironment] = useState<string | null>(null);
+  const { data: environmentsData } = useEnvironments(serviceName);
+  const environments = environmentsData?.environments ?? [];
   const [timeWindow, setWindowValue] = useState<TimeWindow>("1h");
   const [requestedView, setView] = useState<"dashboard" | "settings">("dashboard");
   // Settings need a signed-in user; signing out there lands on the dashboard.
@@ -155,7 +158,9 @@ export function Dashboard({
   const projects = projectsData?.projects ?? [];
   const project = projects.find((p) => p.id === projectId) ?? null;
 
-  const { data: summary, isLoading } = useMetricsSummary(serviceName, route, timeWindow);
+  const { data: summary, isLoading } = useMetricsSummary(
+    serviceName, route, timeWindow, environment && environments.includes(environment) ? environment : null,
+  );
 
   const year = new Date().getFullYear();
 
@@ -175,7 +180,7 @@ export function Dashboard({
         <div className="mx-auto flex max-w-screen-xl items-center gap-4 px-4 py-3 sm:px-6">
           {/* Logo */}
           <button
-            onClick={() => { setServiceName(null); setRoute(null); }}
+            onClick={() => { setServiceName(null); setRoute(null); setEnvironment(null); }}
             className="flex shrink-0 items-center gap-2 text-white"
           >
             <ReqlyIcon size={20} />
@@ -205,6 +210,7 @@ export function Dashboard({
                   setProjectId(e.target.value ? Number(e.target.value) : null);
                   setServiceName(null);
                   setRoute(null);
+                  setEnvironment(null);
                 }}
                 className="h-8 rounded-md border border-slate-700 bg-slate-900 px-2.5 text-xs font-medium text-slate-200 focus:border-cyan-600 focus:outline-none"
               >
@@ -219,10 +225,23 @@ export function Dashboard({
                 <ServiceSelector
                   serviceName={serviceName}
                   route={route}
-                  onServiceChange={(s) => { setServiceName(s); setRoute(null); }}
+                  onServiceChange={(s) => { setServiceName(s); setRoute(null); setEnvironment(null); }}
                   onRouteChange={setRoute}
                   onlyServices={project?.services ?? null}
                 />
+                {environments.length > 0 && (
+                  <select
+                    aria-label="Environment"
+                    value={environment ?? ""}
+                    onChange={(e) => setEnvironment(e.target.value || null)}
+                    className="h-8 rounded-md border border-slate-700 bg-slate-900 px-2.5 text-xs font-medium text-slate-200 focus:border-cyan-600 focus:outline-none"
+                  >
+                    <option value="">All environments</option>
+                    {environments.map((env) => (
+                      <option key={env} value={env}>{env}</option>
+                    ))}
+                  </select>
+                )}
                 <TimeRangePicker value={timeWindow} onChange={setWindowValue} />
               </>
             )}
