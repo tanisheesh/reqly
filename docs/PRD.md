@@ -1,6 +1,6 @@
 # Reqly — Product Requirements Document
 
-**Status:** Final (v2 — shipped; collector 0.10, Python SDK 0.5, Node SDK 0.1)
+**Status:** Final (v2 — shipped; collector 0.12, Python SDK 0.5, Node SDK 0.3)
 **Owner:** Tanish Poddar
 **One-liner:** Self-hosted API monitoring that tells you what broke, when, and which deploy did it — for Python, Node.js and any OpenTelemetry stack.
 
@@ -63,7 +63,7 @@ Teams running a handful of HTTP APIs have two bad options for knowing whether th
 ### 6.1 SDKs
 
 - Python: auto-detects FastAPI, Starlette, Litestar and Flask from `reqly.instrument(app)`; Django via middleware; any WSGI/ASGI app via `instrument_wsgi` / `instrument_asgi` with a route resolver.
-- Node.js: `reqlyExpress`, `reqlyFastify`, `reqlyHono` middleware; ESM and CommonJS builds.
+- Node.js: `reqlyExpress`, `reqlyFastify`, `reqlyHono`, `reqlyKoa`, `reqlyNest` and `reqlyHttp` (plain node:http, Bun); ESM and CommonJS builds.
 - Records method, route template (never the raw path; unmatched requests become `__unmatched__`), status, duration, error type, request/response size, release (auto-detected from CI variables), environment, optional consumer id (HMAC-hashed with the app's salt) and optional LLM token usage.
 - Never raises into the host app; bounded queue; batches shipped in the background with retries on 408/429/5xx.
 - FastAPI and Litestar apps can upload their own OpenAPI spec (`push_openapi=True`).

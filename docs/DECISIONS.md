@@ -165,8 +165,6 @@ the tradeoff each answer cost.
 | Real-time streaming (WebSockets/SSE) | 30–60 s polling is enough for the observability use case; persistent connections add complexity to the collector and ops burden |
 | Trace views (span waterfalls) | OTLP spans are reduced to request events; a trace UI is a different product and storage model |
 | OIDC / SSO sign-in | Username + password covers self-hosted teams today; OIDC when a real deployment needs it |
-| Node SDK for Koa, NestJS, plain `http` | OpenTelemetry covers them; built when a real user asks |
-| Helm chart | Docker Compose and single-container deploys cover current users |
 
 ---
 
