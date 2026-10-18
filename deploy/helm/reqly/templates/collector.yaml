@@ -86,7 +86,7 @@ spec:
             periodSeconds: 5
             failureThreshold: 60
           readinessProbe:
-            httpGet: { path: /v1/health, port: http }
+            httpGet: { path: /v1/ready, port: http } # out of rotation while the database is unreachable
             periodSeconds: 10
           livenessProbe:
             httpGet: { path: /v1/health, port: http }
