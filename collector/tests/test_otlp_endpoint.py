@@ -128,3 +128,39 @@ def test_spans_too_old_or_in_the_future_are_rejected(client):
     assert partial["rejectedSpans"] == "2"
     assert "older than 13 days" in partial["errorMessage"] and "in the future" in partial["errorMessage"]
     assert len(client.captured) == 1
+
+
+def test_otlp_consumers_are_hashed_and_capped(client, monkeypatch):
+    import dataclasses
+    import json as _json
+
+    from app.config import settings
+    from app.db.queries import EVENT_COLUMNS
+
+    seen = []
+
+    async def cap(pool, service, pairs, limit):
+        seen.append((service, [c for _, c in pairs], limit))
+        return ["__other__" for _ in pairs]  # the cap kicked in
+
+    monkeypatch.setattr(otlp_module.consumer_cap, "apply", cap)
+    monkeypatch.setattr(otlp_module, "_now", lambda: datetime.now(timezone.utc))
+    monkeypatch.setattr(otlp_module, "settings", dataclasses.replace(settings, consumer_salt="s3cret"))
+
+    now = str(int(datetime.now(timezone.utc).timestamp() * 1e9))
+    span = {
+        "traceId": "5b8efff798038103d269b633813fc60c", "spanId": "eee19b7ec3c1b174", "kind": 2,
+        "startTimeUnixNano": now, "endTimeUnixNano": now,
+        "attributes": [
+            {"key": "http.request.method", "value": {"stringValue": "GET"}},
+            {"key": "http.response.status_code", "value": {"intValue": "200"}},
+            {"key": "http.route", "value": {"stringValue": "/a"}},
+            {"key": "enduser.id", "value": {"stringValue": "alice@example.com"}},
+        ],
+    }
+    body = {"resourceSpans": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "svc"}}]},
+                               "scopeSpans": [{"spans": [span]}]}]}
+    assert _post(client, _json.dumps(body).encode(), "application/json").status_code == 200
+    (service, consumers, limit), = seen
+    assert service == "svc" and len(consumers[0]) == 16 and "alice" not in consumers[0]
+    assert client.captured[0][EVENT_COLUMNS.index("consumer_id")] == "__other__"

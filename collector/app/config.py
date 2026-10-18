@@ -36,6 +36,7 @@ class Settings:
     db_pool_min_size: int
     db_pool_max_size: int
     rate_limit_per_minute: int
+    consumer_salt: str | None
     rate_limit_env_key_per_minute: int
     rate_limit_ingest_per_ip_per_minute: int
     insights_scheduler_enabled: bool
@@ -114,6 +115,9 @@ class Settings:
             # Distinct consumers kept per service per UTC day; later new ones
             # are stored as "__other__". 0 turns the cap off.
             consumer_limit_per_day=int(os.environ.get("CONSUMER_LIMIT_PER_DAY", "1000")),
+            # Hashes consumer ids that arrive raw over OTLP (enduser.id), like the
+            # SDKs do before sending. Unset: OTLP consumer ids aren't stored.
+            consumer_salt=os.environ.get("REQLY_CONSUMER_SALT") or None,
             dashboard_url=os.environ.get("DASHBOARD_URL") or None,
             # true: the read key (public in the dashboard bundle) can read
             # everything -- a public demo. false: reading needs a signed-in
