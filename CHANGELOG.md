@@ -8,7 +8,21 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 
 ## [Unreleased]
 
-Python SDK 0.5.6
+Collector 0.12.2 · Helm chart 0.12.2 · Python SDK 0.5.6
+
+### 🐛 Fixed
+- OpenAPI spec upload (`push_openapi`) failed with project keys: it needed the `admin` scope, and
+  even an admin project key got a 403 on a brand-new service, because the SDK uploads on the first
+  request, before its first batch has claimed the service. Upload now takes the `ingest` (or
+  `admin`) scope and claims a new service for the uploader's project, like ingest does
+- Ingest with the env key no longer queries the database for the default project on every batch
+- Two collectors starting at once (a rolling deploy) can't race on migrations: an advisory lock
+  serializes them
+
+### ✨ Added
+- `GET /v1/ready`: readiness that checks the database (503 when it doesn't answer); `/v1/health`
+  stays a liveness check. The Helm chart's readiness probe uses it
+- The collector image runs as a non-root user (uid 1000, matching the Helm chart)
 
 ### ✨ Added
 - Python SDK: `push_openapi` takes the spec (a dict or a function returning it), so Flask, Django
