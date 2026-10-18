@@ -23,16 +23,19 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
 )
 
 from ..auth import Principal, verify_ingest_key, writable_service
+from ..config import settings
+from ..consumers.cap import consumer_cap
 from ..db.late_data import event_time_problem
 from ..db.late_data import tracker as late_data_tracker
 from ..db.pool import get_pool
 from ..db.queries import EVENT_COLUMNS, insert_events, record_deployments, row_time
 from ..otlp.mapping import map_resource_spans
-from ..rate_limit import RATE_LIMIT, limiter
+from ..rate_limit import INGEST_IP_LIMIT, ingest_key, ingest_limit, limiter
 
 router = APIRouter()
 
 _SERVICE_INDEX = EVENT_COLUMNS.index("service_name")
+_CONSUMER_INDEX = EVENT_COLUMNS.index("consumer_id")
 
 # Compressed request bodies are capped before reading, decompressed ones
 # while inflating, so a small gzip bomb can't exhaust memory.
@@ -77,8 +80,28 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+async def _cap_consumers(pool, rows: list[tuple]) -> list[tuple]:
+    """The per-service daily cap on distinct consumers, as on /v1/ingest."""
+    by_service: dict[str, list[int]] = {}
+    for i, row in enumerate(rows):
+        if row[_CONSUMER_INDEX] is not None:
+            by_service.setdefault(row[_SERVICE_INDEX], []).append(i)
+    rows = list(rows)
+    for service, indexes in by_service.items():
+        capped = await consumer_cap.apply(
+            pool, service, [(row_time(rows[i]), rows[i][_CONSUMER_INDEX]) for i in indexes],
+            settings.consumer_limit_per_day,
+        )
+        for i, consumer in zip(indexes, capped):
+            row = list(rows[i])
+            row[_CONSUMER_INDEX] = consumer
+            rows[i] = tuple(row)
+    return rows
+
+
 @router.post("/otlp/v1/traces")
-@limiter.limit(RATE_LIMIT)
+@limiter.limit(INGEST_IP_LIMIT)
+@limiter.limit(ingest_limit, key_func=ingest_key)
 async def export_traces(request: Request, principal: Principal = Depends(verify_ingest_key)) -> Response:
     content_type = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
     if content_type not in (_PROTOBUF, _JSON):
@@ -109,7 +132,7 @@ async def export_traces(request: Request, principal: Principal = Depends(verify_
         if not isinstance(payload, dict):
             raise HTTPException(status_code=400, detail="JSON body must be an object")
 
-    result = map_resource_spans(payload)
+    result = map_resource_spans(payload, settings.consumer_salt)
     now = _now()
     accepted = []
     writable: dict[str, bool] = {}
@@ -134,6 +157,7 @@ async def export_traces(request: Request, principal: Principal = Depends(verify_
 
     if result.rows:
         pool = get_pool()
+        result.rows = await _cap_consumers(pool, result.rows)
         await insert_events(pool, result.rows)
         await record_deployments(pool, result.rows)
         late_data_tracker.note(min(row_time(r) for r in result.rows))

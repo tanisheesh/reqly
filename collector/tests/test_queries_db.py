@@ -246,3 +246,43 @@ def test_concurrent_migration_runs_apply_each_migration_once():
             await pool_module.close_pool()
 
     assert asyncio.run(run()) == len(list(pool_module._MIGRATIONS_DIR.glob("*.sql")))
+
+
+def test_summary_filters_by_environment(aggregate_mode):
+    """prod and staging traffic of one service, filtered apart; without the
+    Toolkit the filter is refused rather than silently ignored."""
+    service = f"test-env-{uuid.uuid4().hex[:8]}"
+    now = datetime.now(timezone.utc) - timedelta(minutes=3)
+
+    async def run():
+        pool = await pool_module.create_pool()
+        try:
+            rows = [_row(service, "/a", now - timedelta(seconds=i), False, environment="prod") for i in range(6)]
+            rows += [_row(service, "/a", now - timedelta(seconds=i), True, environment="staging") for i in range(4)]
+            await queries.insert_events(pool, rows)
+            await _refresh_all(pool)
+            if aggregate_mode == "percentile_cont":
+                with pytest.raises(queries.EnvironmentFilterUnavailable):
+                    await queries.get_top_routes(pool, service, "1h", "prod")
+                return None
+            return (
+                await queries.list_environments(pool, service),
+                await queries.get_top_routes(pool, service, "1h", "prod"),
+                await queries.get_top_routes(pool, service, "1h", None),
+                await queries.get_status_distribution(pool, service, None, "1h", "staging"),
+                sum(p["request_count"] for p in await queries.get_latency_series(pool, service, None, "1h", "staging")),
+            )
+        finally:
+            await pool.execute("DELETE FROM request_events WHERE service_name = $1", service)
+            await _refresh_all(pool)
+            await pool_module.close_pool()
+
+    out = asyncio.run(run())
+    if out is None:
+        return
+    environments, prod_routes, all_routes, staging_status, staging_count = out
+    assert environments == ["prod", "staging"]
+    assert prod_routes[0]["request_count"] == 6 and prod_routes[0]["error_rate"] == 0
+    assert all_routes[0]["request_count"] == 10 and abs(all_routes[0]["error_rate"] - 0.4) < 1e-9
+    assert [(r["status_code"], r["count"]) for r in staging_status] == [(500, 4)]
+    assert staging_count == 4

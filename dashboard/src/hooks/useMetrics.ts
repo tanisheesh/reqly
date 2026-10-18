@@ -84,14 +84,25 @@ export function useAlerts(serviceName: string | null) {
   });
 }
 
+export function useEnvironments(serviceName: string | null) {
+  return useQuery({
+    queryKey: ["environments", serviceName],
+    queryFn: () => api.listEnvironments(serviceName!),
+    enabled: !!serviceName,
+    refetchInterval: LIST_POLL_MS,
+    retry: false, // collectors before 0.12.3 have no endpoint
+  });
+}
+
 export function useMetricsSummary(
   serviceName: string | null,
   route: string | null,
-  window: TimeWindow
+  window: TimeWindow,
+  environment: string | null = null,
 ) {
   return useQuery({
-    queryKey: ["metrics-summary", serviceName, route, window],
-    queryFn: () => api.getMetricsSummary(serviceName!, route, window),
+    queryKey: ["metrics-summary", serviceName, route, window, environment],
+    queryFn: () => api.getMetricsSummary(serviceName!, route, window, environment),
     enabled: !!serviceName,
     refetchInterval: METRICS_POLL_MS,
   });

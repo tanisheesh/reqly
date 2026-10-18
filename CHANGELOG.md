@@ -8,6 +8,28 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 
 ## [Unreleased]
 
+Collector 0.12.3 · Helm chart 0.12.3
+
+### ✨ Added
+- **Environment filter:** `?environment=` on `/v1/metrics/summary`, a new
+  `GET /v1/services/{service}/environments`, and an Environment dropdown in the dashboard, so
+  production and staging traffic aren't mixed in the charts (needs the TimescaleDB Toolkit)
+- OpenTelemetry apps get API consumers: `enduser.id` (or `reqly.consumer_id`) on the server span,
+  HMAC-hashed by the collector with `REQLY_CONSUMER_SALT` (the SDKs' formula) and capped per day
+  like ingest. Without the salt the attribute is ignored, so a raw user id is never stored
+
+### 🐛 Fixed
+- Ingest was rate-limited per client IP, so services behind one NAT or in one cluster shared a
+  single 600/minute budget. It's now per key (`RATE_LIMIT_PER_MINUTE` per project key,
+  `RATE_LIMIT_ENV_KEY_PER_MINUTE` for the shared env key) under a per-IP cap
+  (`RATE_LIMIT_INGEST_PER_IP_PER_MINUTE`). Ask Reqly, insights and sign-in stay per IP
+- Top routes for the 1h window scanned raw events even with the sketch aggregate available; the
+  service and route lists read the older view. Both use `api_latency_1min` now
+
+---
+
+## [0.12.2] — 2026-10-19
+
 Collector 0.12.2 · Helm chart 0.12.2 · Python SDK 0.5.6
 
 ### 🐛 Fixed
@@ -238,7 +260,8 @@ Python SDK 0.1.5
 
 ---
 
-[Unreleased]: https://github.com/tanisheesh/reqly/compare/collector-v0.12.1...HEAD
+[Unreleased]: https://github.com/tanisheesh/reqly/compare/collector-v0.12.2...HEAD
+[0.12.2]: https://github.com/tanisheesh/reqly/tree/collector-v0.12.2
 [0.12.1]: https://github.com/tanisheesh/reqly/tree/collector-v0.12.1
 [0.12.0]: https://github.com/tanisheesh/reqly/tree/collector-v0.12.0
 [0.11.0]: https://github.com/tanisheesh/reqly/tree/collector-v0.11.0

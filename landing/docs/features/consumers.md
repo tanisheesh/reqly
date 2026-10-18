@@ -33,9 +33,13 @@ Tag each request with the client that made it, and Reqly answers three questions
 
 Or with environment variables: `REQLY_CONSUMER_HEADER` and `REQLY_CONSUMER_SALT`.
 
+=== "OpenTelemetry"
+
+    Set `enduser.id` (or `reqly.consumer_id`) on the server span, and `REQLY_CONSUMER_SALT` on the **collector**. OTLP exporters send the attribute in plain text, so the collector hashes it, the same way the SDKs do: with the same salt, a caller gets the same id whichever way it reaches Reqly. Without the salt the attribute is ignored.
+
 ## Privacy
 
-Consumer ids are **hashed with HMAC-SHA256 and your salt inside the SDK**, before they leave the process. The collector never sees API keys or user ids. The same id always hashes to the same value for a given salt, so a consumer is recognisable across requests without being reversible.
+Consumer ids are **hashed with HMAC-SHA256 and your salt inside the SDK**, before they leave the process. The collector never sees API keys or user ids. Over OpenTelemetry, the collector hashes them on arrival, before anything is stored. The same id always hashes to the same value for a given salt, so a consumer is recognisable across requests without being reversible.
 
 Set `consumer_salt` to a secret and keep it stable; changing it makes every consumer look new. For ids that aren't secret, such as tenant names, `hash_consumer=False` (`hashConsumer: false` in Node) sends them as they are, so they're readable on the dashboard.
 
