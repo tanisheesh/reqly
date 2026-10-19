@@ -15,7 +15,7 @@ import asyncpg
 
 from ..llm.anomalies import detect_cost_anomalies
 from ..llm.prices import price_table
-from . import notifier
+from . import actions, notifier
 from .hourly import BASELINE_WEEKS, apply_detections
 
 KIND = "llm_cost"
@@ -63,5 +63,5 @@ async def check_service(
     findings = detect_cost_anomalies(rows, hour, price_table(), min_usd)
     events = await apply_detections(pool, service_name, hour, findings, now, renotify_after, kind=KIND)
     for event, alert in events:
-        await notifier.send(channels, event, alert)
+        await actions.deliver(pool, channels, event, alert, now)
     return events

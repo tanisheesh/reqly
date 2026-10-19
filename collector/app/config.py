@@ -71,6 +71,18 @@ class Settings:
     alert_slack_webhook_url: str | None
     alert_discord_webhook_url: str | None
     alert_webhook_url: str | None
+    alert_teams_webhook_url: str | None
+    alert_pagerduty_routing_key: str | None
+    alert_opsgenie_api_key: str | None
+    alert_opsgenie_api_url: str
+    alert_email_to: list[str]
+    alert_email_from: str | None
+    smtp_host: str | None
+    smtp_port: int
+    smtp_username: str | None
+    smtp_password: str | None
+    smtp_starttls: bool
+    resend_api_key: str | None
     alert_renotify_hours: float
     llm_cost_alert_min_usd: float | None
     consumer_limit_per_day: int
@@ -152,6 +164,22 @@ class Settings:
             alert_slack_webhook_url=os.environ.get("ALERT_SLACK_WEBHOOK_URL") or None,
             alert_discord_webhook_url=os.environ.get("ALERT_DISCORD_WEBHOOK_URL") or None,
             alert_webhook_url=os.environ.get("ALERT_WEBHOOK_URL") or None,
+            # Teams: a Workflows "When a Teams webhook request is received" URL.
+            alert_teams_webhook_url=os.environ.get("ALERT_TEAMS_WEBHOOK_URL") or None,
+            # PagerDuty Events API v2 integration (routing) key.
+            alert_pagerduty_routing_key=os.environ.get("ALERT_PAGERDUTY_ROUTING_KEY") or None,
+            alert_opsgenie_api_key=os.environ.get("ALERT_OPSGENIE_API_KEY") or None,
+            # EU accounts: https://api.eu.opsgenie.com
+            alert_opsgenie_api_url=os.environ.get("ALERT_OPSGENIE_API_URL") or "https://api.opsgenie.com",
+            # Email: through SMTP_HOST, or Resend's API with RESEND_API_KEY.
+            alert_email_to=[a.strip() for a in os.environ.get("ALERT_EMAIL_TO", "").split(",") if a.strip()],
+            alert_email_from=os.environ.get("ALERT_EMAIL_FROM") or None,
+            smtp_host=os.environ.get("SMTP_HOST") or None,
+            smtp_port=int(os.environ.get("SMTP_PORT", "587")),
+            smtp_username=os.environ.get("SMTP_USERNAME") or None,
+            smtp_password=os.environ.get("SMTP_PASSWORD") or None,
+            smtp_starttls=_env_flag("SMTP_STARTTLS", True),
+            resend_api_key=os.environ.get("RESEND_API_KEY") or None,
             alert_renotify_hours=float(os.environ.get("ALERT_RENOTIFY_HOURS", "6")),
             # LLM cost alerts: the smallest extra spend per route-hour, in USD,
             # worth an alert. 0 or negative turns them off.

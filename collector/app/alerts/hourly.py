@@ -24,7 +24,7 @@ from ..consumers.queries import add_affected_consumers
 from ..insights.anomaly_detection import detect_anomalies
 from ..insights.deploys import add_release_context
 from ..insights.hints import add_hints
-from . import notifier
+from . import actions, notifier
 
 logger = logging.getLogger("reqly.collector")
 
@@ -161,7 +161,7 @@ async def check_service(
 
     events = await apply_detections(pool, service_name, hour, anomalies, now, renotify_after)
     for event, alert in events:
-        await notifier.send(channels, event, alert)
+        await actions.deliver(pool, channels, event, alert, now)
     return events
 
 

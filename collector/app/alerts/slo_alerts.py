@@ -17,7 +17,7 @@ import asyncpg
 
 from ..slo import status as slo_status
 from ..slo.model import BURNING_STATES
-from . import notifier
+from . import actions, notifier
 
 logger = logging.getLogger("reqly.collector")
 
@@ -109,7 +109,7 @@ async def run_slo_check(
             status = await slo_status.slo_status(pool, slo, now)
             event = await apply_slo_status(pool, slo, status, now, renotify_after)
             if event is not None:
-                await notifier.send(channels, *event)
+                await actions.deliver(pool, channels, *event, now=now)
                 sent += 1
         except Exception:
             logger.exception("SLO check failed for %s/%s", slo["service_name"], slo["name"])

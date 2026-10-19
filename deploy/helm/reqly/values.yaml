@@ -5,7 +5,8 @@
 # Leave a value empty to have the chart generate it once (and keep it across
 # upgrades), or point existingSecret at a Secret you manage with these keys:
 #   ingest-key, read-key, database-url, postgres-password,
-#   groq-api-key, llm-api-key, admin-password, slack-webhook-url, discord-webhook-url, webhook-url
+#   groq-api-key, llm-api-key, admin-password, slack-webhook-url, discord-webhook-url, webhook-url,
+#   teams-webhook-url, pagerduty-routing-key, opsgenie-api-key, smtp-password, resend-api-key
 secrets:
   existingSecret: ""
   ingestKey: ""        # REQLY_INGEST_KEY: SDKs and admin API calls (write)
@@ -16,6 +17,11 @@ secrets:
   slackWebhookUrl: ""
   discordWebhookUrl: ""
   webhookUrl: ""
+  teamsWebhookUrl: ""
+  pagerdutyRoutingKey: ""
+  opsgenieApiKey: ""
+  smtpPassword: ""     # email alerts: ALERT_EMAIL_TO / ALERT_EMAIL_FROM / SMTP_HOST in collector.config
+  resendApiKey: ""     # or email through Resend
 
 # -- Collector -----------------------------------------------------------------
 collector:

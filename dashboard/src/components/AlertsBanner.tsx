@@ -1,5 +1,6 @@
 import { Anomaly, LlmCostAlertDetails, SloAlertDetails } from "../api/client";
 import { useAlerts } from "../hooks/useMetrics";
+import { AlertActions } from "./AlertActions";
 import { formatMs, formatPercent, formatUsd } from "../format";
 
 export function AlertsBanner({ serviceName }: { serviceName: string }) {
@@ -28,6 +29,7 @@ export function AlertsBanner({ serviceName }: { serviceName: string }) {
                 <span className="text-slate-500">
                   · {s.status.budget_remaining === null ? "—" : `${Math.max(0, s.status.budget_remaining * 100).toFixed(0)}%`} of budget left
                 </span>
+                <AlertActions alert={a} />
               </li>
             );
           }
@@ -54,6 +56,7 @@ export function AlertsBanner({ serviceName }: { serviceName: string }) {
                   </div>
                 ))}
                 {c.model_mix && <div className="text-violet-300">{c.model_mix.text.replace(/`/g, "")}</div>}
+                <AlertActions alert={a} />
               </li>
             );
           }
@@ -96,6 +99,7 @@ export function AlertsBanner({ serviceName }: { serviceName: string }) {
                   )}
                 </div>
               )}
+              <AlertActions alert={a} />
             </li>
           );
         })}

@@ -52,6 +52,12 @@ The weekly report and Ask Reqly use any OpenAI-compatible chat completions API: 
 | `ALERT_SLACK_WEBHOOK_URL` | empty | |
 | `ALERT_DISCORD_WEBHOOK_URL` | empty | |
 | `ALERT_WEBHOOK_URL` | empty | Generic JSON webhook ([payload](../features/alerts.md#channels)) |
+| `ALERT_TEAMS_WEBHOOK_URL` | empty | Microsoft Teams Workflows webhook |
+| `ALERT_PAGERDUTY_ROUTING_KEY` | empty | PagerDuty Events API v2 integration key |
+| `ALERT_OPSGENIE_API_KEY` / `ALERT_OPSGENIE_API_URL` | empty / `https://api.opsgenie.com` | Opsgenie API integration |
+| `ALERT_EMAIL_TO` / `ALERT_EMAIL_FROM` | empty | Email alerts: comma-separated recipients, and the sender |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_STARTTLS` | empty / `587` / empty / empty / `true` | SMTP server for email alerts |
+| `RESEND_API_KEY` | empty | Send email alerts through Resend's API instead of SMTP |
 | `ALERT_RENOTIFY_HOURS` | `6` | Reminder interval while an alert keeps firing |
 | `LLM_COST_ALERT_MIN_USD` | `1.0` | The smallest extra LLM spend per route-hour, in USD, worth an [alert](../features/alerts.md#llm-cost-alerts). `0` turns LLM cost alerts off. The local Compose stack uses `0.4` |
 | `DASHBOARD_URL` | `http://localhost:5173` | Linked from Slack alerts |

@@ -182,14 +182,42 @@ export interface LlmCostAlertDetails {
 
 export interface Alert {
   id: number;
-  kind?: "anomaly" | "slo" | "llm_cost";
+  kind?: "anomaly" | "slo" | "llm_cost" | "client_errors";
   service_name: string;
   route: string;
   opened_at: string;
   first_hour: string;
   last_hour: string;
   resolved_at: string | null;
-  details: Anomaly | SloAlertDetails | LlmCostAlertDetails;
+  details: Anomaly | SloAlertDetails | LlmCostAlertDetails | ClientErrorAlertDetails;
+  // collector 0.14+: on-call state (notifications only; the alert stays open)
+  acknowledged_at?: string | null;
+  acknowledged_by?: string | null;
+  silenced_until?: string | null;
+  muted?: boolean;
+}
+
+export interface ClientErrorAlertDetails {
+  kind: "client_errors";
+  status_code: number;
+  observed: number;
+  baseline: number;
+  requests: number;
+  day_of_week: string;
+  hour_range: string;
+  release_context?: ReleaseContext | null;
+  trace_ids?: string[];
+  trace_urls?: string[];
+}
+
+export interface AlertMute {
+  id: number;
+  service_name: string;
+  route: string | null;
+  kind: string | null;
+  muted_until: string;
+  reason: string | null;
+  created_by: string | null;
 }
 
 export interface ReleaseStats {
@@ -506,6 +534,15 @@ export const api = {
 
   listAlerts: (serviceName: string) =>
     getJSON<{ alerts: Alert[] }>(`/v1/alerts?service_name=${encodeURIComponent(serviceName)}`),
+
+  acknowledgeAlert: (alertId: number) =>
+    callJSON<{ acknowledged_at: string; acknowledged_by: string }>("POST", `/v1/alerts/${alertId}/acknowledge`),
+
+  silenceAlert: (alertId: number, hours: number) =>
+    callJSON<{ silenced_until: string | null }>("POST", `/v1/alerts/${alertId}/silence`, { hours }),
+
+  muteAlerts: (serviceName: string, route: string | null, hours: number, reason?: string) =>
+    callJSON<AlertMute>("POST", "/v1/alert-mutes", { service_name: serviceName, route, hours, reason }),
 
   getLatestInsight: (serviceName: string) =>
     getJSON<InsightReport>(
