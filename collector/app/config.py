@@ -23,13 +23,39 @@ def _positive_or_none(raw: str) -> float | None:
     return value if value > 0 else None
 
 
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+OPENAI_BASE_URL = "https://api.openai.com/v1"
+_DEFAULT_LLM_MODEL = "openai/gpt-oss-120b"
+
+
+def _llm_from_env() -> tuple[str | None, str | None, str]:
+    """(base_url, api_key, model) of the OpenAI-compatible LLM; base_url is
+    None when none is configured. LLM_BASE_URL picks any provider (Ollama
+    needs no key); LLM_API_KEY alone means OpenAI; GROQ_API_KEY alone means
+    Groq, as before 0.13. The Groq key only ever goes to Groq."""
+    base_url = os.environ.get("LLM_BASE_URL") or None
+    api_key = os.environ.get("LLM_API_KEY") or None
+    groq_key = os.environ.get("GROQ_API_KEY") or None
+    if base_url is None and api_key:
+        base_url = OPENAI_BASE_URL
+    elif base_url is None and groq_key:
+        base_url, api_key = GROQ_BASE_URL, groq_key
+    model = os.environ.get("LLM_MODEL") or os.environ.get("GROQ_MODEL") or None
+    if model is None:
+        if base_url and base_url.rstrip("/") != GROQ_BASE_URL:
+            _logger.warning("LLM_MODEL is not set; using %r, which %s may not serve", _DEFAULT_LLM_MODEL, base_url)
+        model = _DEFAULT_LLM_MODEL
+    return (base_url.rstrip("/") if base_url else None), api_key, model
+
+
 @dataclass(frozen=True)
 class Settings:
     database_url: str
     ingest_key: str
     read_key: str
-    groq_api_key: str | None
-    groq_model: str
+    llm_base_url: str | None
+    llm_api_key: str | None
+    llm_model: str
     ask_model: str
     ask_daily_limit: int
     cors_origins: list[str]
@@ -54,6 +80,10 @@ class Settings:
     admin_password: str | None
     session_ttl_hours: float
 
+    @property
+    def llm_enabled(self) -> bool:
+        return self.llm_base_url is not None
+
     @classmethod
     def from_env(cls) -> "Settings":
         ingest_key = os.environ.get("REQLY_INGEST_KEY", "demo-key")
@@ -76,6 +106,7 @@ class Settings:
 
         cors_raw = os.environ.get("CORS_ORIGINS", "")
         cors_origins = [o.strip() for o in cors_raw.split(",") if o.strip()]
+        llm_base_url, llm_api_key, llm_model = _llm_from_env()
 
         return cls(
             database_url=os.environ.get(
@@ -84,12 +115,13 @@ class Settings:
             ),
             ingest_key=ingest_key,
             read_key=read_key,
-            groq_api_key=os.environ.get("GROQ_API_KEY") or None,
-            groq_model=os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b"),
+            llm_base_url=llm_base_url,
+            llm_api_key=llm_api_key,
+            llm_model=llm_model,
             # Ask Reqly needs reliable tool calling; defaults to the report model.
-            ask_model=os.environ.get("ASK_MODEL") or os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b"),
+            ask_model=os.environ.get("ASK_MODEL") or llm_model,
             # The read key ships in the dashboard bundle, so anyone who can open
-            # the dashboard can ask. This caps the Groq spend per day; 0 turns Ask off.
+            # the dashboard can ask. This caps the LLM spend per day; 0 turns Ask off.
             ask_daily_limit=int(os.environ.get("ASK_DAILY_LIMIT", "200")),
             cors_origins=cors_origins,
             db_pool_min_size=int(os.environ.get("DB_POOL_MIN_SIZE", "2")),

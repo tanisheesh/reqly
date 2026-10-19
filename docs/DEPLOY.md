@@ -32,7 +32,7 @@ Set these in the host dashboard (never commit them). Every variable, its default
 | `REQLY_READ_KEY` | ✅ | Read key compiled into the dashboard. Must differ from the ingest key |
 | `CORS_ORIGINS` | ✅ | The dashboard's origin |
 | `FORWARDED_ALLOW_IPS` | ✅ behind a proxy | `*` on Render, so rate limits see the real client IP |
-| `GROQ_API_KEY` | ❌ | AI reports and Ask Reqly. Without it reports are plain text and Ask is off |
+| `GROQ_API_KEY` | ❌ | AI reports and Ask Reqly. Without it (or `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` for another OpenAI-compatible API) reports are plain text and Ask is off |
 | `PUBLIC_DASHBOARD` | ❌ | `true` for the public demo; `false` requires sign-in |
 | `REQLY_ADMIN_PASSWORD` | ❌ | Creates the first admin when there are no users (12+ characters) |
 | `ALERT_SLACK_WEBHOOK_URL` / `ALERT_DISCORD_WEBHOOK_URL` / `ALERT_WEBHOOK_URL` | ❌ | Where alerts go |
@@ -145,7 +145,7 @@ Add the release to the root [CHANGELOG.md](../CHANGELOG.md) as well.
 - [ ] `GET https://reqly-eventflow-collector.onrender.com/v1/health` returns 200
 - [ ] The dashboard loads, lists services and shows charts for the last hour
 - [ ] Making traffic on [EventFlow](https://eventflow-g2h5.onrender.com) shows up on the dashboard within a minute or two
-- [ ] With `GROQ_API_KEY` set, Ask Reqly answers a question
+- [ ] With an LLM configured, Ask Reqly answers a question
 - [ ] [reqly.tanisheesh.in](https://reqly.tanisheesh.in) and [/docs/](https://reqly.tanisheesh.in/docs/) load with no console errors
 
 ---
@@ -179,7 +179,7 @@ After rolling back, note it in a commit or PR so the next push doesn't silently 
 - One collector instance only: the scheduler, rate limits and caches are per process
 - The most recent ~1 minute of data isn't in the aggregates yet (continuous aggregate `end_offset`)
 - With `PUBLIC_DASHBOARD` on, anyone with the dashboard URL can read every project. Meant for demos only
-- AI features depend on Groq. Models get retired, so the model is configurable and reports fall back to plain text
+- AI features depend on an LLM provider (Groq by default; any OpenAI-compatible API works). Models get retired, so the model is configurable and reports fall back to plain text
 
 ---
 

@@ -49,7 +49,7 @@ Images are built for linux/amd64 and arm64. Pin a version rather than `latest`.
 Also set:
 
 - **Behind a platform proxy** (Render, Fly.io, a load balancer): `FORWARDED_ALLOW_IPS=*`, so rate limits see real client IPs. Use `*` only if the collector is reachable solely through that proxy.
-- `GROQ_API_KEY` for AI features, and alert webhooks.
+- `GROQ_API_KEY` (or `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL`) for AI features, and alert webhooks.
 - `PUBLIC_DASHBOARD=false` and `REQLY_ADMIN_PASSWORD` unless the dashboard should be public. See [Projects, keys & sign-in](access.md).
 
 Check it with `GET /v1/health`, which returns `{"status": "ok"}`.
@@ -85,7 +85,7 @@ Add the dashboard's URL to the collector's `CORS_ORIGINS`.
 
 - [ ] `GET /v1/health` returns 200
 - [ ] Send traffic from an instrumented app; the service appears on the dashboard within a minute or two
-- [ ] With `GROQ_API_KEY` set, Ask Reqly answers a question
+- [ ] With an LLM configured, Ask Reqly answers a question
 - [ ] A test alert reaches your Slack, Discord or webhook
 
 ## Upgrade and roll back

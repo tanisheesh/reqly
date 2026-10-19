@@ -12,6 +12,7 @@ import asyncpg
 
 from ..config import settings
 from ..db import queries
+from ..llm.client import llm_client
 from .tools import TOOL_SCHEMAS, run_tool
 from .verify import unverified_numbers
 
@@ -71,12 +72,6 @@ class AskError(Exception):
     """The model couldn't produce an answer (provider error, bad tool use)."""
 
 
-def _client():
-    from groq import AsyncGroq
-
-    return AsyncGroq(api_key=settings.groq_api_key, timeout=30.0)
-
-
 async def _system_prompt(pool: asyncpg.Pool, service: str, now: datetime) -> str:
     routes = await queries.list_routes(pool, service)
     shown = routes[:MAX_ROUTES_IN_PROMPT]
@@ -133,7 +128,7 @@ def _final_messages(opening: list[dict], steps: list[dict]) -> list[dict]:
 
 
 async def _complete(client, messages: list[dict], allow_tools: bool):
-    """One model turn. A malformed tool call (Groq's tool_use_failed) is
+    """One model turn. A malformed tool call (tool_use_failed on Groq) is
     retried once; anything else is an AskError."""
     kwargs = {"tools": TOOL_SCHEMAS, "tool_choice": "auto"} if allow_tools else {}
     for attempt in (1, 2):
@@ -174,7 +169,7 @@ async def ask(
 ) -> dict:
     """{"answer", "steps": [{"tool", "arguments", "result"}], "model"}."""
     now = now or datetime.now(timezone.utc)
-    client = client or _client()
+    client = client or llm_client()
     messages: list[dict] = [
         {"role": "system", "content": await _system_prompt(pool, service, now)},
         {"role": "user", "content": question},

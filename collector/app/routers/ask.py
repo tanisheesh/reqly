@@ -46,8 +46,8 @@ _budget = _DailyBudget()
 @limiter.limit(_ASK_RATE_LIMIT)
 async def ask_question(request: Request, body: AskIn, principal: Principal = Depends(verify_read_key)):
     """Answers a question about one service's traffic from its own data."""
-    if not settings.groq_api_key or settings.ask_daily_limit <= 0:
-        raise HTTPException(status_code=503, detail="Ask Reqly is not enabled on this collector (set GROQ_API_KEY)")
+    if not settings.llm_enabled or settings.ask_daily_limit <= 0:
+        raise HTTPException(status_code=503, detail="Ask Reqly is not enabled on this collector (set LLM_BASE_URL or GROQ_API_KEY)")
     await check_service(principal, body.service_name)
     pool = get_pool()
     if body.service_name not in await queries.list_services(pool):

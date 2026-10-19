@@ -41,7 +41,7 @@ Models occasionally mis-copy a digit. After the answer is written, every number 
 
 - At most **6 tool calls** per question. After that the model must answer from what it has.
 - **5 questions per minute** per IP, and `ASK_DAILY_LIMIT` per collector per day (default 200; `0` turns Ask off). The read key is public to dashboard viewers, and every question is an LLM call.
-- Needs `GROQ_API_KEY`. Without it the endpoint returns 503. The model is `ASK_MODEL`, which defaults to `GROQ_MODEL` (`openai/gpt-oss-120b`) and must support tool calling.
+- Needs an LLM: `GROQ_API_KEY`, or any OpenAI-compatible API through `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` ([Configuration](../self-hosting/configuration.md#ai)). Without one the endpoint returns 503. The model is `ASK_MODEL`, which defaults to `LLM_MODEL` (`openai/gpt-oss-120b` on Groq) and must support tool calling.
 
 ## API
 
@@ -53,4 +53,4 @@ curl -X POST http://localhost:8000/v1/ask \
 
 The response contains the answer, every tool call with its arguments and result, and `unverified_numbers`.
 
-An eval set of 19 questions over the demo scenarios lives in [`collector/tests/ask_eval/`](https://github.com/tanisheesh/reqly/tree/main/collector/tests/ask_eval). It's run by hand after prompt or model changes and needs a Groq key.
+An eval set of 19 questions over the demo scenarios lives in [`collector/tests/ask_eval/`](https://github.com/tanisheesh/reqly/tree/main/collector/tests/ask_eval). It's run by hand after prompt or model changes and needs an LLM.

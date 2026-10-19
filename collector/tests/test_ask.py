@@ -200,13 +200,13 @@ def _post(api, **body):
     )
 
 
-def test_ask_needs_a_groq_key(api, monkeypatch):
-    _with_settings(monkeypatch, groq_api_key=None)
+def test_ask_needs_an_llm(api, monkeypatch):
+    _with_settings(monkeypatch, llm_base_url=None)
     assert _post(api).status_code == 503
 
 
 def test_ask_rejects_unknown_service_and_bad_keys(api, monkeypatch):
-    _with_settings(monkeypatch, groq_api_key="k")
+    _with_settings(monkeypatch, llm_base_url="http://llm")
     assert _post(api, service_name="nope").status_code == 404
     assert api.post("/v1/ask", json={"service_name": "flask-demo", "question": "hi?"}).status_code == 401
     # the ingest key is not the read key
@@ -219,7 +219,7 @@ def test_ask_rejects_unknown_service_and_bad_keys(api, monkeypatch):
 
 
 def test_ask_daily_limit_and_model_errors(api, monkeypatch):
-    _with_settings(monkeypatch, groq_api_key="k", ask_daily_limit=2)
+    _with_settings(monkeypatch, llm_base_url="http://llm", ask_daily_limit=2)
     answers = iter([{"answer": "ok", "steps": [], "model": "m"}, agent.AskError("model broke")])
 
     async def fake_ask(pool, service, question, now):

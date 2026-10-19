@@ -90,10 +90,11 @@ Copy `.env.example` to `.env` and set what you need, then `docker compose up -d`
 
 ```bash
 GROQ_API_KEY=gsk_...                 # AI weekly report and Ask Reqly (free key: console.groq.com/keys)
+# or any OpenAI-compatible API: LLM_BASE_URL=... LLM_API_KEY=... LLM_MODEL=...
 ALERT_SLACK_WEBHOOK_URL=https://...  # or ALERT_DISCORD_WEBHOOK_URL / ALERT_WEBHOOK_URL
 ```
 
-Without a Groq key, the weekly report is a plain statistical summary and Ask Reqly is off. Every setting is listed in [Configuration](self-hosting/configuration.md).
+Without an LLM, the weekly report is a plain statistical summary and Ask Reqly is off. Every setting is listed in [Configuration](self-hosting/configuration.md).
 
 ## Stop or reset
 

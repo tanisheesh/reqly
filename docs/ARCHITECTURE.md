@@ -13,7 +13,7 @@ Companion to [PRD.md](PRD.md): the PRD says what Reqly does, this says how.
 | Collector | FastAPI · Uvicorn · asyncpg · APScheduler 3 · slowapi · Pydantic v2 · argon2-cffi · opentelemetry-proto · httpx |
 | Database | TimescaleDB on PostgreSQL 16 (`timescale/timescaledb-ha`, with the Toolkit) · hypertables · continuous aggregates · UddSketch · retention policies |
 | Dashboard | React 19 · Vite · TypeScript · Tailwind CSS 4 · Recharts · TanStack Query |
-| AI | Groq API · `openai/gpt-oss-120b` (reports and tool calling) · statistics-first detection (Poisson tail / z-score) |
+| AI | Any OpenAI-compatible API (Groq by default) · `openai/gpt-oss-120b` (reports and tool calling) · statistics-first detection (Poisson tail / z-score) |
 | Infra (local) | Docker Compose: timescaledb, collector, dashboard, load-generator |
 | Infra (Kubernetes) | Helm chart `deploy/helm/reqly`: collector, dashboard, optional TimescaleDB StatefulSet; published to `oci://ghcr.io/tanisheesh/charts` |
 | Infra (live demo) | TimescaleDB on an EC2 t3.micro (TLS) · collector and dashboard on Render · GHCR images · PyPI and npm trusted publishing |
@@ -88,7 +88,7 @@ A service's spec (`api_specs`, one per service, uploaded with the ingest key or 
 
 ### Ask Reqly
 
-`POST /v1/ask {service_name, question}` answers questions like "why was /orders slow yesterday afternoon?" with Groq tool calling (`app/ask/`). The model never writes SQL: it chooses among nine read-only tools — `get_stats` (totals or per route/hour/day, from the sketch aggregate), `compare_periods`, `get_breakdown` (by host, environment, release, status code, error type, method or consumer, from raw events), `list_releases`, `get_alerts`, `get_slos`, `get_api_drift`, `get_consumers` and `get_llm_costs` — whose arguments are validated and whose time ranges are clamped to retention. Results are rounded aggregates, never raw events. The system prompt carries the current UTC time, the dates of the last 8 days, the service's routes and its recent releases, so relative times ("last Monday") and deploys resolve without a lookup. At most 6 tool calls per question; after that the model must answer from what it has. The response includes every tool call and its result, and the dashboard shows them under the answer. Every number in the answer is then looked up in those results (as written, as a percentage, ms as seconds, a ratio as a percent change, at the written precision); the ones not found come back as `unverified_numbers` and the dashboard flags them, since models occasionally mis-copy digits. The read key is public to dashboard viewers, so the endpoint is limited to 5 questions a minute per IP and `ASK_DAILY_LIMIT` (default 200) per collector per day. An eval set over the load generator's scenarios lives in `collector/tests/ask_eval/` (run by hand; it needs a Groq key).
+`POST /v1/ask {service_name, question}` answers questions like "why was /orders slow yesterday afternoon?" with LLM tool calling (`app/ask/`). The model never writes SQL: it chooses among nine read-only tools — `get_stats` (totals or per route/hour/day, from the sketch aggregate), `compare_periods`, `get_breakdown` (by host, environment, release, status code, error type, method or consumer, from raw events), `list_releases`, `get_alerts`, `get_slos`, `get_api_drift`, `get_consumers` and `get_llm_costs` — whose arguments are validated and whose time ranges are clamped to retention. Results are rounded aggregates, never raw events. The system prompt carries the current UTC time, the dates of the last 8 days, the service's routes and its recent releases, so relative times ("last Monday") and deploys resolve without a lookup. At most 6 tool calls per question; after that the model must answer from what it has. The response includes every tool call and its result, and the dashboard shows them under the answer. Every number in the answer is then looked up in those results (as written, as a percentage, ms as seconds, a ratio as a percent change, at the written precision); the ones not found come back as `unverified_numbers` and the dashboard flags them, since models occasionally mis-copy digits. The read key is public to dashboard viewers, so the endpoint is limited to 5 questions a minute per IP and `ASK_DAILY_LIMIT` (default 200) per collector per day. An eval set over the load generator's scenarios lives in `collector/tests/ask_eval/` (run by hand; it needs an LLM).
 
 ### AI Insights Pipeline
 
@@ -99,7 +99,7 @@ A service's spec (`api_specs`, one per service, uploaded with the ingest key or 
 5. `deploys.py` adds `release_context`: which release served that route in that hour, whether it was first seen within the week before, and for a new release the previous one plus before/after error rate and p95.
 6. `hints.py` adds deterministic root-cause `hints`: errors or slow requests concentrated on one host/environment relative to its traffic share, or an error type / status code that dominates and was rare the week before.
 7. `consumers/queries.py` adds `affected_consumers`: how many of the consumers active on that route in that hour got errors, and the top ones.
-8. With `GROQ_API_KEY` set, the anomaly JSON goes to `openai/gpt-oss-120b` (temperature 0.3, at most 2 000 tokens including reasoning) with a system prompt that forbids inventing root causes; otherwise the findings are formatted as plain text.
+8. With an LLM configured (`GROQ_API_KEY`, or `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL`), the anomaly JSON goes to the model (temperature 0.3, at most 2 000 tokens including reasoning) with a system prompt that forbids inventing root causes; otherwise the findings are formatted as plain text.
 9. The result is upserted into `insight_reports`.
 
 ---
@@ -115,11 +115,11 @@ A service's spec (`api_specs`, one per service, uploaded with the ingest key or 
                          api_latency_1min, route_*_1hour, consumer/llm_usage_1hour
                                                                         |
 [Dashboard] --GET /v1/metrics/summary, /consumers, /llm-usage, ...------+--> charts, tables, panels
-[Dashboard] --POST /v1/ask--> Groq tool calls --> read-only queries --> answer + verified numbers
+[Dashboard] --POST /v1/ask--> LLM tool calls --> read-only queries --> answer + verified numbers
 
 [Scheduler] :15 hourly   --> last hour vs 8 weekday-hours (errors, p95, LLM cost) --> alerts table --> Slack / Discord / webhook
             every 5 min  --> SLO burn rates               --> alerts table --> same channels
-            Sunday 23:00 --> week vs baseline --> Groq narrative --> insight_reports
+            Sunday 23:00 --> week vs baseline --> LLM narrative --> insight_reports
 ```
 
 1. The SDK (or an OpenTelemetry exporter) sends request events; the collector validates each, refuses ones too old or too new, and checks that the key may write that service.
@@ -172,11 +172,11 @@ The system prompt instructs the model to write a concise 3–6 bullet report fro
 
 ### Validation
 
-The Groq response is used as-is for display. The anomaly JSON that feeds it is the authoritative record — validated and stored in `insight_reports.anomalies_json`.
+The LLM response is used as-is for display. The anomaly JSON that feeds it is the authoritative record — validated and stored in `insight_reports.anomalies_json`.
 
 ### Failure handling
 
-Groq call has a 30 s timeout. On any exception (timeout, rate limit, provider outage), the pipeline falls back to `_fallback_report()` which formats the raw statistical findings as plain text. The insights panel is "unformatted", not "broken". If `GROQ_API_KEY` is absent entirely, the fallback runs immediately without attempting any API call.
+The LLM call has a 30 s timeout. On any exception (timeout, rate limit, provider outage), the pipeline falls back to `_fallback_report()` which formats the raw statistical findings as plain text. The insights panel is "unformatted", not "broken". If no LLM is configured, the fallback runs immediately without attempting any API call.
 
 ---
 
@@ -227,7 +227,7 @@ Groq call has a 30 s timeout. On any exception (timeout, rate limit, provider ou
 - **Rate limiting:** slowapi enforces 600 req/min per client IP on ingest; insights generation is separately limited at 5/min and returns this week's report as is if it was generated in the last 10 minutes (each generation is an LLM call on a public key). Behind a proxy, set `FORWARDED_ALLOW_IPS` so the real client IP is used.
 - **Request size:** every request body is counted as it arrives and refused with 413 above 16 MB (`app/body_limit.py`), chunked bodies included — Starlette would otherwise buffer a body whole before any handler sees it.
 - **Event age:** ingest and OTLP refuse events older than 13 days (unless the batch is an explicit `backfill`) or more than 15 minutes in the future. Raw events are kept 14 days and aggregates 90–180, so materializing a straggler older than the raw data would replace days of aggregate history with it.
-- **Collector secrets:** `GROQ_API_KEY`, `DATABASE_URL` are env vars only — never committed. `.env.example` ships with empty values.
+- **Collector secrets:** `GROQ_API_KEY` / `LLM_API_KEY`, `DATABASE_URL` are env vars only — never committed. `.env.example` ships with empty values.
 - **CORS:** `CORS_ORIGINS` lists the dashboard origins allowed to call the collector (unset: none; the docker-compose file sets `*` for local use). Allowed headers: `Content-Type`, `X-Reqly-Key`, `Authorization`.
 - **No PII:** The SDKs capture method, route template, status, duration, error type, sizes, release and environment — never request bodies, query strings or headers. Consumer ids are optional and HMAC-SHA256-hashed with the app's salt inside the SDK, so API keys never reach the collector.
 
@@ -241,7 +241,7 @@ Groq call has a 30 s timeout. On any exception (timeout, rate limit, provider ou
 | Collector unreachable | httpx timeout (connect 1s, read/write 2s); retried 3 times with exponential backoff + jitter; batch dropped and counter incremented after 3 failures |
 | SDK queue full | Oldest event dropped, `dropped_events` counter incremented — request thread never blocks |
 | Rate-limited (429), 408, or collector 5xx | SDK retries up to 3 times with backoff (safe: the collector dedups on `event_id`); other 4xx are dropped immediately |
-| Groq API failure | Falls back to plain-text stats report; insight pipeline does not fail |
+| LLM API failure | Falls back to plain-text stats report; insight pipeline does not fail |
 | DB write fails | asyncpg raises; collector returns 500 — SDK will retry the batch on next flush cycle |
 | Malformed event in batch | Validated independently; one bad event increments `rejected` counter and is skipped; rest of batch is accepted |
 

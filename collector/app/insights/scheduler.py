@@ -12,7 +12,7 @@ from .anomaly_detection import detect_anomalies
 from .deploys import add_release_context
 from ..consumers.queries import add_affected_consumers
 from .hints import add_hints
-from .groq_client import generate_report
+from .llm_report import generate_report
 from .report import summarize_drift
 from ..openapi.store import drift_report
 
@@ -28,7 +28,7 @@ async def run_insights_for_service(service_name: str) -> dict:
     """The full pipeline for one service: pull seasonal data, run pure
     statistical anomaly detection (zero LLM involvement), attach which
     release was running for each anomaly, then hand only the structured
-    findings to Groq to write up. Used by both the weekly scheduled job and
+    findings to the LLM to write up. Used by both the weekly scheduled job and
     the manual /v1/insights/generate demo endpoint.
     """
     pool = get_pool()

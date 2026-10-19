@@ -91,7 +91,7 @@ LLM cost alerts follow the same lifecycle as anomaly alerts: one open alert per 
 
 Every **Sunday at 23:00 UTC**, the collector compares the last 7 days with the 7 weeks before, using the same tests. It keeps the top 5 anomalies with their release context, hints and affected consumers. If the service has an [OpenAPI spec](openapi-drift.md), the report also gets a line about the API surface: undocumented endpoints that got traffic, documented ones nobody called, and deprecated ones still being called, with the clients calling them.
 
-With `GROQ_API_KEY` set, `openai/gpt-oss-120b` writes a short report from those findings. The model only sees the structured anomaly list, never raw events, and is told not to invent causes the data doesn't support. Without a key, or if the call fails, the findings are formatted as plain text.
+With an LLM configured (`GROQ_API_KEY`, or any OpenAI-compatible API, see [Configuration](../self-hosting/configuration.md#ai)), the model writes a short report from those findings. The model only sees the structured anomaly list, never raw events, and is told not to invent causes the data doesn't support. Without one, or if the call fails, the findings are formatted as plain text.
 
 The report shows on the dashboard. To generate it on demand:
 
