@@ -147,6 +147,7 @@ Options passed to `reqlyExpress()` / `reqlyFastify()` / `reqlyHono()` (or to a s
 | `consumerSalt` | `REQLY_CONSUMER_SALT` | none: set it |
 | `hashConsumer` | `REQLY_HASH_CONSUMER` | `true` |
 | `pushOpenapi` | `REQLY_PUSH_OPENAPI` | `false`. See [OpenAPI drift](../features/openapi-drift.md) |
+| `traceSlowMs` | `REQLY_TRACE_SLOW_MS` | `500`: requests at least this slow send their [trace id](../features/alerts.md#traces) (4xx/5xx always do) |
 
 ## Shutting down
 

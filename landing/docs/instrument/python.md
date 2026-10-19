@@ -153,6 +153,7 @@ Every option can be passed to `instrument()` or set as an environment variable. 
 | `consumer_salt` | `REQLY_CONSUMER_SALT` | `None`: set it |
 | `hash_consumer` | `REQLY_HASH_CONSUMER` | `True`. `False` sends ids unhashed (only for non-secret ids) |
 | `push_openapi` | `REQLY_PUSH_OPENAPI` | `False`. `True` on FastAPI and Litestar, or the spec (a dict or a function returning it) on any app |
+| `trace_slow_ms` | `REQLY_TRACE_SLOW_MS` | `500`: requests at least this slow send their [trace id](../features/alerts.md#traces) (4xx/5xx always do) |
 
 With `sample_rate` below 1.0, request counts in the dashboard are the sampled volume; latency percentiles and error rates stay unbiased.
 
