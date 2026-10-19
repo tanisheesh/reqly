@@ -1,4 +1,4 @@
-import { Anomaly, LlmCostAlertDetails, SloAlertDetails } from "../api/client";
+import { Anomaly, ClientErrorAlertDetails, LlmCostAlertDetails, SloAlertDetails } from "../api/client";
 import { useAlerts } from "../hooks/useMetrics";
 import { AlertActions } from "./AlertActions";
 import { formatMs, formatPercent, formatUsd } from "../format";
@@ -29,6 +29,35 @@ export function AlertsBanner({ serviceName }: { serviceName: string }) {
                 <span className="text-slate-500">
                   · {s.status.budget_remaining === null ? "—" : `${Math.max(0, s.status.budget_remaining * 100).toFixed(0)}%`} of budget left
                 </span>
+                <AlertActions alert={a} />
+              </li>
+            );
+          }
+          if (a.kind === "client_errors") {
+            const c = a.details as ClientErrorAlertDetails;
+            const others = c.statuses.filter((s) => s.status_code !== c.status_code);
+            return (
+              <li key={a.id} className="text-xs leading-relaxed">
+                <div className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="font-mono font-semibold text-slate-200">{a.route}</span>
+                  <span className="text-amber-300">{c.status_code} spike</span>
+                  <span className="text-slate-400">
+                    {formatPercent(c.observed_share)} of requests vs {formatPercent(c.baseline_share)} usual (
+                    {c.observed_count.toLocaleString()} of {c.requests.toLocaleString()})
+                  </span>
+                  <span className="text-slate-600">since {new Date(a.first_hour).toLocaleString()}</span>
+                </div>
+                {others.length > 0 && (
+                  <div className="text-slate-400">
+                    also {others.map((s) => `${s.status_code} ${formatPercent(s.observed_share)}`).join(", ")}
+                  </div>
+                )}
+                {c.release_context?.is_new_release && (
+                  <div className="text-violet-300">
+                    running new release <span className="font-mono">{c.release_context.release}</span>
+                    {c.release_context.previous_release && <> (previous {c.release_context.previous_release})</>}
+                  </div>
+                )}
                 <AlertActions alert={a} />
               </li>
             );

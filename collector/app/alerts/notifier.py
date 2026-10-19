@@ -161,13 +161,48 @@ def _format_llm_cost(event: str, service_name: str, route: str, details: dict) -
     return "\n".join(lines)
 
 
+def _release_line(context: dict) -> str | None:
+    if not context.get("is_new_release"):
+        return None
+    line = f"• running release `{context['release']}`, first seen {context['release_first_seen_at']}"
+    before, after = context.get("before"), context.get("after")
+    if context.get("previous_release") and before and after:
+        line += (
+            f" — vs `{context['previous_release']}`: errors {_pct(before['error_rate'])} → "
+            f"{_pct(after['error_rate'])}, p95 {_ms(before['p95_ms'])} → {_ms(after['p95_ms'])}"
+        )
+    return line
+
+
+def _format_client_errors(event: str, service_name: str, route: str, details: dict) -> str:
+    if event == RESOLVED:
+        return f"✅ *Resolved* — `{service_name}` `{route}` client errors are back to normal."
+    icon = "🟡" if event == OPENED else "🟠"
+    title = "Client error spike" if event == OPENED else "Client errors still high"
+    lines = [
+        f"{icon} *{title}* — `{service_name}` `{route}` ({details['day_of_week']} {details['hour_range']} UTC, "
+        f"z={details['z_score']})",
+        f"• {details['status_code']} on {_pct(details['observed_share'])} of requests vs "
+        f"{_pct(details['baseline_share'])} usual ({details['observed_count']:,} of {details['requests']:,})",
+    ]
+    others = [s for s in details.get("statuses") or [] if s["status_code"] != details["status_code"]]
+    if others:
+        lines.append("• also " + ", ".join(f"{s['status_code']} {_pct(s['observed_share'])}" for s in others))
+    release = _release_line(details.get("release_context") or {})
+    if release:
+        lines.append(release)
+    return "\n".join(lines)
+
+
 def format_text(event: str, service_name: str, route: str, details: dict, dashboard_url: str | None = None) -> str:
     """One plain-text message used for Slack and Discord (both render the
     *bold* / `code` subset the same way closely enough)."""
     service_name, route, details = _clean(service_name), _clean(route), _clean(details)
-    if details.get("kind") in ("slo", "llm_cost"):
+    if details.get("kind") in ("slo", "llm_cost", "client_errors"):
         if details["kind"] == "slo":
             text = _format_slo(event, service_name, details)
+        elif details["kind"] == "client_errors":
+            text = _format_client_errors(event, service_name, route, details)
         else:
             text = _format_llm_cost(event, service_name, route, details)
         return f"{text}\n<{dashboard_url}|Open dashboard>" if dashboard_url and event != RESOLVED else text
@@ -182,16 +217,9 @@ def format_text(event: str, service_name: str, route: str, details: dict, dashbo
         f"• error rate {_pct(details['observed_error_rate'])} vs {_pct(details['baseline_error_rate'])} usual · "
         f"p95 {_ms(details['observed_p95_ms'])} vs {_ms(details['baseline_p95_ms'])} usual",
     ]
-    context = details.get("release_context") or {}
-    if context.get("is_new_release"):
-        line = f"• running release `{context['release']}`, first seen {context['release_first_seen_at']}"
-        before, after = context.get("before"), context.get("after")
-        if context.get("previous_release") and before and after:
-            line += (
-                f" — vs `{context['previous_release']}`: errors {_pct(before['error_rate'])} → "
-                f"{_pct(after['error_rate'])}, p95 {_ms(before['p95_ms'])} → {_ms(after['p95_ms'])}"
-            )
-        lines.append(line)
+    release = _release_line(details.get("release_context") or {})
+    if release:
+        lines.append(release)
     for hint in details.get("hints") or []:
         lines.append(f"• {hint['text']}")
     affected = details.get("affected_consumers")

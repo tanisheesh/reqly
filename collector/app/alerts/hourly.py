@@ -172,14 +172,18 @@ async def run_hourly_check(
     renotify_after: timedelta,
     now: datetime | None = None,
     llm_cost_min_usd: float | None = None,
+    client_error_statuses: tuple[int, ...] = (),
 ) -> int:
-    """Error/latency anomalies for every service, then (when llm_cost_min_usd
-    is set) LLM cost anomalies."""
-    from . import llm_cost
+    """Error/latency anomalies for every service, then client-error (4xx)
+    spikes for `client_error_statuses`, then (when llm_cost_min_usd is set)
+    LLM cost anomalies."""
+    from . import client_errors, llm_cost
 
     now = now or datetime.now(timezone.utc)
     hour = last_complete_hour(now)
     await _refresh_hour(pool, hour)
+    if client_error_statuses:
+        await client_errors.refresh_hour(pool, hour)
     if llm_cost_min_usd is not None:
         await llm_cost.refresh_hour(pool, hour)
     total = 0
@@ -188,6 +192,13 @@ async def run_hourly_check(
             total += len(await check_service(pool, service_name, hour, now, channels, renotify_after))
         except Exception:
             logger.exception("hourly alert check failed for service=%s", service_name)
+        if client_error_statuses:
+            try:
+                total += len(await client_errors.check_service(
+                    pool, service_name, hour, now, channels, renotify_after, client_error_statuses
+                ))
+            except Exception:
+                logger.exception("client error check failed for service=%s", service_name)
         if llm_cost_min_usd is None:
             continue
         try:

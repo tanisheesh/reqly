@@ -23,6 +23,17 @@ def _positive_or_none(raw: str) -> float | None:
     return value if value > 0 else None
 
 
+def _status_codes(raw: str) -> tuple[int, ...]:
+    codes = []
+    for part in raw.split(","):
+        part = part.strip()
+        if part.isdigit() and 400 <= int(part) <= 499:
+            codes.append(int(part))
+        elif part:
+            _logger.warning("ignoring %r in CLIENT_ERROR_ALERT_STATUSES (4xx codes only)", part)
+    return tuple(codes)
+
+
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 OPENAI_BASE_URL = "https://api.openai.com/v1"
 _DEFAULT_LLM_MODEL = "openai/gpt-oss-120b"
@@ -85,6 +96,7 @@ class Settings:
     resend_api_key: str | None
     alert_renotify_hours: float
     llm_cost_alert_min_usd: float | None
+    client_error_alert_statuses: tuple[int, ...]
     consumer_limit_per_day: int
     dashboard_url: str | None
     public_dashboard: bool
@@ -184,6 +196,8 @@ class Settings:
             # LLM cost alerts: the smallest extra spend per route-hour, in USD,
             # worth an alert. 0 or negative turns them off.
             llm_cost_alert_min_usd=_positive_or_none(os.environ.get("LLM_COST_ALERT_MIN_USD", "1.0")),
+            # 4xx status codes whose spikes open alerts; empty turns them off.
+            client_error_alert_statuses=_status_codes(os.environ.get("CLIENT_ERROR_ALERT_STATUSES", "401,403,422,429")),
             # Distinct consumers kept per service per UTC day; later new ones
             # are stored as "__other__". 0 turns the cap off.
             consumer_limit_per_day=int(os.environ.get("CONSUMER_LIMIT_PER_DAY", "1000")),

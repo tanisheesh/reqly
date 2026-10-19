@@ -197,17 +197,24 @@ export interface Alert {
   muted?: boolean;
 }
 
-export interface ClientErrorAlertDetails {
-  kind: "client_errors";
+export interface ClientErrorStatus {
   status_code: number;
-  observed: number;
-  baseline: number;
+  observed_count: number;
+  expected_count: number;
+  observed_share: number;
+  baseline_share: number;
+  z_score: number;
+}
+
+/** A 401/403/422/429 wave on a route (collector 0.14+). */
+export interface ClientErrorAlertDetails extends ClientErrorStatus {
+  kind: "client_errors";
+  route: string;
   requests: number;
+  statuses: ClientErrorStatus[];
   day_of_week: string;
   hour_range: string;
   release_context?: ReleaseContext | null;
-  trace_ids?: string[];
-  trace_urls?: string[];
 }
 
 export interface AlertMute {
