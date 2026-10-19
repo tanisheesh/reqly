@@ -6,6 +6,16 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 
 ---
 
+## [Unreleased]
+
+Python SDK 0.7.1 · Node SDK 0.5.1 (collector unchanged)
+
+- LLM client instrumentation also counts the `stream()` helpers in Python
+  (`client.messages.stream(...)`, `client.chat.completions.stream(...)`, `client.responses.stream(...)`)
+- `trace_slow_ms` / `traceSlowMs` (`REQLY_TRACE_SLOW_MS`) in both SDKs, to match a lower `TRACE_ID_SLOW_MS`
+
+---
+
 ## [0.14.0] — 2026-10-19
 
 Collector 0.14.0 · Helm chart 0.14.0 · Python SDK 0.7.0 · Node SDK 0.5.0
