@@ -24,6 +24,8 @@ _CONSUMER_HASH_HEX = 16
 _HASH_CACHE_SIZE = 4096
 _MAX_CONSUMER_LEN = 128
 _MAX_MODEL_LEN = 255
+# Models listed per request in llm_usage (the collector's cap).
+MAX_MODELS_PER_REQUEST = 16
 
 
 class LazyHeaders(_MappingABC):
@@ -86,16 +88,19 @@ class LLMUsage:
         totals[0] += input_tokens
         totals[1] += output_tokens
 
-    def summary(self) -> tuple[str, int, int] | None:
-        """(model, input_tokens, output_tokens) for the event. A request
-        that used several models is attributed to the one with the most
-        tokens and carries the token totals of all of them."""
+    def summary(self) -> tuple | None:
+        """(model, input_tokens, output_tokens, by_model) for the event. The
+        first three are the model with the most tokens and the totals of all
+        of them (what collectors before 0.13 read); by_model is
+        ((model, input, output), ...) when the request used several models,
+        so each is priced at its own rate, else ()."""
         if not self.tokens_by_model:
             return None
-        model = max(self.tokens_by_model, key=lambda m: sum(self.tokens_by_model[m]))
+        ranked = sorted(self.tokens_by_model.items(), key=lambda item: -sum(item[1]))
         input_total = sum(t[0] for t in self.tokens_by_model.values())
         output_total = sum(t[1] for t in self.tokens_by_model.values())
-        return model, input_total, output_total
+        by_model = tuple((m, t[0], t[1]) for m, t in ranked[:MAX_MODELS_PER_REQUEST]) if len(ranked) > 1 else ()
+        return ranked[0][0], input_total, output_total, by_model
 
 
 _current_usage: contextvars.ContextVar[Optional[LLMUsage]] = contextvars.ContextVar(
@@ -107,7 +112,7 @@ def begin_request() -> contextvars.Token:
     return _current_usage.set(LLMUsage())
 
 
-def end_request(token: contextvars.Token | None) -> tuple[str, int, int] | None:
+def end_request(token: contextvars.Token | None) -> tuple | None:
     usage = _current_usage.get()
     if token is not None:
         try:

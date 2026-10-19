@@ -108,6 +108,12 @@ def test_llm_usage_from_async_and_sync_endpoints(fake_collector):
         reqly.record_llm_response({"model": "claude-haiku", "usage": {"input_tokens": 900, "output_tokens": 100}})
         return {}
 
+    @app.post("/agent")
+    def agent():
+        reqly.record_llm_usage("gpt-4o", 1000, 300)
+        reqly.record_llm_usage("gpt-4o-mini", 400, 40)
+        return {}
+
     @app.get("/plain")
     def plain():
         return {}
@@ -116,11 +122,20 @@ def test_llm_usage_from_async_and_sync_endpoints(fake_collector):
     http = TestClient(app)
     http.post("/chat")
     http.post("/summarize")
+    http.post("/agent")
     http.get("/plain")
     events = {e["route"]: e for e in _events(client, batches)}
     assert (events["/chat"]["llm_model"], events["/chat"]["llm_input_tokens"], events["/chat"]["llm_output_tokens"]) == ("gpt-4o-mini", 200, 50)
     assert (events["/summarize"]["llm_model"], events["/summarize"]["llm_input_tokens"]) == ("claude-haiku", 900)
     assert events["/plain"]["llm_model"] is None and events["/plain"]["llm_input_tokens"] is None
+    # one model: no per-model list; several: each with its own tokens
+    assert "llm_usage" not in events["/chat"] and "llm_usage" not in events["/plain"]
+    agent = events["/agent"]
+    assert (agent["llm_model"], agent["llm_input_tokens"], agent["llm_output_tokens"]) == ("gpt-4o", 1400, 340)
+    assert agent["llm_usage"] == [
+        {"model": "gpt-4o", "input_tokens": 1000, "output_tokens": 300},
+        {"model": "gpt-4o-mini", "input_tokens": 400, "output_tokens": 40},
+    ]
     client.shutdown()
 
 
@@ -141,8 +156,10 @@ def test_record_llm_response_shapes():
     reqly.record_llm_response({"model": "x"})  # no usage: ignored
     reqly.record_llm_response(None)  # never raises
     reqly.record_llm_usage("bad", -5, 0)  # rejected, logged
-    # several models: attributed to the biggest, with all tokens summed
-    assert rc.end_request(token) == ("claude-sonnet", 1011, 507)
+    # several models: the biggest, all tokens summed, and the breakdown
+    assert rc.end_request(token) == (
+        "claude-sonnet", 1011, 507, (("claude-sonnet", 1000, 500), ("gpt-4.1", 11, 7)),
+    )
 
 
 def test_record_llm_usage_outside_a_request_is_a_no_op():

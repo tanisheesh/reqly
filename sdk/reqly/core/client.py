@@ -78,11 +78,11 @@ class ReqlyClient:
         request_bytes: int | None = None,
         response_bytes: int | None = None,
         request_info=None,
-        llm: tuple[str, int, int] | None = None,
+        llm: tuple | None = None,
     ) -> None:
         """``request_info``: zero-argument callable returning a RequestInfo,
         only called when consumer tracking is on. ``llm``: (model,
-        input_tokens, output_tokens) recorded during the request."""
+        input_tokens, output_tokens[, by_model]) recorded during the request."""
         if self._disabled:
             return
         try:
