@@ -21,6 +21,11 @@ services:
 
   reqly:
     image: ghcr.io/tanisheesh/reqly:${REQLY_VERSION:-latest}
+    # Any other collector setting in .env (alert channels, METRICS_TOKEN, ...)
+    # reaches it too; see https://reqly.tanisheesh.in/docs/self-hosting/configuration/
+    env_file:
+      - path: .env
+        required: false
     depends_on:
       timescaledb:
         condition: service_healthy
