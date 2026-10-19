@@ -5,24 +5,27 @@ description: Every environment variable the Reqly collector, dashboard and local
 
 # Configuration
 
-The collector reads its settings from environment variables. Locally, copy `.env.example` to `.env`. `docker compose up` also works without a `.env`, using the defaults below.
+The collector reads its settings from environment variables. Locally, copy `.env.example` to `.env`. `docker compose up` also works without a `.env`: it runs in demo mode, with the demo keys below.
+
+Outside demo mode the collector is locked down by default (collector 0.14+): it won't start without both keys, the dashboard needs a sign-in, and no other origin may call the API.
 
 ## Keys and access
 
 | Variable | Default | Notes |
 |---|---|---|
-| `REQLY_INGEST_KEY` | `demo-key` | Write key. SDKs and OTLP exporters send it as `X-Reqly-Key`; it also manages SLOs, specs and projects |
-| `REQLY_READ_KEY` | `demo-read-key` | Read key the dashboard sends. It's compiled into the dashboard, so treat it as public to anyone who can open the dashboard. **Must differ from the ingest key** |
-| `PUBLIC_DASHBOARD` | `true` | `true`: anyone with the dashboard can read (a public demo). `false`: [sign-in required](access.md) and the read key is refused |
+| `REQLY_DEMO_MODE` | `false` (`true` in docker-compose) | `true` brings back the public demo defaults: `demo-key` / `demo-read-key`, `PUBLIC_DASHBOARD=true`, `CORS_ORIGINS=*`. For local use and demos only |
+| `REQLY_INGEST_KEY` | **required** (demo: `demo-key`) | Write key. SDKs and OTLP exporters send it as `X-Reqly-Key`; it also manages SLOs, specs and projects |
+| `REQLY_READ_KEY` | **required** (demo: `demo-read-key`) | Read key the dashboard sends. It's compiled into the dashboard, so treat it as public to anyone who can open the dashboard. **Must differ from the ingest key** |
+| `PUBLIC_DASHBOARD` | `false` (demo: `true`) | `true`: anyone with the dashboard can read (a public demo). `false`: [sign-in required](access.md) and the read key is refused |
 | `REQLY_ADMIN_USERNAME` / `REQLY_ADMIN_PASSWORD` | `admin` / empty | First admin, created at start-up when there are no users. Password 12+ characters |
 | `SESSION_TTL_HOURS` | `168` | How long a sign-in lasts |
-| `CORS_ORIGINS` | `*` locally | Comma-separated dashboard origins allowed to call the collector. Restrict it in production |
+| `CORS_ORIGINS` | empty (demo: `*`) | Comma-separated dashboard origins allowed to call the collector. Not needed when the collector serves the dashboard itself ([all-in-one](deploy.md)) |
 | `FORWARDED_ALLOW_IPS` | `127.0.0.1` | Behind a proxy, the proxy's IP (or `*` if the collector is only reachable through it), so rate limits see real client IPs |
 | `RATE_LIMIT_PER_MINUTE` | `600` | Ingest requests (`/v1/ingest`, `/otlp/v1/traces`) per minute **per project key**, so services behind one IP don't share a budget. An SDK sends one request per batch, not per app request |
 | `RATE_LIMIT_ENV_KEY_PER_MINUTE` | `6000` | The same for `REQLY_INGEST_KEY`, which every service using it shares. For many services, give each project its own key |
 | `RATE_LIMIT_INGEST_PER_IP_PER_MINUTE` | `6000` | Outer ingest cap per client IP, so made-up keys can't get around the per-key limits. Ask Reqly, insights and sign-in stay limited per IP |
 
-The collector warns at start-up if the keys are the defaults or if the two keys are equal.
+The collector refuses to start without the keys (outside demo mode), and warns if they are the demo keys or equal to each other. Generate one with `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
 
 ## AI
 

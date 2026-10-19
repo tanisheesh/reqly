@@ -50,7 +50,7 @@ Also set:
 
 - **Behind a platform proxy** (Render, Fly.io, a load balancer): `FORWARDED_ALLOW_IPS=*`, so rate limits see real client IPs. Use `*` only if the collector is reachable solely through that proxy.
 - `GROQ_API_KEY` (or `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL`) for AI features, and alert webhooks.
-- `PUBLIC_DASHBOARD=false` and `REQLY_ADMIN_PASSWORD` unless the dashboard should be public. See [Projects, keys & sign-in](access.md).
+- `REQLY_ADMIN_PASSWORD` for the first admin: the dashboard needs a sign-in by default. `PUBLIC_DASHBOARD=true` makes it public instead (a demo). See [Projects, keys & sign-in](access.md).
 
 Check it with `GET /v1/health`, which returns `{"status": "ok"}`, and `GET /v1/ready`, which also checks the database. Point Prometheus at `GET /metrics` to watch the collector itself ([settings](configuration.md#monitoring-the-collector)).
 

@@ -93,7 +93,8 @@ docker run -d \
   -e REQLY_INGEST_KEY="your_ingest_key" \
   -e REQLY_READ_KEY="your_read_key" \
   -e GROQ_API_KEY="gsk_your_key_here" \
-  -e CORS_ORIGINS="*" \
+  -e CORS_ORIGINS="https://your-dashboard.example.com" \
+  -e REQLY_ADMIN_PASSWORD="at-least-12-characters" \
   -p 8000:8000 \
   ghcr.io/tanisheesh/reqly-collector:latest
 ```
@@ -109,7 +110,8 @@ DATABASE_URL=postgresql://reqly:your_password@<ec2-ip>:5432/reqly?sslmode=requir
 REQLY_INGEST_KEY=your_ingest_key
 REQLY_READ_KEY=your_read_key
 GROQ_API_KEY=gsk_your_key_here
-CORS_ORIGINS=*
+CORS_ORIGINS=https://your-dashboard.example.com
+REQLY_ADMIN_PASSWORD=at-least-12-characters   # first admin; or PUBLIC_DASHBOARD=true for a public demo
 FORWARDED_ALLOW_IPS=*              # only if the collector is reachable solely via the platform's proxy
 ```
 

@@ -82,6 +82,7 @@ class Settings:
     log_format: str
     metrics_enabled: bool
     metrics_token: str | None
+    demo_mode: bool
 
     @property
     def llm_enabled(self) -> bool:
@@ -89,25 +90,32 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> "Settings":
-        ingest_key = os.environ.get("REQLY_INGEST_KEY", "demo-key")
+        # Safe unless told otherwise: without REQLY_DEMO_MODE the keys must be
+        # set, the dashboard needs a sign-in and no other origin may call the
+        # API. Demo mode (docker-compose, the load generator) brings back the
+        # public demo-key / demo-read-key, PUBLIC_DASHBOARD=true and CORS "*".
+        demo_mode = _env_flag("REQLY_DEMO_MODE", False)
+        # Empty when unset outside demo mode: the collector refuses to start
+        # (main.py) and no key can match an empty one.
+        ingest_key = os.environ.get("REQLY_INGEST_KEY") or ("demo-key" if demo_mode else "")
         # The read key is shipped inside the dashboard's JS bundle, so it is
         # effectively public. It deliberately does NOT fall back to the ingest
         # key -- that would hand write access to anyone who opens the dashboard.
-        read_key = os.environ.get("REQLY_READ_KEY", "demo-read-key")
+        read_key = os.environ.get("REQLY_READ_KEY") or ("demo-read-key" if demo_mode else "")
 
         if ingest_key == "demo-key":
             _logger.warning(
                 "REQLY_INGEST_KEY is not set — using the public default 'demo-key'. "
                 "Set REQLY_INGEST_KEY and REQLY_READ_KEY before exposing this collector."
             )
-        if read_key == ingest_key:
+        if read_key and read_key == ingest_key:
             _logger.warning(
                 "REQLY_READ_KEY equals REQLY_INGEST_KEY. The read key is embedded in "
                 "the dashboard bundle, so anyone with dashboard access can also write "
                 "telemetry. Use two different keys."
             )
 
-        cors_raw = os.environ.get("CORS_ORIGINS", "")
+        cors_raw = os.environ.get("CORS_ORIGINS", "*" if demo_mode else "")
         cors_origins = [o.strip() for o in cors_raw.split(",") if o.strip()]
         llm_base_url, llm_api_key, llm_model = _llm_from_env()
 
@@ -157,7 +165,7 @@ class Settings:
             # true: the read key (public in the dashboard bundle) can read
             # everything -- a public demo. false: reading needs a signed-in
             # user (the read key is refused).
-            public_dashboard=_env_flag("PUBLIC_DASHBOARD", True),
+            public_dashboard=_env_flag("PUBLIC_DASHBOARD", demo_mode),
             # First admin, created at start-up when there are no users yet.
             admin_username=os.environ.get("REQLY_ADMIN_USERNAME") or "admin",
             admin_password=os.environ.get("REQLY_ADMIN_PASSWORD") or None,
@@ -168,7 +176,13 @@ class Settings:
             # need "Authorization: Bearer <token>".
             metrics_enabled=_env_flag("METRICS_ENABLED", True),
             metrics_token=os.environ.get("METRICS_TOKEN") or None,
+            demo_mode=demo_mode,
         )
+
+    def missing_keys(self) -> list[str]:
+        """Settings the collector can't run without (outside demo mode)."""
+        return [name for name, value in (("REQLY_INGEST_KEY", self.ingest_key), ("REQLY_READ_KEY", self.read_key))
+                if not value]
 
 
 settings = Settings.from_env()

@@ -30,6 +30,12 @@ _scheduler = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    missing = settings.missing_keys()
+    if missing:
+        raise RuntimeError(
+            f"{' and '.join(missing)} must be set (or REQLY_DEMO_MODE=true for the public demo keys). "
+            "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+        )
     pool = await create_pool()
     logger.info("Reqly collector: db pool ready")
     await bootstrap_admin(pool, settings.admin_username, settings.admin_password)
