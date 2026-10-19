@@ -1,12 +1,13 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { hostname } from "node:os";
-import { gzipSync } from "node:zlib";
+import { promisify } from "node:util";
+import { gzip as gzipCallback } from "node:zlib";
 
 import { ReqlyOptions, ResolvedConfig, resolveConfig } from "./config.js";
 import { LlmSummary, RequestInfo } from "./context.js";
 import { traceIdFromHeaders, wantsTraceId } from "./traces.js";
 
-export const SDK_VERSION = "0.5.1";
+export const SDK_VERSION = "0.5.2";
 export const UNMATCHED_ROUTE = "__unmatched__";
 
 const HOST = hostname();
@@ -19,6 +20,9 @@ const SHUTDOWN_FLUSH_MS = 5000;
 // and the client stops compressing.
 const GZIP_MIN_BYTES = 1024;
 const GZIP_REJECTED = new Set([400, 415, 422]);
+// On libuv's thread pool: a synchronous gzip of a full batch would block the
+// app's event loop for every flush.
+const gzip = promisify(gzipCallback);
 
 export interface RecordedRequest {
   method: string;
@@ -149,7 +153,7 @@ export class ReqlyClient {
       const error = request.errorType !== undefined || request.statusCode >= 500;
       const requestInfo = once(request.requestInfo);
       const traceId = this.traceId(requestInfo, request.statusCode, request.durationMs);
-      this.queue.push({
+      const event: WireEvent = {
         event_id: randomUUID(),
         timestamp: new Date().toISOString(),
         method: request.method.toUpperCase(),
@@ -165,17 +169,17 @@ export class ReqlyClient {
         llm_model: request.llm?.model ?? null,
         llm_input_tokens: request.llm?.inputTokens ?? null,
         llm_output_tokens: request.llm?.outputTokens ?? null,
-        ...(request.llm?.byModel
-          ? {
-              llm_usage: request.llm.byModel.map((m) => ({
-                model: m.model,
-                input_tokens: m.inputTokens,
-                output_tokens: m.outputTokens,
-              })),
-            }
-          : {}),
-        ...(traceId ? { trace_id: traceId } : {}),
-      });
+      };
+      // Set only when present, so the common event stays one object literal.
+      if (request.llm?.byModel) {
+        event.llm_usage = request.llm.byModel.map((m) => ({
+          model: m.model,
+          input_tokens: m.inputTokens,
+          output_tokens: m.outputTokens,
+        }));
+      }
+      if (traceId) event.trace_id = traceId;
+      this.queue.push(event);
       this.stats.recorded += 1;
       if (this.queue.length > this.config.maxQueueSize) {
         const excess = this.queue.length - this.config.maxQueueSize;
@@ -253,7 +257,14 @@ export class ReqlyClient {
       ...(this.config.environment ? { environment: this.config.environment } : {}),
       events,
     });
-    const compressed = Buffer.byteLength(body) >= GZIP_MIN_BYTES ? gzipSync(body) : undefined;
+    let compressed: Buffer | undefined;
+    if (this.gzip && Buffer.byteLength(body) >= GZIP_MIN_BYTES) {
+      try {
+        compressed = await gzip(body);
+      } catch {
+        compressed = undefined; // send it plain
+      }
+    }
     for (let attempt = 0; attempt < retries; attempt++) {
       try {
         const response = await this.post(body, compressed, timeoutMs);
