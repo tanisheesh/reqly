@@ -36,6 +36,8 @@ docker compose exec collector python -m app.users create-user alice           # 
 docker compose exec collector python -m app.users set-password alice
 ```
 
+Both ask for the password in the terminal; in a script, pass it in `REQLY_NEW_PASSWORD` instead (never as an argument, where it would land in the shell history).
+
 Passwords are hashed with argon2id. A sign-in is a bearer session (7 days by default, `SESSION_TTL_HOURS`); changing a password ends all of that user's sessions.
 
 ## Manage it from the dashboard

@@ -31,11 +31,11 @@ Tag each request with the client that made it, and Reqly answers three questions
     reqlyExpress({ consumer: (info) => info.headers["x-tenant-id"] });
     ```
 
-Or with environment variables: `REQLY_CONSUMER_HEADER` and `REQLY_CONSUMER_SALT`.
-
 === "OpenTelemetry"
 
     Set `enduser.id` (or `reqly.consumer_id`) on the server span, and `REQLY_CONSUMER_SALT` on the **collector**. OTLP exporters send the attribute in plain text, so the collector hashes it, the same way the SDKs do: with the same salt, a caller gets the same id whichever way it reaches Reqly. Without the salt the attribute is ignored.
+
+The SDKs also take `REQLY_CONSUMER_HEADER` and `REQLY_CONSUMER_SALT` from the environment.
 
 ## Privacy
 

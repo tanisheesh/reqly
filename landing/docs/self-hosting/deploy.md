@@ -60,7 +60,7 @@ docker run -d -p 8000:8000 \
   -e REQLY_INGEST_KEY=... \
   -e REQLY_READ_KEY=... \
   -e CORS_ORIGINS=https://reqly-dashboard.example.com \
-  ghcr.io/tanisheesh/reqly-collector:0.14.1
+  ghcr.io/tanisheesh/reqly-collector:0.14.2
 ```
 
 Images are built for linux/amd64 and arm64. Pin a version rather than `latest`.
@@ -86,7 +86,7 @@ Check it with `GET /v1/health`, which returns `{"status": "ok"}`, and `GET /v1/r
     docker run -d -p 5173:5173 \
       -e REQLY_COLLECTOR_URL=https://reqly.example.com \
       -e REQLY_READ_KEY=... \
-      ghcr.io/tanisheesh/reqly-dashboard:0.14.1
+      ghcr.io/tanisheesh/reqly-dashboard:0.14.2
     ```
 
 === "Static host"

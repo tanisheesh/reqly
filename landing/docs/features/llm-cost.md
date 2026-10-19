@@ -27,7 +27,7 @@ The simplest way: instrument the client once, and every call it makes is counted
     const anthropic = instrumentAnthropic(new Anthropic());
     ```
 
-It covers OpenAI chat completions, Responses, completions and embeddings, and Anthropic messages, including streams, which count when they finish, and the `stream()` helpers (`client.messages.stream(...)`, `client.chat.completions.stream(...)`, `client.responses.stream(...)`), however the stream is read: iterated, `text_stream`, `until_done()` or the final message (Python SDK 0.7.1+). OpenAI chat streams report usage only with `stream_options: {"include_usage": true}`: that's the API, not Reqly. Only that client object is patched, and the provider's own return value comes back unchanged.
+It covers OpenAI chat completions, Responses, completions and embeddings, and Anthropic messages, including streams, which count when they finish. The `stream()` helpers count too (`messages.stream(...)`, `chat.completions.stream(...)`, `responses.stream(...)`), however the stream is read: in Python iterated, `text_stream`, `until_done()` or `get_final_*()` (0.7.1+); in Node iterated or `finalMessage()` / `finalChatCompletion()` / `finalResponse()`. OpenAI chat streams report usage only with `stream_options: {"include_usage": true}`: that's the API, not Reqly. Only that client object is patched, and the provider's own return value comes back unchanged.
 
 Or record usage yourself, from a response or as numbers:
 

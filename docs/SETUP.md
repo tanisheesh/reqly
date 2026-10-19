@@ -8,7 +8,7 @@
 
 ## Prerequisites
 
-- Docker + Docker Compose (tested with Compose v2.x)
+- Docker + Docker Compose 2.24 or newer (it loads `.env` into the collector)
 - Python 3.9+ (only needed if you want to run the SDK or collector outside Docker)
 - Node.js 20+ (only needed to develop the dashboard or the Node SDK outside Docker)
 
@@ -57,7 +57,7 @@ cp .env.example .env
 | `ASK_DAILY_LIMIT` | `200` | Ask Reqly questions per day per collector (the read key is public to dashboard viewers); `0` turns Ask off |
 | `CORS_ORIGINS` | `*` in compose (empty outside demo mode) | Comma-separated list of allowed origins; restrict in production |
 | `INSIGHTS_SCHEDULER_ENABLED` | `true` | `false` turns off the weekly insights report |
-| `ALERTS_ENABLED` | `true` | Hourly anomaly check (open alerts appear on the dashboard) |
+| `ALERTS_ENABLED` | `true` | Hourly anomaly, client error and LLM cost checks and the 5-minute SLO check (open alerts appear on the dashboard) |
 | `ALERT_SLACK_WEBHOOK_URL` / `ALERT_DISCORD_WEBHOOK_URL` / `ALERT_WEBHOOK_URL` | *(empty)* | Where alert notifications go; unset channels are skipped |
 | `ALERT_TEAMS_WEBHOOK_URL` / `ALERT_PAGERDUTY_ROUTING_KEY` / `ALERT_OPSGENIE_API_KEY` | *(empty)* | Microsoft Teams (Workflows webhook), PagerDuty (Events API v2), Opsgenie |
 | `ALERT_EMAIL_TO` / `ALERT_EMAIL_FROM` + `SMTP_*` or `RESEND_API_KEY` | *(empty)* | Email alerts through SMTP or Resend |
@@ -65,13 +65,15 @@ cp .env.example .env
 | `TRACE_ID_SLOW_MS` / `TRACE_URL_TEMPLATE` | `1000` / *(empty)* | Which requests keep their trace id besides 4xx/5xx, and the link for one in alerts |
 | `ALERT_RENOTIFY_HOURS` | `6` | Reminder interval while an alert keeps firing |
 | `LLM_COST_ALERT_MIN_USD` | `1.0` (`0.4` in Compose) | Smallest extra LLM spend per route-hour (USD) worth an alert; `0` turns LLM cost alerts off |
-| `DASHBOARD_URL` | `http://localhost:5173` | Linked from alert messages |
+| `DASHBOARD_URL` | `http://localhost:5173` in compose (empty otherwise) | Linked from alert messages |
 | `METRICS_ENABLED` / `METRICS_TOKEN` / `LOG_FORMAT` | `true` / *(empty)* / `text` | The collector's Prometheus `/metrics` (optionally behind a bearer token) and JSON logs |
 | `LATE_DATA_REFRESH_SECONDS` | `60` | How often late-arriving events (older than 1h) are materialized into the aggregates |
 | `FORWARDED_ALLOW_IPS` | `127.0.0.1` | Behind a proxy, the proxy's IP — lets rate limiting see the real client IP |
 | `VITE_COLLECTOR_URL` | `http://localhost:8000` | Collector URL as seen from the **browser** (not the Docker network) |
 | `BACKFILL_WEEKS` | `8` | Weeks of synthetic history to generate on first load-generator run |
 | `BACKFILL_EVENTS_PER_HOUR` | `30` | Synthetic events per hour during backfill |
+| `LIVE_RPS` | `2` | Live requests per second after the backfill |
+| `DB_POOL_MIN_SIZE` / `DB_POOL_MAX_SIZE` | `2` / `10` | The collector's database connection pool |
 
 ---
 

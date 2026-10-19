@@ -5,7 +5,7 @@ description: Run Reqly locally with Docker Compose and instrument your first app
 
 # Quickstart
 
-Run the full stack locally, then point an app at it. You need Docker with Compose, plus Python 3.9+ or Node 20+ for the app you instrument.
+Run the full stack locally, then point an app at it. You need Docker with Compose 2.24+, plus Python 3.9+ or Node 20+ for the app you instrument.
 
 ## 1. Start the stack
 

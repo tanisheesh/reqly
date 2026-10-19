@@ -32,6 +32,9 @@ compresses resends that batch as plain JSON and stops compressing (see
 |---|---|---|
 | `200 {"accepted": n, "rejected": m, "reasons": [...]}` | Batch processed. `rejected` events failed validation and were dropped individually; `reasons` (up to 5, only when something was rejected) says why. | Treat as success. |
 | `401` | Missing or wrong ingest key. | Drop the batch, don't retry. |
+| `403` | The key is valid but may not write this service (it belongs to another project), or a `backfill` batch was sent with a project key. | Drop the batch, don't retry. |
+| `400`, `415` | A gzip body that doesn't decompress, or an unsupported `Content-Encoding`. | Resend as plain JSON (see above). |
+| `413` | Body over 16 MB, or over 32 MB decompressed. | Send smaller batches. |
 | `422` | Batch envelope invalid (e.g. `service_name` missing or too long, more than 1,000 events). | Drop the batch, don't retry. |
 | `408`, `429`, any `5xx` | Transient (rate limited, collector restarting, proxy error). | Retry with exponential backoff. |
 
