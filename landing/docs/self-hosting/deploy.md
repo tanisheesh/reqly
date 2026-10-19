@@ -52,7 +52,7 @@ Also set:
 - `GROQ_API_KEY` (or `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL`) for AI features, and alert webhooks.
 - `PUBLIC_DASHBOARD=false` and `REQLY_ADMIN_PASSWORD` unless the dashboard should be public. See [Projects, keys & sign-in](access.md).
 
-Check it with `GET /v1/health`, which returns `{"status": "ok"}`.
+Check it with `GET /v1/health`, which returns `{"status": "ok"}`, and `GET /v1/ready`, which also checks the database. Point Prometheus at `GET /metrics` to watch the collector itself ([settings](configuration.md#monitoring-the-collector)).
 
 !!! tip "Render or similar"
     Create a Web Service from the repository with root directory `collector` and the Docker runtime, or deploy the prebuilt image. Add the variables above.

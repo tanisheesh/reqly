@@ -79,6 +79,9 @@ class Settings:
     admin_username: str
     admin_password: str | None
     session_ttl_hours: float
+    log_format: str
+    metrics_enabled: bool
+    metrics_token: str | None
 
     @property
     def llm_enabled(self) -> bool:
@@ -159,6 +162,12 @@ class Settings:
             admin_username=os.environ.get("REQLY_ADMIN_USERNAME") or "admin",
             admin_password=os.environ.get("REQLY_ADMIN_PASSWORD") or None,
             session_ttl_hours=float(os.environ.get("SESSION_TTL_HOURS", "168")),
+            # "json": one JSON object per log line; anything else: plain text.
+            log_format=(os.environ.get("LOG_FORMAT") or "text").strip().lower(),
+            # Prometheus metrics at /metrics; with METRICS_TOKEN set, scrapes
+            # need "Authorization: Bearer <token>".
+            metrics_enabled=_env_flag("METRICS_ENABLED", True),
+            metrics_token=os.environ.get("METRICS_TOKEN") or None,
         )
 
 

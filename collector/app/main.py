@@ -15,11 +15,14 @@ from .config import settings
 from .db.late_data import run_refresh_loop
 from .db.pool import close_pool, create_pool, get_pool
 from .insights.scheduler import start_scheduler
+from .logs import configure_logging
+from .observability import MetricsMiddleware
+from .observability import router as observability_router
 from .rate_limit import limiter
 from .users.accounts import bootstrap_admin
 from .routers import alerts, ask, auth, ingest, insights, metrics, openapi, otlp, projects, slos, usage
 
-logging.basicConfig(level=logging.INFO)
+configure_logging(settings.log_format)
 logger = logging.getLogger("reqly.collector")
 
 _scheduler = None
@@ -73,6 +76,8 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Content-Type", "X-Reqly-Key", "Authorization"],
 )
+# Outside the others, so it also counts what they answer themselves (413, CORS).
+app.add_middleware(MetricsMiddleware)
 
 app.include_router(auth.router)
 app.include_router(ingest.router)
@@ -85,6 +90,7 @@ app.include_router(ask.router)
 app.include_router(openapi.router)
 app.include_router(usage.router)
 app.include_router(projects.router)
+app.include_router(observability_router)
 
 
 @app.get("/v1/health")

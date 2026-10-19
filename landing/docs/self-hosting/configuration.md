@@ -64,6 +64,16 @@ The weekly report and Ask Reqly use any OpenAI-compatible chat completions API: 
 
 The database must be TimescaleDB with the Toolkit: the `timescale/timescaledb-ha:pg16` image includes both. The collector applies its migrations on start-up.
 
+## Monitoring the collector
+
+| Variable | Default | Notes |
+|---|---|---|
+| `METRICS_ENABLED` | `true` | Prometheus metrics at `GET /metrics`: requests and latency per collector route, events ingested and rejected per source (SDK, OTLP), database pool connections, and the late-data backlog. No service, project or consumer names appear in them |
+| `METRICS_TOKEN` | empty | When set, `/metrics` needs `Authorization: Bearer <token>` (Prometheus: `authorization: {credentials: <token>}`) |
+| `LOG_FORMAT` | `text` | `json`: one JSON object per line (`time`, `level`, `logger`, `message`; access lines add `method`, `path`, `status`) for Loki, CloudWatch or Datadog |
+
+`GET /v1/health` answers while the process is up; `GET /v1/ready` also checks the database (503 when it doesn't answer).
+
 ## Dashboard
 
 | Variable | Default | Notes |

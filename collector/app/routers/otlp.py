@@ -28,6 +28,7 @@ from ..db.late_data import tracker as late_data_tracker
 from ..db.pool import get_pool
 from ..db.queries import EVENT_COLUMNS, insert_events, record_deployments, row_time
 from ..gzip_body import decompress
+from ..observability import INGEST_EVENTS
 from ..otlp.mapping import map_export_request, map_resource_spans
 from ..rate_limit import INGEST_IP_LIMIT, ingest_key, ingest_limit, limiter
 
@@ -144,4 +145,6 @@ async def export_traces(request: Request, principal: Principal = Depends(verify_
         await record_deployments(pool, result.rows)
         late_data_tracker.note(min(row_time(r) for r in result.rows))
 
+    INGEST_EVENTS.labels("otlp", "accepted").inc(len(result.rows))
+    INGEST_EVENTS.labels("otlp", "rejected").inc(result.rejected)
     return _respond(content_type, result.rejected, "; ".join(result.reasons))

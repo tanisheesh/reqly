@@ -14,6 +14,7 @@ from ..db.late_data import tracker as late_data_tracker
 from ..db.pool import get_pool
 from ..db.queries import event_row, insert_events, record_deployments, row_time
 from ..gzip_body import GzipRoute
+from ..observability import INGEST_EVENTS
 from ..rate_limit import INGEST_IP_LIMIT, ingest_key, ingest_limit, limiter
 
 # The SDKs gzip larger batches (Content-Encoding: gzip).
@@ -167,6 +168,8 @@ async def ingest(request: Request, body: IngestRequest, principal: Principal = D
             late_data_tracker.note_backfill(row_time(r) for r in rows)
         else:
             late_data_tracker.note(min(row_time(r) for r in rows))
+    INGEST_EVENTS.labels("sdk", "accepted").inc(len(rows))
+    INGEST_EVENTS.labels("sdk", "rejected").inc(rejected)
     response = {"accepted": len(rows), "rejected": rejected}
     if reasons:
         response["reasons"] = reasons
