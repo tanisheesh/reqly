@@ -9,6 +9,7 @@ from .openapi_push import OpenAPIPusher
 from .request_context import ConsumerResolver
 from .sampling import Sampler
 from .shipper import Shipper
+from .traces import trace_id_from_headers, wants_trace_id
 
 logger = logging.getLogger("reqly")
 
@@ -81,7 +82,8 @@ class ReqlyClient:
         llm: tuple | None = None,
     ) -> None:
         """``request_info``: zero-argument callable returning a RequestInfo,
-        only called when consumer tracking is on. ``llm``: (model,
+        called (once) when consumer tracking is on, or for the trace id of a
+        failed or slow request. ``llm``: (model,
         input_tokens, output_tokens[, by_model]) recorded during the request."""
         if self._disabled:
             return
@@ -92,8 +94,10 @@ class ReqlyClient:
                 return
             if not self._sampler.should_sample():
                 return
+            request_info = _once(request_info)
             event = build_event(
                 consumer_id=self._consumer_id(request_info),
+                trace_id=_trace_id(request_info, status_code, duration_ms),
                 llm=llm,
                 service_name=self.config.service_name,
                 method=method,
@@ -157,3 +161,26 @@ class ReqlyClient:
             self._buffer.shutdown()
         except Exception:
             pass
+
+
+def _once(factory):
+    """The request info built at most once, however many need it."""
+    if factory is None:
+        return None
+    cache: list = []
+
+    def get():
+        if not cache:
+            cache.append(factory())
+        return cache[0]
+
+    return get
+
+
+def _trace_id(request_info, status_code: int, duration_ms: float) -> str | None:
+    if request_info is None or not wants_trace_id(status_code, duration_ms):
+        return None
+    try:
+        return trace_id_from_headers(request_info().headers)
+    except Exception:
+        return None  # costs the trace id, not the event
