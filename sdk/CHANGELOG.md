@@ -2,6 +2,15 @@
 
 All notable changes to the `reqly` Python SDK.
 
+## 0.7.0 — 2026-10-19
+
+### Added
+- `reqly.instrument_openai(client)` and `reqly.instrument_anthropic(client)`: every call the client
+  makes (chat completions, Responses, completions, embeddings; Anthropic messages; sync, async and
+  streams) adds its tokens to the request that made it. Only that client object is patched.
+- The trace id of failed (4xx/5xx) and slow (500 ms+) requests, from `traceparent`,
+  `sentry-trace` or `x-b3-traceid`, so collector 0.14+ alerts can point at traces.
+
 ## 0.6.0 — 2026-10-19
 
 ### Added
