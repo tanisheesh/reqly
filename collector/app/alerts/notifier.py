@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 import httpx
 
@@ -155,7 +156,7 @@ def build_payloads(channels: Channels, event: str, alert: dict) -> list[tuple[st
     """(url, json body) per configured channel. `alert` has service_name,
     route, details and id/opened_at/resolved_at."""
     text = format_text(event, alert["service_name"], alert["route"], alert["details"], channels.dashboard_url)
-    payloads = []
+    payloads: list[tuple[str, dict[str, Any]]] = []
     if channels.slack_webhook_url:
         payloads.append((channels.slack_webhook_url, {"text": text}))
     if channels.discord_webhook_url:

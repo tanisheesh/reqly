@@ -7,9 +7,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from app.db import late_data
+from app.db import late_data, queries
 from app.db import pool as pool_module
-from app.db import queries
 from tests.test_queries_db import _db_reachable, _refresh_all
 
 pytestmark = pytest.mark.skipif(not _db_reachable(), reason="TimescaleDB not reachable")

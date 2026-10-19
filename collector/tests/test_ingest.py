@@ -255,8 +255,8 @@ def test_ingest_is_rate_limited_per_key_not_per_ip(client, monkeypatch):
 def test_ingest_bucket_never_holds_the_raw_key():
     from starlette.requests import Request
 
-    from app.rate_limit import ENV_KEY_BUCKET, ingest_key
     from app.config import settings
+    from app.rate_limit import ENV_KEY_BUCKET, ingest_key
 
     def req(key):
         headers = [(b"x-reqly-key", key.encode())] if key else []

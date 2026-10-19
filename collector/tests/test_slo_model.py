@@ -4,7 +4,14 @@ from fastapi.testclient import TestClient
 from app.alerts import notifier
 from app.main import app
 from app.slo.model import (
-    BUDGET_EXHAUSTED, FAST_BURN, NO_DATA, OK, SLOW_BURN, Counts, burn_rate, evaluate,
+    BUDGET_EXHAUSTED,
+    FAST_BURN,
+    NO_DATA,
+    OK,
+    SLOW_BURN,
+    Counts,
+    burn_rate,
+    evaluate,
 )
 
 

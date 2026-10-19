@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from datetime import datetime
 
 HTTP_METHODS = ("GET", "PUT", "POST", "DELETE", "OPTIONS", "HEAD", "PATCH", "TRACE")
 # Served by frameworks and proxies without being in the spec; not drift.
@@ -53,7 +54,7 @@ class Operation:
     deprecated: bool = False
 
     def describe(self) -> dict:
-        out = {"method": self.method, "path": self.path}
+        out: dict[str, object] = {"method": self.method, "path": self.path}
         if self.operation_id:
             out["operation_id"] = self.operation_id
         if self.summary:
@@ -133,7 +134,7 @@ class Traffic:
     route: str
     requests: int
     errors: int
-    last_seen: object  # datetime
+    last_seen: datetime
 
     def describe(self) -> dict:
         return {

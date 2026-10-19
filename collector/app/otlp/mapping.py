@@ -25,6 +25,7 @@ import hmac
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import Any
 
 from ..db.queries import event_row
 
@@ -87,10 +88,10 @@ class _Span:
     span_id: str
     parent_id: str
     attrs: dict
-    start_ns: object  # int from protobuf; a string (or anything) from JSON
-    end_ns: object
+    start_ns: Any  # int from protobuf; a string (or anything) from JSON
+    end_ns: Any
     status_error: bool
-    exception_type: object  # exception.type of the first "exception" event
+    exception_type: Any  # exception.type of the first "exception" event
 
 
 @dataclass(slots=True)
@@ -233,7 +234,7 @@ def _genai_usage(attrs: dict) -> tuple[str, int, int] | None:
         return None
     if not (0 <= tokens_in <= _MAX_TOKENS and 0 <= tokens_out <= _MAX_TOKENS):
         return None
-    return _truncate(model, _MAX_SHORT_TEXT_LEN), tokens_in, tokens_out
+    return str(model)[:_MAX_SHORT_TEXT_LEN], tokens_in, tokens_out
 
 
 def _llm_usage_by_server_span(resources: list[_Resource]) -> dict[tuple[str, str], dict]:

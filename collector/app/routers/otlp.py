@@ -76,9 +76,9 @@ async def _cap_consumers(pool, rows: list[tuple]) -> list[tuple]:
             settings.consumer_limit_per_day,
         )
         for i, consumer in zip(indexes, capped):
-            row = list(rows[i])
-            row[_CONSUMER_INDEX] = consumer
-            rows[i] = tuple(row)
+            fields = list(rows[i])
+            fields[_CONSUMER_INDEX] = consumer
+            rows[i] = tuple(fields)
     return rows
 
 

@@ -170,7 +170,7 @@ async def ingest(request: Request, body: IngestRequest, principal: Principal = D
             late_data_tracker.note(min(row_time(r) for r in rows))
     INGEST_EVENTS.labels("sdk", "accepted").inc(len(rows))
     INGEST_EVENTS.labels("sdk", "rejected").inc(rejected)
-    response = {"accepted": len(rows), "rejected": rejected}
+    response: dict[str, object] = {"accepted": len(rows), "rejected": rejected}
     if reasons:
         response["reasons"] = reasons
     return response

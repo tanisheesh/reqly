@@ -34,3 +34,22 @@ include = ["app*"]
 
 [tool.setuptools.package-data]
 app = ["llm/*.yaml"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+# pyflakes, import order and bugbear. Not B008 (FastAPI's Depends() defaults),
+# B904 (HTTPException translation is deliberate) or B905 (zip strictness).
+select = ["E4", "E7", "E9", "F", "I", "B"]
+ignore = ["B008", "B904", "B905"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "tests"]
+
+[tool.mypy]
+files = ["app"]
+python_version = "3.11"
+# Framework and driver packages ship partial or no stubs.
+ignore_missing_imports = true

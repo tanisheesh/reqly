@@ -14,8 +14,8 @@ import contextvars
 import hashlib
 import hmac
 import logging
-from dataclasses import dataclass, field
 from collections.abc import Mapping as _MappingABC
+from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable, Mapping, Optional
 
 logger = logging.getLogger("reqly")
@@ -197,7 +197,12 @@ class ConsumerResolver:
 
     def resolve(self, info_factory: Callable[[], RequestInfo]) -> str | None:
         info = info_factory()
-        value = self._func(info) if self._func is not None else info.headers.get(self._header)
+        if self._func is not None:
+            value = self._func(info)
+        elif self._header:
+            value = info.headers.get(self._header)
+        else:
+            return None
         if value is None or value == "":
             return None
         value = str(value)

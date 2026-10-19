@@ -26,6 +26,7 @@ import statistics
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from typing import Any
 
 from .prices import PriceTable
 
@@ -122,7 +123,7 @@ def _drivers(current: _Hour, baseline: list[_Hour]) -> list[dict]:
         ("usd_per_1m_tokens", "price per 1M tokens", current.usd_per_1m_tokens,
          _median([h.usd_per_1m_tokens for h in baseline if h.tokens]), "${:,.2f}"),
     ]
-    drivers = []
+    drivers: list[dict[str, Any]] = []
     for key, label, after, before, fmt in factors:
         ratio = _ratio(after, before)
         # Only factors that went up explain a rise in cost; one that fell
@@ -171,7 +172,7 @@ def detect_cost_anomalies(
     """Pure. rows cover `hour` and the same weekday-hour in earlier weeks.
     Returns one finding per route whose LLM cost in `hour` is anomalous,
     biggest extra cost first."""
-    findings = []
+    findings: list[dict[str, Any]] = []
     for route, hours in _hours_by_route(rows, prices).items():
         current = hours.get(hour)
         if current is None or current.cost <= 0:

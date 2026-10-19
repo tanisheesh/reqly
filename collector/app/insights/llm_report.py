@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import Any
 
 from ..config import settings
 from ..llm.client import llm_client
@@ -31,7 +32,7 @@ async def generate_report(
 
 
 async def _write_report(service_name: str, week_start: str, anomalies: list[dict], drift: dict | None) -> str:
-    payload = {"service_name": service_name, "week_of": week_start, "anomalies": anomalies}
+    payload: dict[str, Any] = {"service_name": service_name, "week_of": week_start, "anomalies": anomalies}
     if drift:
         payload["api_drift"] = drift
     response = await llm_client().chat.completions.create(

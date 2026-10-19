@@ -5,10 +5,10 @@ import logging
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi.errors import RateLimitExceeded
+from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from .body_limit import BodySizeLimitMiddleware
 from .config import settings
@@ -19,8 +19,8 @@ from .logs import configure_logging
 from .observability import MetricsMiddleware
 from .observability import router as observability_router
 from .rate_limit import limiter
-from .users.accounts import bootstrap_admin
 from .routers import alerts, ask, auth, ingest, insights, metrics, openapi, otlp, projects, slos, usage
+from .users.accounts import bootstrap_admin
 
 configure_logging(settings.log_format)
 logger = logging.getLogger("reqly.collector")
@@ -68,7 +68,7 @@ app.state.limiter = limiter
 
 # Outermost: no request body above 16 MB is buffered, whatever the route.
 app.add_middleware(BodySizeLimitMiddleware)
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]  # slowapi's narrower signature
 
 app.add_middleware(
     CORSMiddleware,

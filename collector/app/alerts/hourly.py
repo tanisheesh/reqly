@@ -20,9 +20,9 @@ from datetime import datetime, timedelta, timezone
 
 import asyncpg
 
+from ..consumers.queries import add_affected_consumers
 from ..insights.anomaly_detection import detect_anomalies
 from ..insights.deploys import add_release_context
-from ..consumers.queries import add_affected_consumers
 from ..insights.hints import add_hints
 from . import notifier
 
