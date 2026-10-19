@@ -28,9 +28,19 @@ EVENT_COLUMNS: tuple[str, ...] = (
 )
 _TIME_INDEX = EVENT_COLUMNS.index("time")
 
-_INSERT_EVENT_SQL = f"""
+# Postgres type of each EVENT_COLUMNS entry, for the unnest() bulk insert.
+_COLUMN_TYPES = (
+    "uuid", "timestamptz", "text", "text", "text", "smallint", "float8", "boolean", "text", "text",
+    "text", "text", "text", "bigint", "bigint", "text", "integer", "integer",
+)
+assert len(_COLUMN_TYPES) == len(EVENT_COLUMNS)
+
+# One statement per batch: each column travels as one array and unnest()
+# turns them back into rows -- a single round trip, with no temp table (which
+# would churn the system catalog on every batch) and the same dedup on event_id.
+_INSERT_EVENTS_SQL = f"""
 INSERT INTO request_events ({", ".join(EVENT_COLUMNS)})
-VALUES ({", ".join(f"${i}" for i in range(1, len(EVENT_COLUMNS) + 1))})
+SELECT * FROM unnest({", ".join(f"${i}::{t}[]" for i, t in enumerate(_COLUMN_TYPES, start=1))})
 ON CONFLICT (time, event_id) DO NOTHING
 """
 
@@ -49,15 +59,15 @@ def row_time(row: tuple) -> datetime:
 
 
 async def insert_events(pool: asyncpg.Pool, rows: list[tuple]) -> None:
-    """Bulk insert via executemany. `rows` come from event_row(). event_id
-    is the dedup key (ON CONFLICT DO NOTHING) so a batch retried by the
-    SDK's shipper after a timeout can't double-count events that actually
-    succeeded server-side.
+    """Bulk insert in one statement (unnest). `rows` come from event_row().
+    event_id is the dedup key (ON CONFLICT DO NOTHING) so a batch retried by
+    the SDK's shipper after a timeout can't double-count events that
+    actually succeeded server-side.
     """
     if not rows:
         return
-    async with pool.acquire() as conn:
-        await conn.executemany(_INSERT_EVENT_SQL, rows)
+    columns = [list(column) for column in zip(*rows)]
+    await pool.execute(_INSERT_EVENTS_SQL, *columns)
 
 
 _UPSERT_DEPLOYMENT_SQL = """
