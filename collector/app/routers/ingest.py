@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import AwareDatetime, BaseModel, Field, ValidationError, field_validator
+from pydantic import AwareDatetime, BaseModel, Field, TypeAdapter, ValidationError, field_validator
 
 from ..auth import Principal, verify_ingest_key, writable_service
 from ..config import settings
@@ -60,6 +60,31 @@ class EventIn(BaseModel):
         return v
 
 
+# Validates a whole batch in one pydantic-core call; per-event validation
+# only runs when this fails, to find which events to drop.
+_BATCH_ADAPTER = TypeAdapter(list[EventIn])
+
+
+def _validate_events(raw_events: list[dict]) -> tuple[list[EventIn], int, list[str]]:
+    """Returns (valid events, rejected count, up to 5 reasons)."""
+    try:
+        return _BATCH_ADAPTER.validate_python(raw_events), 0, []
+    except ValidationError:
+        pass
+    valid: list[EventIn] = []
+    rejected = 0
+    reasons: list[str] = []
+    for raw_event in raw_events:
+        try:
+            valid.append(EventIn.model_validate(raw_event))
+        except ValidationError as exc:
+            rejected += 1
+            if len(reasons) < 5:
+                first = exc.errors()[0]
+                reasons.append(f"{'.'.join(str(p) for p in first['loc'])}: {first['msg']}")
+    return valid, rejected, reasons
+
+
 class IngestRequest(BaseModel):
     service_name: str = Field(max_length=_MAX_SERVICE_NAME_LEN)
     sdk_version: str | None = None
@@ -92,19 +117,10 @@ async def ingest(request: Request, body: IngestRequest, principal: Principal = D
     if not await writable_service(principal, body.service_name):
         raise HTTPException(status_code=403, detail="this service belongs to another project")
 
+    parsed, rejected, reasons = _validate_events(body.events)
     valid: list[EventIn] = []
-    rejected = 0
-    reasons: list[str] = []
     now = datetime.now(timezone.utc)
-    for raw_event in body.events:
-        try:
-            e = EventIn.model_validate(raw_event)
-        except ValidationError as exc:
-            rejected += 1
-            if len(reasons) < 5:
-                first = exc.errors()[0]
-                reasons.append(f"{'.'.join(str(p) for p in first['loc'])}: {first['msg']}")
-            continue
+    for e in parsed:
         problem = event_time_problem(e.timestamp, now, body.backfill)
         if problem:
             rejected += 1
