@@ -62,7 +62,7 @@ async def lifespan(app: FastAPI):
         await close_pool()
 
 
-app = FastAPI(title="Reqly Collector", version="0.12.3", lifespan=lifespan)
+app = FastAPI(title="Reqly Collector", version="0.13.0", lifespan=lifespan)
 
 app.state.limiter = limiter
 

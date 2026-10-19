@@ -2,6 +2,15 @@
 
 All notable changes to `reqly-node`.
 
+## 0.4.0 — 2026-10-19
+
+### Added
+- A request that calls several LLM models sends each model's tokens (`llm_usage`), so the
+  collector (0.13+) prices each at its own rate. `llm_model` and the token totals are still sent,
+  for older collectors.
+- Batches above 1 KB are gzip-compressed. A collector that can't read gzip (before 0.13) gets the
+  batch again as plain JSON, and the client stops compressing.
+
 ## 0.3.2 — 2026-10-11
 
 ### Fixed

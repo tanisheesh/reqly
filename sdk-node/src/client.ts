@@ -5,7 +5,7 @@ import { gzipSync } from "node:zlib";
 import { ReqlyOptions, ResolvedConfig, resolveConfig } from "./config.js";
 import { LlmSummary, RequestInfo } from "./context.js";
 
-export const SDK_VERSION = "0.3.2";
+export const SDK_VERSION = "0.4.0";
 export const UNMATCHED_ROUTE = "__unmatched__";
 
 const HOST = hostname();
