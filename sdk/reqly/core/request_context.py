@@ -147,21 +147,34 @@ def _field(obj, name):
     return obj.get(name) if isinstance(obj, Mapping) else getattr(obj, name, None)
 
 
-def record_llm_response(response) -> None:
-    """``record_llm_usage()`` from a provider response object or dict:
-    OpenAI-style (``usage.prompt_tokens`` / ``completion_tokens``, also
+def usage_from_response(response) -> tuple[str, int, int] | None:
+    """(model, input_tokens, output_tokens) of a provider response object or
+    dict: OpenAI-style (``usage.prompt_tokens`` / ``completion_tokens``, also
     Groq, Mistral, vLLM, LiteLLM...), OpenAI Responses API and Anthropic
-    (``usage.input_tokens`` / ``output_tokens``). Never raises."""
+    (``usage.input_tokens`` / ``output_tokens``). None without usage."""
+    usage = _field(response, "usage")
+    if usage is None:
+        return None
+    input_tokens = _field(usage, "prompt_tokens")
+    output_tokens = _field(usage, "completion_tokens")
+    if input_tokens is None and output_tokens is None:
+        input_tokens = _field(usage, "input_tokens")
+        output_tokens = _field(usage, "output_tokens")
+    return str(_field(response, "model") or "unknown"), _as_count(input_tokens), _as_count(output_tokens)
+
+
+def current_usage() -> LLMUsage | None:
+    """The usage of the request being served (None outside one)."""
+    return _current_usage.get()
+
+
+def record_llm_response(response) -> None:
+    """``record_llm_usage()`` from a provider response object or dict (see
+    ``usage_from_response``). Never raises."""
     try:
-        usage = _field(response, "usage")
-        if usage is None:
-            return
-        input_tokens = _field(usage, "prompt_tokens")
-        output_tokens = _field(usage, "completion_tokens")
-        if input_tokens is None and output_tokens is None:
-            input_tokens = _field(usage, "input_tokens")
-            output_tokens = _field(usage, "output_tokens")
-        record_llm_usage(_field(response, "model") or "unknown", input_tokens or 0, output_tokens or 0)
+        found = usage_from_response(response)
+        if found is not None:
+            record_llm_usage(*found)
     except Exception:
         logger.warning("reqly: record_llm_response() failed", exc_info=True)
 

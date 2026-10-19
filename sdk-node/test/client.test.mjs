@@ -71,6 +71,23 @@ test("large batches are gzipped; a collector without gzip gets plain JSON from t
   await old.close();
 });
 
+test("failed and slow requests carry the trace id from traceparent, sentry-trace or b3", async () => {
+  const collector = await fakeCollector();
+  const client = new ReqlyClient(options(collector.url));
+  const trace = "4bf92f3577b34da6a3ce929d0e0e4736";
+  const info = (headers) => () => ({ method: "GET", path: "/x", headers, raw: null });
+  client.record(request({ requestInfo: info({ traceparent: `00-${trace}-00f067aa0ba902b7-01` }) })); // fast 200
+  client.record(request({ statusCode: 500, requestInfo: info({ traceparent: `00-${trace}-00f067aa0ba902b7-01` }) }));
+  client.record(request({ durationMs: 900, requestInfo: info({ "sentry-trace": "771a43a4192642f0b136d5159a501700-b8d6b0c4d7b4a3f2-1" }) }));
+  client.record(request({ statusCode: 401, requestInfo: info({ "x-b3-traceid": "463AC35C9F6413AD" }) }));
+  client.record(request({ statusCode: 500, requestInfo: info({ traceparent: `00-${"0".repeat(32)}-00f067aa0ba902b7-01` }) }));
+  await client.shutdown();
+  assert.deepEqual(collector.events().map((e) => e.trace_id), [
+    undefined, trace, "771a43a4192642f0b136d5159a501700", "463ac35c9f6413ad", undefined,
+  ]);
+  await collector.close();
+});
+
 test("an unreachable collector never throws into the app", async () => {
   const client = new ReqlyClient(options("http://127.0.0.1:1"));
   client.record(request());

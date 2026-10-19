@@ -5,24 +5,27 @@ description: Every environment variable the Reqly collector, dashboard and local
 
 # Configuration
 
-The collector reads its settings from environment variables. Locally, copy `.env.example` to `.env`. `docker compose up` also works without a `.env`, using the defaults below.
+The collector reads its settings from environment variables. Locally, copy `.env.example` to `.env`. `docker compose up` also works without a `.env`: it runs in demo mode, with the demo keys below.
+
+Outside demo mode the collector is locked down by default (collector 0.14+): it won't start without both keys, the dashboard needs a sign-in, and no other origin may call the API.
 
 ## Keys and access
 
 | Variable | Default | Notes |
 |---|---|---|
-| `REQLY_INGEST_KEY` | `demo-key` | Write key. SDKs and OTLP exporters send it as `X-Reqly-Key`; it also manages SLOs, specs and projects |
-| `REQLY_READ_KEY` | `demo-read-key` | Read key the dashboard sends. It's compiled into the dashboard, so treat it as public to anyone who can open the dashboard. **Must differ from the ingest key** |
-| `PUBLIC_DASHBOARD` | `true` | `true`: anyone with the dashboard can read (a public demo). `false`: [sign-in required](access.md) and the read key is refused |
+| `REQLY_DEMO_MODE` | `false` (`true` in docker-compose) | `true` brings back the public demo defaults: `demo-key` / `demo-read-key`, `PUBLIC_DASHBOARD=true`, `CORS_ORIGINS=*`. For local use and demos only |
+| `REQLY_INGEST_KEY` | **required** (demo: `demo-key`) | Write key. SDKs and OTLP exporters send it as `X-Reqly-Key`; it also manages SLOs, specs and projects |
+| `REQLY_READ_KEY` | **required** (demo: `demo-read-key`) | Read key the dashboard sends. It's compiled into the dashboard, so treat it as public to anyone who can open the dashboard. **Must differ from the ingest key** |
+| `PUBLIC_DASHBOARD` | `false` (demo: `true`) | `true`: anyone with the dashboard can read (a public demo). `false`: [sign-in required](access.md) and the read key is refused |
 | `REQLY_ADMIN_USERNAME` / `REQLY_ADMIN_PASSWORD` | `admin` / empty | First admin, created at start-up when there are no users. Password 12+ characters |
 | `SESSION_TTL_HOURS` | `168` | How long a sign-in lasts |
-| `CORS_ORIGINS` | `*` locally | Comma-separated dashboard origins allowed to call the collector. Restrict it in production |
+| `CORS_ORIGINS` | empty (demo: `*`) | Comma-separated dashboard origins allowed to call the collector. Not needed when the collector serves the dashboard itself ([all-in-one](deploy.md)) |
 | `FORWARDED_ALLOW_IPS` | `127.0.0.1` | Behind a proxy, the proxy's IP (or `*` if the collector is only reachable through it), so rate limits see real client IPs |
 | `RATE_LIMIT_PER_MINUTE` | `600` | Ingest requests (`/v1/ingest`, `/otlp/v1/traces`) per minute **per project key**, so services behind one IP don't share a budget. An SDK sends one request per batch, not per app request |
 | `RATE_LIMIT_ENV_KEY_PER_MINUTE` | `6000` | The same for `REQLY_INGEST_KEY`, which every service using it shares. For many services, give each project its own key |
 | `RATE_LIMIT_INGEST_PER_IP_PER_MINUTE` | `6000` | Outer ingest cap per client IP, so made-up keys can't get around the per-key limits. Ask Reqly, insights and sign-in stay limited per IP |
 
-The collector warns at start-up if the keys are the defaults or if the two keys are equal.
+The collector refuses to start without the keys (outside demo mode), and warns if they are the demo keys or equal to each other. Generate one with `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
 
 ## AI
 
@@ -49,7 +52,16 @@ The weekly report and Ask Reqly use any OpenAI-compatible chat completions API: 
 | `ALERT_SLACK_WEBHOOK_URL` | empty | |
 | `ALERT_DISCORD_WEBHOOK_URL` | empty | |
 | `ALERT_WEBHOOK_URL` | empty | Generic JSON webhook ([payload](../features/alerts.md#channels)) |
+| `ALERT_TEAMS_WEBHOOK_URL` | empty | Microsoft Teams Workflows webhook |
+| `ALERT_PAGERDUTY_ROUTING_KEY` | empty | PagerDuty Events API v2 integration key |
+| `ALERT_OPSGENIE_API_KEY` / `ALERT_OPSGENIE_API_URL` | empty / `https://api.opsgenie.com` | Opsgenie API integration |
+| `ALERT_EMAIL_TO` / `ALERT_EMAIL_FROM` | empty | Email alerts: comma-separated recipients, and the sender |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_STARTTLS` | empty / `587` / empty / empty / `true` | SMTP server for email alerts |
+| `RESEND_API_KEY` | empty | Send email alerts through Resend's API instead of SMTP |
 | `ALERT_RENOTIFY_HOURS` | `6` | Reminder interval while an alert keeps firing |
+| `TRACE_ID_SLOW_MS` | `1000` | Besides 4xx/5xx responses, requests at least this slow keep their [trace id](../features/alerts.md#traces) |
+| `TRACE_URL_TEMPLATE` | empty | Link for a trace id in the dashboard's alerts, with `{trace_id}` where it goes (Tempo, Jaeger, Sentry) |
+| `CLIENT_ERROR_ALERT_STATUSES` | `401,403,422,429` | 4xx codes whose sudden spikes on a route open an [alert](../features/alerts.md#client-error-alerts). Empty turns them off |
 | `LLM_COST_ALERT_MIN_USD` | `1.0` | The smallest extra LLM spend per route-hour, in USD, worth an [alert](../features/alerts.md#llm-cost-alerts). `0` turns LLM cost alerts off. The local Compose stack uses `0.4` |
 | `DASHBOARD_URL` | `http://localhost:5173` | Linked from Slack alerts |
 | `INSIGHTS_SCHEDULER_ENABLED` | `true` | `false` turns off the weekly insights report |
@@ -78,6 +90,7 @@ The database must be TimescaleDB with the Toolkit: the `timescale/timescaledb-ha
 
 | Variable | Default | Notes |
 |---|---|---|
+| `DASHBOARD_DIR` | empty (set in the all-in-one image) | The collector serves the built dashboard from this directory on its own origin ([all-in-one](deploy.md#all-in-one-two-containers)) |
 | `VITE_COLLECTOR_URL` | `http://localhost:8000` | Collector URL **as seen from the browser**, at build time |
 | `VITE_READ_KEY` | `demo-read-key` | At build time |
 | `REQLY_COLLECTOR_URL` / `REQLY_READ_KEY` | — | The same two settings at run time, for the prebuilt image |

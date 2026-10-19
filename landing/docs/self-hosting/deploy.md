@@ -18,6 +18,25 @@ The [live demo](https://reqly-eventflow-dashboard.onrender.com) runs the databas
 !!! tip "On Kubernetes?"
     The [Helm chart](kubernetes.md) installs all three with one command.
 
+## All-in-one: two containers
+
+`ghcr.io/tanisheesh/reqly` is the collector serving the dashboard on the same port (collector 0.14+). With it a deployment is just that image and TimescaleDB: no separate dashboard, no `CORS_ORIGINS`, and no collector URL to build into the dashboard.
+
+```bash
+curl -O https://raw.githubusercontent.com/tanisheesh/reqly/main/deploy/all-in-one/docker-compose.yml
+cat > .env <<'ENV'
+POSTGRES_PASSWORD=change-me
+REQLY_INGEST_KEY=change-me-too
+REQLY_READ_KEY=and-this-one
+REQLY_ADMIN_PASSWORD=at-least-12-characters
+ENV
+docker compose up -d     # dashboard and API on http://localhost:8000
+```
+
+Put it behind your TLS proxy like any web app. To run the image without Compose, give it the collector settings below; it sets `DASHBOARD_DIR` itself. Any collector can do the same with a built dashboard: point `DASHBOARD_DIR` at the build output (`dashboard/dist`).
+
+The sections below set up the three parts separately.
+
 ## 1. Database
 
 Run `timescale/timescaledb-ha:pg16` anywhere you can reach from the collector. Use a strong password and TLS, and connect with `?sslmode=require`.
@@ -50,7 +69,7 @@ Also set:
 
 - **Behind a platform proxy** (Render, Fly.io, a load balancer): `FORWARDED_ALLOW_IPS=*`, so rate limits see real client IPs. Use `*` only if the collector is reachable solely through that proxy.
 - `GROQ_API_KEY` (or `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL`) for AI features, and alert webhooks.
-- `PUBLIC_DASHBOARD=false` and `REQLY_ADMIN_PASSWORD` unless the dashboard should be public. See [Projects, keys & sign-in](access.md).
+- `REQLY_ADMIN_PASSWORD` for the first admin: the dashboard needs a sign-in by default. `PUBLIC_DASHBOARD=true` makes it public instead (a demo). See [Projects, keys & sign-in](access.md).
 
 Check it with `GET /v1/health`, which returns `{"status": "ok"}`, and `GET /v1/ready`, which also checks the database. Point Prometheus at `GET /metrics` to watch the collector itself ([settings](configuration.md#monitoring-the-collector)).
 

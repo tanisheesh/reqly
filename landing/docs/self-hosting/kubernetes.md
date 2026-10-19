@@ -79,7 +79,7 @@ secrets:
 
 Any other collector setting goes under `collector.config` (plain values) or `collector.extraEnv`. Every setting is listed in [Configuration](configuration.md).
 
-To keep secrets out of values files, create a Secret yourself and pass `secrets.existingSecret`. It needs these keys: `ingest-key`, `read-key`, `database-url`, and optionally `postgres-password`, `groq-api-key`, `llm-api-key`, `admin-password`, `slack-webhook-url`, `discord-webhook-url` and `webhook-url`.
+To keep secrets out of values files, create a Secret yourself and pass `secrets.existingSecret`. It needs these keys: `ingest-key`, `read-key`, `database-url`, and optionally `postgres-password`, `groq-api-key`, `llm-api-key`, `admin-password`, `slack-webhook-url`, `discord-webhook-url`, `webhook-url`, `teams-webhook-url`, `pagerduty-routing-key`, `opsgenie-api-key`, `smtp-password` and `resend-api-key`.
 
 ## External database
 

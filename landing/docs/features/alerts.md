@@ -38,6 +38,28 @@ An alert from the demo data:
 - **Resolved:** after 2 clean hours the alert resolves, with a final message.
 - Open alerts are shown on the dashboard. `GET /v1/alerts?status=all` also returns recent resolved ones.
 
+### Acknowledge, silence, mute
+
+On the dashboard, a signed-in user sees these under each open alert. They only change which notifications go out: the alert stays open and keeps updating.
+
+| Action | Effect | API |
+|---|---|---|
+| **Acknowledge** | Someone is on it: no more reminders. The resolve message still goes out | `POST /v1/alerts/{id}/acknowledge` |
+| **Silence** | No notifications at all for this alert for 1-168 hours (`0` lifts it) | `POST /v1/alerts/{id}/silence {"hours": 4}` |
+| **Mute** | No notifications for a service, one of its routes, or one kind of alert (`anomaly`, `client_errors`, `llm_cost`, `slo`), for up to 30 days. New alerts still open and show | `POST /v1/alert-mutes {"service_name", "route"?, "kind"?, "hours", "reason"?}`; `GET` lists active ones, `DELETE /v1/alert-mutes/{id}` ends one |
+
+The public read key can't do any of these: they need a signed-in user with access to the service's project, or a key with the `admin` scope.
+
+### Traces
+
+When requests carry a trace id (the SDKs read `traceparent`, `sentry-trace` or `x-b3-traceid`; OTLP spans have one anyway), error and client error alerts list up to 5 traces from that hour on that route, failed ones first, then the slowest:
+
+```
+• traces: `4bf92f3577b34da6a3ce929d0e0e4736`, `771a43a4192642f0b136d5159a501700`
+```
+
+Copy one into Tempo, Jaeger or Sentry. With `TRACE_URL_TEMPLATE` set (e.g. `https://grafana.example.com/explore?left=...{trace_id}...`), the dashboard links them. Only 4xx/5xx responses and requests slower than `TRACE_ID_SLOW_MS` (default 1000) keep their trace id.
+
 ### Root-cause hints
 
 Hints are computed from your data, not guessed by a model:
@@ -53,13 +75,31 @@ Set any combination. Channels that aren't set are skipped.
 |---|---|
 | `ALERT_SLACK_WEBHOOK_URL` | a Slack incoming webhook |
 | `ALERT_DISCORD_WEBHOOK_URL` | a Discord webhook |
+| `ALERT_TEAMS_WEBHOOK_URL` | Microsoft Teams: the URL of a Workflows flow "When a Teams webhook request is received" (posts an Adaptive Card) |
+| `ALERT_PAGERDUTY_ROUTING_KEY` | PagerDuty, the Events API v2 integration key of a service. One incident per Reqly alert; it resolves with the alert |
+| `ALERT_OPSGENIE_API_KEY` | Opsgenie, an API integration key (`ALERT_OPSGENIE_API_URL=https://api.eu.opsgenie.com` for EU accounts). One alert per Reqly alert, closed when it resolves |
+| `ALERT_EMAIL_TO` + `ALERT_EMAIL_FROM` | email to comma-separated addresses, through `SMTP_HOST` (`SMTP_PORT` 587, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_STARTTLS` true) or Resend's API with `RESEND_API_KEY` |
 | `ALERT_WEBHOOK_URL` | any URL, as JSON: `{"event": "alert.opened" \| "alert.still_firing" \| "alert.resolved", "text": "...", "alert": {...}}` |
-| `DASHBOARD_URL` | linked from Slack messages |
+| `DASHBOARD_URL` | linked from the messages |
 
 Set `ALERTS_ENABLED=false` to turn the hourly check off. [SLO burn-rate alerts](slos.md#burn-rate-alerts) and [LLM cost alerts](#llm-cost-alerts) go to the same channels.
 
 !!! note "Run one collector"
     The scheduler runs inside the collector process. With two collector instances, every check runs twice.
+
+## Client error alerts
+
+5xx responses are the only errors in error rates and [availability SLOs](slos.md): a 4xx is the API correctly refusing a bad request. But a sudden wave of **401, 403, 422 or 429** on one route usually means a contract broke: auth after a deploy, a frontend sending a field the backend stopped accepting, a rate limit set too low.
+
+Every hour, each of those codes' share of a route's requests is compared with the same weekday-hour of the previous 8 weeks, with the same exact Poisson test as the error alerts (z ≥ 4). It also has to be at least 20 responses, 5 points above its usual share and twice it. The alert names the status code, and the release that was running if it was new:
+
+```
+🟡 Client error spike — shop /orders (Thursday 09:00-10:00 UTC, z=38.2)
+• 401 on 40.0% of requests vs 1.0% usual (400 of 1,000)
+• running release v7, first seen 2026-10-15T08:40:00+00:00
+```
+
+`CLIENT_ERROR_ALERT_STATUSES` picks the codes (default `401,403,422,429`; empty turns these alerts off). They go to the same channels, and can be [muted](#acknowledge-silence-mute) on their own with `kind: client_errors`.
 
 ## LLM cost alerts
 

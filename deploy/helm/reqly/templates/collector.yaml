@@ -74,6 +74,16 @@ spec:
               valueFrom: { secretKeyRef: { name: {{ $secret }}, key: discord-webhook-url, optional: true } }
             - name: ALERT_WEBHOOK_URL
               valueFrom: { secretKeyRef: { name: {{ $secret }}, key: webhook-url, optional: true } }
+            - name: ALERT_TEAMS_WEBHOOK_URL
+              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: teams-webhook-url, optional: true } }
+            - name: ALERT_PAGERDUTY_ROUTING_KEY
+              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: pagerduty-routing-key, optional: true } }
+            - name: ALERT_OPSGENIE_API_KEY
+              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: opsgenie-api-key, optional: true } }
+            - name: SMTP_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: smtp-password, optional: true } }
+            - name: RESEND_API_KEY
+              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: resend-api-key, optional: true } }
             {{- range $name, $value := .Values.collector.config }}
             - name: {{ $name }}
               value: {{ $value | quote }}

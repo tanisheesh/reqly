@@ -12,6 +12,7 @@ from slowapi.errors import RateLimitExceeded
 
 from .body_limit import BodySizeLimitMiddleware
 from .config import settings
+from .dashboard import mount_dashboard
 from .db.late_data import run_refresh_loop
 from .db.pool import close_pool, create_pool, get_pool
 from .insights.scheduler import start_scheduler
@@ -30,6 +31,12 @@ _scheduler = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    missing = settings.missing_keys()
+    if missing:
+        raise RuntimeError(
+            f"{' and '.join(missing)} must be set (or REQLY_DEMO_MODE=true for the public demo keys). "
+            "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+        )
     pool = await create_pool()
     logger.info("Reqly collector: db pool ready")
     await bootstrap_admin(pool, settings.admin_username, settings.admin_password)
@@ -62,7 +69,7 @@ async def lifespan(app: FastAPI):
         await close_pool()
 
 
-app = FastAPI(title="Reqly Collector", version="0.13.0", lifespan=lifespan)
+app = FastAPI(title="Reqly Collector", version="0.14.0", lifespan=lifespan)
 
 app.state.limiter = limiter
 
@@ -85,6 +92,7 @@ app.include_router(otlp.router)
 app.include_router(metrics.router)
 app.include_router(insights.router)
 app.include_router(alerts.router)
+app.include_router(alerts.actions_router)
 app.include_router(slos.router)
 app.include_router(ask.router)
 app.include_router(openapi.router)
@@ -108,3 +116,8 @@ async def ready():
     except Exception:
         return JSONResponse({"status": "unavailable", "database": "unreachable"}, status_code=503)
     return {"status": "ready", "database": "ok"}
+
+
+# Last, so every API route above matches first.
+if settings.dashboard_dir:
+    mount_dashboard(app, settings.dashboard_dir)

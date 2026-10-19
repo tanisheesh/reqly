@@ -43,6 +43,7 @@ cp .env.example .env
 | Variable | Default | Where to get it |
 |---|---|---|
 | `POSTGRES_PASSWORD` | `localdev` | Any value — used internally by Docker Compose |
+| `REQLY_DEMO_MODE` | `true` in docker-compose | Demo defaults (demo keys, public dashboard, CORS `*`). Off outside compose: the keys are then required |
 | `REQLY_INGEST_KEY` | `demo-key` | Any secret string — sent by the SDK as `X-Reqly-Key` on ingest |
 | `REQLY_READ_KEY` | `demo-read-key` | Sent by the dashboard to read metrics. It is compiled into the dashboard bundle, so treat it as public to dashboard viewers — it must differ from `REQLY_INGEST_KEY` |
 | `GROQ_API_KEY` | *(empty)* | [console.groq.com/keys](https://console.groq.com/keys) — free tier; leave empty to use plain-text fallback for AI insights |

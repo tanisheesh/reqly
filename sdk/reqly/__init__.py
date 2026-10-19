@@ -5,6 +5,7 @@ import logging
 from .core.client import ReqlyClient
 from .core.config import Config, _get_sdk_version
 from .core.request_context import RequestInfo, record_llm_response, record_llm_usage
+from .llm_clients import instrument_anthropic, instrument_openai
 
 __version__ = _get_sdk_version()
 
@@ -14,6 +15,8 @@ __all__ = [
     "instrument_wsgi",
     "record_llm_usage",
     "record_llm_response",
+    "instrument_openai",
+    "instrument_anthropic",
     "RequestInfo",
 ]
 

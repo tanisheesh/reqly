@@ -29,6 +29,7 @@ from typing import Any
 
 from ..db.queries import event_row
 from ..llm.splits import split_rows, summarize_models
+from ..traces import keep_trace_id, normalize_trace_id
 
 # Namespace for event ids derived from (traceId, spanId): exporters retry
 # failed exports, and a deterministic id lets the existing ON CONFLICT dedup
@@ -417,6 +418,7 @@ def _map_span(span: _Span, service_name, release, environment, host, result: Map
             request_bytes=_byte_count(attrs, "http.request.body.size", "http.request_content_length"),
             response_bytes=_byte_count(attrs, "http.response.body.size", "http.response_content_length"),
             consumer_id=_consumer_id(attrs, consumer_salt),
+            trace_id=keep_trace_id(normalize_trace_id(span.trace_id), status_code, duration_ms),
             **llm,
         )
     )

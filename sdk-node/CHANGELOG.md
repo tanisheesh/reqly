@@ -2,6 +2,16 @@
 
 All notable changes to `reqly-node`.
 
+## 0.5.0 — 2026-10-19
+
+### Added
+- `instrumentOpenAI(client)` and `instrumentAnthropic(client)`: every call the client makes
+  (chat completions, Responses, completions, embeddings; Anthropic messages; streams) adds its
+  tokens to the request that made it. The provider's own promise is returned, so `.withResponse()`
+  keeps working.
+- The trace id of failed (4xx/5xx) and slow (500 ms+) requests, from `traceparent`,
+  `sentry-trace` or `x-b3-traceid`, so collector 0.14+ alerts can point at traces.
+
 ## 0.4.0 — 2026-10-19
 
 ### Added

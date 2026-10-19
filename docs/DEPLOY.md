@@ -33,7 +33,7 @@ Set these in the host dashboard (never commit them). Every variable, its default
 | `CORS_ORIGINS` | ✅ | The dashboard's origin |
 | `FORWARDED_ALLOW_IPS` | ✅ behind a proxy | `*` on Render, so rate limits see the real client IP |
 | `GROQ_API_KEY` | ❌ | AI reports and Ask Reqly. Without it (or `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` for another OpenAI-compatible API) reports are plain text and Ask is off |
-| `PUBLIC_DASHBOARD` | ❌ | `true` for the public demo; `false` requires sign-in |
+| `PUBLIC_DASHBOARD` | ❌ | Default `false` (sign-in required); `true` for a public demo |
 | `REQLY_ADMIN_PASSWORD` | ❌ | Creates the first admin when there are no users (12+ characters) |
 | `ALERT_SLACK_WEBHOOK_URL` / `ALERT_DISCORD_WEBHOOK_URL` / `ALERT_WEBHOOK_URL` | ❌ | Where alerts go |
 | `INSIGHTS_SCHEDULER_ENABLED` | ❌ | `false` turns off the weekly report |

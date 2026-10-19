@@ -109,3 +109,36 @@ def test_flask_ships_byte_counts(fake_collector, clean_release_env):
     event = batch["events"][0]
     assert event["request_bytes"] == 6
     assert event["response_bytes"] == len(response.data)
+
+
+def test_trace_ids_of_failed_and_slow_requests(fake_collector):
+    from fastapi import HTTPException
+
+    from reqly.core import traces
+
+    url, batches = fake_collector
+    app = FastAPI()
+
+    @app.get("/ok")
+    def ok():
+        return {}
+
+    @app.get("/denied")
+    def denied():
+        raise HTTPException(status_code=401)
+
+    client = reqly.instrument(app, service_name="s", collector_url=url, flush_interval_seconds=999)
+    http = TestClient(app)
+    trace = "4bf92f3577b34da6a3ce929d0e0e4736"
+    http.get("/ok", headers={"traceparent": f"00-{trace}-00f067aa0ba902b7-01"})  # fast 200: not sent
+    http.get("/denied", headers={"traceparent": f"00-{trace}-00f067aa0ba902b7-01"})
+    http.get("/denied", headers={"sentry-trace": "771a43a4192642f0b136d5159a501700-b8d6b0c4d7b4a3f2-1"})
+    http.get("/denied")
+    client._buffer.flush()
+    time.sleep(0.05)
+    events = [e for b in batches for e in b["events"]]
+    assert ["trace_id" in e for e in events] == [False, True, True, False]
+    assert [e.get("trace_id") for e in events[1:3]] == [trace, "771a43a4192642f0b136d5159a501700"]
+    assert traces.trace_id_from_headers({"x-b3-traceid": "463AC35C9F6413AD"}) == "463ac35c9f6413ad"
+    assert traces.trace_id_from_headers({"traceparent": "00-" + "0" * 32 + "-00f067aa0ba902b7-01"}) is None
+    client.shutdown()

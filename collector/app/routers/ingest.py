@@ -17,6 +17,7 @@ from ..gzip_body import GzipRoute
 from ..llm.splits import MAX_MODELS_PER_REQUEST, split_rows, summarize_models
 from ..observability import INGEST_EVENTS
 from ..rate_limit import INGEST_IP_LIMIT, ingest_key, ingest_limit, limiter
+from ..traces import keep_trace_id, normalize_trace_id
 
 # The SDKs gzip larger batches (Content-Encoding: gzip).
 router = APIRouter(route_class=GzipRoute)
@@ -65,6 +66,9 @@ class EventIn(BaseModel):
     # present it is the source of truth: llm_model / llm_*_tokens are
     # recomputed from it (main model, totals) so the two can't disagree.
     llm_usage: list[LlmModelUsageIn] | None = Field(default=None, max_length=MAX_MODELS_PER_REQUEST)
+    # v4: the request's trace id (W3C traceparent, 16 or 32 hex digits). A
+    # malformed one is dropped, not the event.
+    trace_id: str | None = None
 
     @field_validator("duration_ms")
     @classmethod
@@ -72,6 +76,11 @@ class EventIn(BaseModel):
         if v < 0 or v > _MAX_DURATION_MS:
             raise ValueError("duration_ms out of plausible range")
         return v
+
+    @field_validator("trace_id", mode="before")
+    @classmethod
+    def valid_trace_id(cls, v):
+        return normalize_trace_id(v)
 
     @model_validator(mode="after")
     def totals_from_llm_usage(self) -> EventIn:
@@ -187,6 +196,7 @@ async def ingest(request: Request, body: IngestRequest, principal: Principal = D
                 llm_model=e.llm_model,
                 llm_input_tokens=e.llm_input_tokens,
                 llm_output_tokens=e.llm_output_tokens,
+                trace_id=keep_trace_id(e.trace_id, e.status_code, e.duration_ms),
             )
         )
 

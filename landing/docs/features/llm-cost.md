@@ -9,6 +9,28 @@ If your API calls language models, record the token usage during the request and
 
 ## Record usage
 
+The simplest way: instrument the client once, and every call it makes is counted for the request that made it (Python SDK 0.7+, Node SDK 0.5+).
+
+=== "Python"
+
+    ```python
+    client = reqly.instrument_openai(OpenAI())        # or AsyncOpenAI(), or an OpenAI-compatible client
+    claude = reqly.instrument_anthropic(Anthropic())  # or AsyncAnthropic()
+    ```
+
+=== "Node.js"
+
+    ```js
+    import { instrumentAnthropic, instrumentOpenAI } from "reqly-node";
+
+    const openai = instrumentOpenAI(new OpenAI());
+    const anthropic = instrumentAnthropic(new Anthropic());
+    ```
+
+It covers OpenAI chat completions, Responses, completions and embeddings, and Anthropic messages, including streams, which count when they finish (OpenAI chat streams report usage only with `stream_options: {"include_usage": true}`). Only that client object is patched, and the provider's own return value comes back unchanged.
+
+Or record usage yourself, from a response or as numbers:
+
 === "Python"
 
     ```python

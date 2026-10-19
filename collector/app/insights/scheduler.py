@@ -79,15 +79,11 @@ async def run_hourly_alerts() -> None:
 
     pool = get_pool()
     services = await queries.list_services(pool)
-    channels = notifier.Channels(
-        slack_webhook_url=settings.alert_slack_webhook_url,
-        discord_webhook_url=settings.alert_discord_webhook_url,
-        webhook_url=settings.alert_webhook_url,
-        dashboard_url=settings.dashboard_url,
-    )
+    channels = notifier.channels_from_settings(settings)
     await hourly.run_hourly_check(
         pool, services, channels, timedelta(hours=settings.alert_renotify_hours),
         llm_cost_min_usd=settings.llm_cost_alert_min_usd,
+        client_error_statuses=settings.client_error_alert_statuses,
     )
 
 
@@ -95,12 +91,7 @@ async def run_slo_alerts() -> None:
     from ..alerts import notifier, slo_alerts
     from ..config import settings
 
-    channels = notifier.Channels(
-        slack_webhook_url=settings.alert_slack_webhook_url,
-        discord_webhook_url=settings.alert_discord_webhook_url,
-        webhook_url=settings.alert_webhook_url,
-        dashboard_url=settings.dashboard_url,
-    )
+    channels = notifier.channels_from_settings(settings)
     await slo_alerts.run_slo_check(get_pool(), channels, timedelta(hours=settings.alert_renotify_hours))
 
 

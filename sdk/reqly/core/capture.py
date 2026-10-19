@@ -42,6 +42,7 @@ class RequestEvent:
     # [{"model", "input_tokens", "output_tokens"}] when several models were
     # called; omitted otherwise (and ignored by collectors before 0.13).
     llm_usage: list[dict] | None = None
+    trace_id: str | None = None  # failed or slow requests only (core/traces.py)
     sdk_version: str = field(default_factory=_get_sdk_version)
     recorded_at: float = field(default_factory=time.time)  # not sent
 
@@ -52,8 +53,9 @@ class RequestEvent:
             self.timestamp = datetime.fromtimestamp(self.recorded_at, timezone.utc).isoformat()
         data = asdict(self)
         del data["recorded_at"]
-        if data["llm_usage"] is None:
-            del data["llm_usage"]
+        for optional in ("llm_usage", "trace_id"):  # omitted when unset
+            if data[optional] is None:
+                del data[optional]
         return data
 
 
@@ -81,6 +83,7 @@ def build_event(
     response_bytes: int | None = None,
     consumer_id: str | None = None,
     llm: tuple | None = None,
+    trace_id: str | None = None,
 ) -> RequestEvent:
     """llm: (model, input_tokens, output_tokens[, by_model]) as returned by
     LLMUsage.summary()."""
@@ -105,4 +108,5 @@ def build_event(
         llm_input_tokens=llm_input_tokens,
         llm_output_tokens=llm_output_tokens,
         llm_usage=llm_usage,
+        trace_id=trace_id,
     )

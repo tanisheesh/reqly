@@ -52,7 +52,7 @@ def test_payload_shape_per_channel():
         webhook_url="https://example.test/z",
         dashboard_url="https://dash.test",
     )
-    payloads = dict(notifier.build_payloads(channels, notifier.OPENED, ALERT))
+    payloads = {d.url: d.body for d in notifier.build_payloads(channels, notifier.OPENED, ALERT)}
     assert payloads["https://hooks.slack.test/x"]["text"].endswith("<https://dash.test|Open dashboard>")
     assert "Open dashboard" not in payloads["https://discord.test/y"]["content"]
     generic = payloads["https://example.test/z"]
@@ -91,5 +91,62 @@ def test_ingested_values_cannot_inject_mentions_or_links():
     assert "<" not in body and ">" not in body and body.count("`") % 2 == 0
     assert link == "<https://dash.test|Open dashboard>"  # our own link survives
     channels = notifier.Channels(discord_webhook_url="https://discord.test/y")
-    (_, payload), = notifier.build_payloads(channels, notifier.OPENED, {**ALERT, "route": "@everyone"})
+    (_, payload, _), = notifier.build_payloads(channels, notifier.OPENED, {**ALERT, "route": "@everyone"})
     assert payload["allowed_mentions"] == {"parse": []}
+
+
+def test_on_call_channels():
+    channels = notifier.Channels(
+        teams_webhook_url="https://teams.test/hook", pagerduty_routing_key="pd-key",
+        opsgenie_api_key="og-key", opsgenie_api_url="https://api.eu.opsgenie.com", dashboard_url="https://dash.test",
+    )
+    sent = {d.url.split("/")[2]: d for d in notifier.build_payloads(channels, notifier.OPENED, ALERT)}
+
+    card = sent["teams.test"].body["attachments"][0]["content"]
+    assert card["type"] == "AdaptiveCard" and card["body"][0]["text"].startswith("🔴 **Anomaly**")
+    assert card["actions"][0]["url"] == "https://dash.test"
+
+    pd = sent["events.pagerduty.com"].body
+    assert (pd["routing_key"], pd["event_action"], pd["dedup_key"]) == ("pd-key", "trigger", "reqly-alert-1")
+    assert pd["payload"]["summary"].startswith("🔴 Anomaly — checkout-api /orders")
+    assert pd["payload"]["source"] == "checkout-api" and pd["links"][0]["href"] == "https://dash.test"
+
+    og = sent["api.eu.opsgenie.com"]
+    assert og.url == "https://api.eu.opsgenie.com/v2/alerts" and og.headers == {"Authorization": "GenieKey og-key"}
+    assert og.body["alias"] == "reqly-alert-1" and len(og.body["message"]) <= 130
+
+    resolved = {d.url.split("/")[2]: d for d in notifier.build_payloads(channels, notifier.RESOLVED, ALERT)}
+    assert resolved["events.pagerduty.com"].body == {
+        "routing_key": "pd-key", "event_action": "resolve", "dedup_key": "reqly-alert-1"}
+    assert resolved["api.eu.opsgenie.com"].url.endswith("/v2/alerts/reqly-alert-1/close?identifierType=alias")
+    assert "actions" not in resolved["teams.test"].body["attachments"][0]["content"]
+
+
+def test_email_message():
+    email = notifier.Email(to=("oncall@example.test", "lead@example.test"), sender="reqly@example.test",
+                           smtp_host="smtp.example.test")
+    message = notifier.build_email(email, notifier.OPENED, ALERT, "https://dash.test")
+    assert message["Subject"].startswith("[Reqly] 🔴 Anomaly — checkout-api /orders")
+    assert message["To"] == "oncall@example.test, lead@example.test"
+    body = message.get_content()
+    assert "*" not in body and "`" not in body and body.rstrip().endswith("Open dashboard: https://dash.test")
+
+
+def test_email_via_resend(monkeypatch):
+    seen = []
+
+    def handler(request):
+        seen.append((request.url.host, request.headers["authorization"], json.loads(request.content)))
+        return httpx.Response(200, json={"id": "x"})
+
+    channels = notifier.Channels(email=notifier.Email(to=("a@example.test",), sender="r@example.test",
+                                                      resend_api_key="re_key"))
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await notifier.send(channels, notifier.RESOLVED, ALERT, client=client)
+
+    assert asyncio.run(run()) == 1
+    host, auth, body = seen[0]
+    assert (host, auth, body["to"]) == ("api.resend.com", "Bearer re_key", ["a@example.test"])
+    assert body["subject"].startswith("[Reqly] ✅ Resolved")

@@ -80,24 +80,30 @@ export function recordLlmUsage(model: string, inputTokens = 0, outputTokens = 0)
 type Usage = Record<string, unknown> | undefined;
 
 /**
- * recordLlmUsage() from a provider response: OpenAI-style
+ * [model, inputTokens, outputTokens] of a provider response: OpenAI-style
  * (`usage.prompt_tokens` / `completion_tokens`; also Groq, Mistral, vLLM...),
  * OpenAI Responses API and Anthropic (`usage.input_tokens` / `output_tokens`).
- * Never throws.
+ * Undefined without usage.
  */
+export function usageFromResponse(response: unknown): [string, number, number] | undefined {
+  if (!response || typeof response !== "object") return undefined;
+  const r = response as { model?: unknown; usage?: Usage };
+  const usage = r.usage;
+  if (!usage) return undefined;
+  let input = usage.prompt_tokens;
+  let output = usage.completion_tokens;
+  if (input === undefined && output === undefined) {
+    input = usage.input_tokens;
+    output = usage.output_tokens;
+  }
+  return [typeof r.model === "string" ? r.model : "unknown", count(input), count(output)];
+}
+
+/** recordLlmUsage() from a provider response (see usageFromResponse). Never throws. */
 export function recordLlmResponse(response: unknown): void {
   try {
-    if (!response || typeof response !== "object") return;
-    const r = response as { model?: unknown; usage?: Usage };
-    const usage = r.usage;
-    if (!usage) return;
-    let input = usage.prompt_tokens;
-    let output = usage.completion_tokens;
-    if (input === undefined && output === undefined) {
-      input = usage.input_tokens;
-      output = usage.output_tokens;
-    }
-    recordLlmUsage(typeof r.model === "string" ? r.model : "unknown", Number(input ?? 0), Number(output ?? 0));
+    const found = usageFromResponse(response);
+    if (found) recordLlmUsage(...found);
   } catch (err) {
     console.warn("reqly: recordLlmResponse() failed:", err);
   }

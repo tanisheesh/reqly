@@ -73,6 +73,7 @@ def collector():
         "DATABASE_URL": DATABASE_URL,
         "REQLY_INGEST_KEY": INGEST_KEY,
         "REQLY_READ_KEY": READ_KEY,
+        "PUBLIC_DASHBOARD": "true",  # read with the read key, as the public demo does
         "INSIGHTS_SCHEDULER_ENABLED": "false",
         "ALERTS_ENABLED": "false",
         "LOG_FORMAT": "json",

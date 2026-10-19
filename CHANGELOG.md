@@ -6,6 +6,50 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 
 ---
 
+## [0.14.0] — 2026-10-19
+
+Collector 0.14.0 · Helm chart 0.14.0 · Python SDK 0.7.0 · Node SDK 0.5.0
+
+### ⚠️ Breaking: safe defaults
+Outside demo mode the collector is now locked down by default:
+- it **refuses to start** without `REQLY_INGEST_KEY` and `REQLY_READ_KEY` (no more `demo-key` fallback)
+- `PUBLIC_DASHBOARD` defaults to **`false`**: the dashboard needs a sign-in
+- `CORS_ORIGINS` defaults to **empty**
+
+`REQLY_DEMO_MODE=true` brings back the old defaults. `docker compose up` sets it, so the local
+stack works as before; the Helm chart sets everything explicitly and is unaffected.
+**Upgrading a collector you run yourself?** Make sure both keys are set, and set
+`PUBLIC_DASHBOARD=true` and `CORS_ORIGINS` explicitly if you relied on the old defaults.
+
+### ✨ Added
+- **All-in-one image** `ghcr.io/tanisheesh/reqly`: the collector serves the dashboard on the same
+  port (`DASHBOARD_DIR`), so a deployment is that image plus TimescaleDB, with no CORS and no
+  collector URL baked into the dashboard. `deploy/all-in-one/docker-compose.yml` runs both
+- **On-call channels:** Microsoft Teams (Workflows webhook, Adaptive Card), PagerDuty (Events API
+  v2, one incident per alert, resolved with it), Opsgenie (closed on resolve) and email (SMTP or
+  Resend). Helm secrets for each
+- **Acknowledge, silence, mute:** acknowledge stops reminders; silence stops an alert's
+  notifications for up to 7 days; mute stops a service's, a route's or a kind's for up to 30 days.
+  Buttons on the dashboard for signed-in users, and `POST /v1/alerts/{id}/acknowledge`,
+  `/silence`, `/v1/alert-mutes`. The public read key can't use them
+- **Client error alerts:** a sudden spike of 401 / 403 / 422 / 429 on a route (same weekday-hour
+  baseline and Poisson test as the error alerts) opens a `client_errors` alert, with the release
+  that was running. `CLIENT_ERROR_ALERT_STATUSES` picks the codes
+- **Trace correlation:** failed (4xx/5xx) and slow requests keep their trace id (SDKs read
+  `traceparent`, `sentry-trace` or `x-b3-traceid`; OTLP spans have one), and error and client
+  error alerts list up to 5 of that hour's traces. `TRACE_URL_TEMPLATE` makes them links in the
+  dashboard; `TRACE_ID_SLOW_MS` sets "slow" (default 1000)
+- **LLM client auto-instrumentation:** `reqly.instrument_openai(client)` /
+  `instrument_anthropic(client)` and `instrumentOpenAI` / `instrumentAnthropic` in Node count every
+  call's tokens (chat, Responses, completions, embeddings, Anthropic messages, streams included)
+  for the request that made it, without `record_llm_usage()`
+
+### ⬆️ Upgrading
+- Migrations 012 (alert actions) and 013 (`trace_id` column) run on start-up
+- Ingest spec v4: the event's optional `trace_id`
+
+---
+
 ## [0.13.0] — 2026-10-19
 
 Collector 0.13.0 · Helm chart 0.13.0 · Python SDK 0.6.0 · Node SDK 0.4.0
@@ -306,7 +350,8 @@ Python SDK 0.1.5
 
 ---
 
-[Unreleased]: https://github.com/tanisheesh/reqly/compare/collector-v0.13.0...HEAD
+[Unreleased]: https://github.com/tanisheesh/reqly/compare/collector-v0.14.0...HEAD
+[0.14.0]: https://github.com/tanisheesh/reqly/tree/collector-v0.14.0
 [0.13.0]: https://github.com/tanisheesh/reqly/tree/collector-v0.13.0
 [0.12.3]: https://github.com/tanisheesh/reqly/tree/collector-v0.12.3
 [0.12.2]: https://github.com/tanisheesh/reqly/tree/collector-v0.12.2

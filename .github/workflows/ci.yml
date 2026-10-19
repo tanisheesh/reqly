@@ -46,6 +46,9 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - run: pip install -e "./sdk[dev]"
+      - name: Real LLM clients, for the instrument_openai / instrument_anthropic tests
+        if: matrix.python-version != '3.9'
+        run: pip install openai anthropic
       - run: pytest sdk/tests -v
 
   sdk-node:

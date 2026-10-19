@@ -23,6 +23,17 @@ def _positive_or_none(raw: str) -> float | None:
     return value if value > 0 else None
 
 
+def _status_codes(raw: str) -> tuple[int, ...]:
+    codes = []
+    for part in raw.split(","):
+        part = part.strip()
+        if part.isdigit() and 400 <= int(part) <= 499:
+            codes.append(int(part))
+        elif part:
+            _logger.warning("ignoring %r in CLIENT_ERROR_ALERT_STATUSES (4xx codes only)", part)
+    return tuple(codes)
+
+
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 OPENAI_BASE_URL = "https://api.openai.com/v1"
 _DEFAULT_LLM_MODEL = "openai/gpt-oss-120b"
@@ -71,8 +82,23 @@ class Settings:
     alert_slack_webhook_url: str | None
     alert_discord_webhook_url: str | None
     alert_webhook_url: str | None
+    alert_teams_webhook_url: str | None
+    alert_pagerduty_routing_key: str | None
+    alert_opsgenie_api_key: str | None
+    alert_opsgenie_api_url: str
+    alert_email_to: list[str]
+    alert_email_from: str | None
+    smtp_host: str | None
+    smtp_port: int
+    smtp_username: str | None
+    smtp_password: str | None
+    smtp_starttls: bool
+    resend_api_key: str | None
     alert_renotify_hours: float
     llm_cost_alert_min_usd: float | None
+    client_error_alert_statuses: tuple[int, ...]
+    trace_id_slow_ms: float
+    trace_url_template: str | None
     consumer_limit_per_day: int
     dashboard_url: str | None
     public_dashboard: bool
@@ -82,6 +108,8 @@ class Settings:
     log_format: str
     metrics_enabled: bool
     metrics_token: str | None
+    demo_mode: bool
+    dashboard_dir: str | None
 
     @property
     def llm_enabled(self) -> bool:
@@ -89,25 +117,32 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> "Settings":
-        ingest_key = os.environ.get("REQLY_INGEST_KEY", "demo-key")
+        # Safe unless told otherwise: without REQLY_DEMO_MODE the keys must be
+        # set, the dashboard needs a sign-in and no other origin may call the
+        # API. Demo mode (docker-compose, the load generator) brings back the
+        # public demo-key / demo-read-key, PUBLIC_DASHBOARD=true and CORS "*".
+        demo_mode = _env_flag("REQLY_DEMO_MODE", False)
+        # Empty when unset outside demo mode: the collector refuses to start
+        # (main.py) and no key can match an empty one.
+        ingest_key = os.environ.get("REQLY_INGEST_KEY") or ("demo-key" if demo_mode else "")
         # The read key is shipped inside the dashboard's JS bundle, so it is
         # effectively public. It deliberately does NOT fall back to the ingest
         # key -- that would hand write access to anyone who opens the dashboard.
-        read_key = os.environ.get("REQLY_READ_KEY", "demo-read-key")
+        read_key = os.environ.get("REQLY_READ_KEY") or ("demo-read-key" if demo_mode else "")
 
         if ingest_key == "demo-key":
             _logger.warning(
                 "REQLY_INGEST_KEY is not set — using the public default 'demo-key'. "
                 "Set REQLY_INGEST_KEY and REQLY_READ_KEY before exposing this collector."
             )
-        if read_key == ingest_key:
+        if read_key and read_key == ingest_key:
             _logger.warning(
                 "REQLY_READ_KEY equals REQLY_INGEST_KEY. The read key is embedded in "
                 "the dashboard bundle, so anyone with dashboard access can also write "
                 "telemetry. Use two different keys."
             )
 
-        cors_raw = os.environ.get("CORS_ORIGINS", "")
+        cors_raw = os.environ.get("CORS_ORIGINS", "*" if demo_mode else "")
         cors_origins = [o.strip() for o in cors_raw.split(",") if o.strip()]
         llm_base_url, llm_api_key, llm_model = _llm_from_env()
 
@@ -143,10 +178,33 @@ class Settings:
             alert_slack_webhook_url=os.environ.get("ALERT_SLACK_WEBHOOK_URL") or None,
             alert_discord_webhook_url=os.environ.get("ALERT_DISCORD_WEBHOOK_URL") or None,
             alert_webhook_url=os.environ.get("ALERT_WEBHOOK_URL") or None,
+            # Teams: a Workflows "When a Teams webhook request is received" URL.
+            alert_teams_webhook_url=os.environ.get("ALERT_TEAMS_WEBHOOK_URL") or None,
+            # PagerDuty Events API v2 integration (routing) key.
+            alert_pagerduty_routing_key=os.environ.get("ALERT_PAGERDUTY_ROUTING_KEY") or None,
+            alert_opsgenie_api_key=os.environ.get("ALERT_OPSGENIE_API_KEY") or None,
+            # EU accounts: https://api.eu.opsgenie.com
+            alert_opsgenie_api_url=os.environ.get("ALERT_OPSGENIE_API_URL") or "https://api.opsgenie.com",
+            # Email: through SMTP_HOST, or Resend's API with RESEND_API_KEY.
+            alert_email_to=[a.strip() for a in os.environ.get("ALERT_EMAIL_TO", "").split(",") if a.strip()],
+            alert_email_from=os.environ.get("ALERT_EMAIL_FROM") or None,
+            smtp_host=os.environ.get("SMTP_HOST") or None,
+            smtp_port=int(os.environ.get("SMTP_PORT", "587")),
+            smtp_username=os.environ.get("SMTP_USERNAME") or None,
+            smtp_password=os.environ.get("SMTP_PASSWORD") or None,
+            smtp_starttls=_env_flag("SMTP_STARTTLS", True),
+            resend_api_key=os.environ.get("RESEND_API_KEY") or None,
             alert_renotify_hours=float(os.environ.get("ALERT_RENOTIFY_HOURS", "6")),
             # LLM cost alerts: the smallest extra spend per route-hour, in USD,
             # worth an alert. 0 or negative turns them off.
             llm_cost_alert_min_usd=_positive_or_none(os.environ.get("LLM_COST_ALERT_MIN_USD", "1.0")),
+            # 4xx status codes whose spikes open alerts; empty turns them off.
+            client_error_alert_statuses=_status_codes(os.environ.get("CLIENT_ERROR_ALERT_STATUSES", "401,403,422,429")),
+            # Trace ids are kept for 4xx/5xx responses and requests at least
+            # this slow; the template turns one into a link in alerts, e.g.
+            # https://grafana.example.com/explore?...{trace_id}...
+            trace_id_slow_ms=float(os.environ.get("TRACE_ID_SLOW_MS", "1000")),
+            trace_url_template=os.environ.get("TRACE_URL_TEMPLATE") or None,
             # Distinct consumers kept per service per UTC day; later new ones
             # are stored as "__other__". 0 turns the cap off.
             consumer_limit_per_day=int(os.environ.get("CONSUMER_LIMIT_PER_DAY", "1000")),
@@ -157,7 +215,7 @@ class Settings:
             # true: the read key (public in the dashboard bundle) can read
             # everything -- a public demo. false: reading needs a signed-in
             # user (the read key is refused).
-            public_dashboard=_env_flag("PUBLIC_DASHBOARD", True),
+            public_dashboard=_env_flag("PUBLIC_DASHBOARD", demo_mode),
             # First admin, created at start-up when there are no users yet.
             admin_username=os.environ.get("REQLY_ADMIN_USERNAME") or "admin",
             admin_password=os.environ.get("REQLY_ADMIN_PASSWORD") or None,
@@ -168,7 +226,15 @@ class Settings:
             # need "Authorization: Bearer <token>".
             metrics_enabled=_env_flag("METRICS_ENABLED", True),
             metrics_token=os.environ.get("METRICS_TOKEN") or None,
+            demo_mode=demo_mode,
+            # All-in-one: serve the built dashboard from this directory.
+            dashboard_dir=os.environ.get("DASHBOARD_DIR") or None,
         )
+
+    def missing_keys(self) -> list[str]:
+        """Settings the collector can't run without (outside demo mode)."""
+        return [name for name, value in (("REQLY_INGEST_KEY", self.ingest_key), ("REQLY_READ_KEY", self.read_key))
+                if not value]
 
 
 settings = Settings.from_env()
