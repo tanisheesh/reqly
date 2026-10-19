@@ -14,7 +14,7 @@ from google.protobuf.json_format import MessageToDict
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
 
 from app.db.queries import EVENT_COLUMNS
-from app.otlp.mapping import UNMATCHED_ROUTE, map_resource_spans
+from app.otlp.mapping import UNMATCHED_ROUTE, map_export_request, map_resource_spans
 
 FIXTURES = Path(__file__).parent / "fixtures" / "otlp"
 
@@ -22,7 +22,7 @@ FIXTURES = Path(__file__).parent / "fixtures" / "otlp"
 def _proto_fixture(name):
     message = ExportTraceServiceRequest()
     message.ParseFromString((FIXTURES / name).read_bytes())
-    return MessageToDict(message)
+    return message
 
 
 def _events(result):
@@ -59,13 +59,13 @@ def test_express_json_fixture():
 
 
 def test_express_protobuf_fixture_maps_like_json():
-    result = map_resource_spans(_proto_fixture("express_http_protobuf.bin"))
+    result = map_export_request(_proto_fixture("express_http_protobuf.bin"))
     assert sorted(_summary(result)) == sorted(EXPRESS_EXPECTED)
     assert result.skipped == 22
 
 
 def test_python_legacy_semconv_fixture():
-    result = map_resource_spans(_proto_fixture("fastapi_python_legacy.bin"))
+    result = map_export_request(_proto_fixture("fastapi_python_legacy.bin"))
     assert sorted(_summary(result)) == sorted([
         ("GET", "/items/{item_id}", 200, False, None),
         ("GET", "/items/{item_id}", 404, False, None),
@@ -74,6 +74,17 @@ def test_python_legacy_semconv_fixture():
     ])
     e = _events(result)[0]
     assert (e["release"], e["environment"], e["host"]) == ("2026.10.1", "staging", "api-pod-3")
+
+
+def test_protobuf_maps_exactly_like_its_json_form():
+    # The protobuf path reads the message directly; its JSON form (with
+    # base64 ids and enum names, as MessageToDict prints it) must give the
+    # very same rows.
+    for name in ("express_http_protobuf.bin", "fastapi_python_legacy.bin"):
+        message = _proto_fixture(name)
+        direct, via_json = map_export_request(message, "salt"), map_resource_spans(MessageToDict(message), "salt")
+        assert direct.rows == via_json.rows and direct.rows
+        assert (direct.skipped, direct.rejected) == (via_json.skipped, via_json.rejected)
 
 
 def test_event_ids_are_stable_across_retries():

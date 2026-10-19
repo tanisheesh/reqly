@@ -14,7 +14,6 @@ import json
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from google.protobuf.json_format import MessageToDict
 from google.protobuf.message import DecodeError
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
@@ -29,7 +28,7 @@ from ..db.late_data import tracker as late_data_tracker
 from ..db.pool import get_pool
 from ..db.queries import EVENT_COLUMNS, insert_events, record_deployments, row_time
 from ..gzip_body import decompress
-from ..otlp.mapping import map_resource_spans
+from ..otlp.mapping import map_export_request, map_resource_spans
 from ..rate_limit import INGEST_IP_LIMIT, ingest_key, ingest_limit, limiter
 
 router = APIRouter()
@@ -106,7 +105,7 @@ async def export_traces(request: Request, principal: Principal = Depends(verify_
             message.ParseFromString(body)
         except DecodeError:
             raise HTTPException(status_code=400, detail="invalid protobuf body")
-        payload = MessageToDict(message)
+        result = map_export_request(message, settings.consumer_salt)
     else:
         try:
             payload = json.loads(body or b"{}")
@@ -114,8 +113,8 @@ async def export_traces(request: Request, principal: Principal = Depends(verify_
             raise HTTPException(status_code=400, detail="invalid JSON body")
         if not isinstance(payload, dict):
             raise HTTPException(status_code=400, detail="JSON body must be an object")
+        result = map_resource_spans(payload, settings.consumer_salt)
 
-    result = map_resource_spans(payload, settings.consumer_salt)
     now = _now()
     accepted = []
     writable: dict[str, bool] = {}
