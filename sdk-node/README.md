@@ -91,10 +91,11 @@ paths; requests no route matched become `__unmatched__`, so 404 scanners can't f
 ## Who is calling, and what it costs
 
 ```js
-import { recordLlmResponse, recordLlmUsage } from "reqly-node";
+import { instrumentOpenAI, recordLlmResponse, recordLlmUsage } from "reqly-node";
 
 reqlyExpress({ consumerHeader: "x-api-key", consumerSalt: process.env.REQLY_CONSUMER_SALT });
 
+const openai = instrumentOpenAI(new OpenAI()); // every call counted (instrumentAnthropic too), or:
 const completion = await openai.chat.completions.create({ model: "gpt-4o-mini", messages });
 recordLlmResponse(completion);              // OpenAI / Anthropic responses, or:
 recordLlmUsage("gpt-4o-mini", 1200, 240);
