@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.alerts import hourly, notifier
+from app.ask import tools
 from app.db import pool as pool_module
 from app.db import queries
 from tests.test_queries_db import _db_reachable, _refresh_all
@@ -44,16 +45,20 @@ def test_hourly_run_opens_a_client_error_alert():
                 pool, [service], notifier.Channels(), timedelta(hours=6), now=now, client_error_statuses=(401, 403),
             )
             alerts = await pool.fetch("SELECT kind, route, details FROM alerts WHERE service_name = $1", service)
-            return sent, [dict(a) for a in alerts]
+            asked = await tools.run_tool(pool, service, "get_alerts", {}, now)
+            return sent, [dict(a) for a in alerts], asked
         finally:
             await pool.execute("DELETE FROM alerts WHERE service_name = $1", service)
             await pool.execute("DELETE FROM request_events WHERE service_name = $1", service)
             await pool_module.close_pool()
 
-    sent, alerts = asyncio.run(run())
+    sent, alerts, asked = asyncio.run(run())
     client = [a for a in alerts if a["kind"] == "client_errors"]
     assert len(client) == 1 and client[0]["route"] == "/orders"
     details = json.loads(client[0]["details"]) if isinstance(client[0]["details"], str) else client[0]["details"]
     assert (details["status_code"], details["observed_count"], details["requests"]) == (401, 40, 100)
     assert "release_context" in details
     assert sent >= 1
+    # Ask Reqly sees the spike's own numbers, not empty anomaly fields
+    [seen] = [a for a in asked["alerts"] if a["kind"] == "client_errors"]
+    assert (seen["status_code"], seen["observed_count"], seen["requests"], seen["observed_share"]) == (401, 40, 100, 0.4)

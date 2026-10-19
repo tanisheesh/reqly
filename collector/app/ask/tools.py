@@ -314,6 +314,20 @@ async def get_alerts(pool, service: str, args: dict, now: datetime) -> dict:
             alert["drivers"] = [d.get("text") for d in details.get("drivers") or []]
             if details.get("model_mix"):
                 alert["model_mix"] = details["model_mix"].get("text")
+        elif r["kind"] == "client_errors":
+            alert["hour"] = _ts(r["last_hour"]) if r["last_hour"] else None
+            alert["status_code"] = details.get("status_code")
+            for key in ("observed_share", "baseline_share", "observed_count", "requests", "z_score"):
+                alert[key] = _num(details.get(key))
+            alert["also"] = [
+                {"status_code": x.get("status_code"), "observed_share": _num(x.get("observed_share"))}
+                for x in details.get("statuses") or [] if x.get("status_code") != details.get("status_code")
+            ]
+            ctx = details.get("release_context") or {}
+            if ctx.get("is_new_release"):
+                alert["new_release"] = ctx.get("release")
+            if details.get("trace_ids"):
+                alert["trace_ids"] = details["trace_ids"][:3]
         else:
             for key in ("observed_error_rate", "baseline_error_rate", "observed_p95_ms",
                         "baseline_p95_ms", "z_score"):
@@ -323,6 +337,8 @@ async def get_alerts(pool, service: str, args: dict, now: datetime) -> dict:
             if ctx.get("is_new_release"):
                 alert["new_release"] = ctx.get("release")
             alert["hints"] = [h.get("text") for h in details.get("hints") or []]
+            if details.get("trace_ids"):
+                alert["trace_ids"] = details["trace_ids"][:3]
         alerts.append(alert)
     return {"status": status, "alerts": alerts}
 
@@ -508,7 +524,7 @@ TOOL_SCHEMAS = [
     _schema("list_releases", "Recent releases (deploys), newest first, with when each was first seen and its error rate and p95.", {}),
     _schema(
         "get_alerts",
-        "Recent alerts: hourly anomalies (with baseline, z-score, release and root-cause hints), SLO burn alerts, and LLM cost spikes (with what drove the cost).",
+        "Recent alerts: hourly anomalies (with baseline, z-score, release and root-cause hints), client error spikes (a 401/403/422/429 status taking a much larger share of a route's requests than usual), SLO burn alerts, and LLM cost spikes (with what drove the cost). Error and client error alerts include sample trace ids.",
         {"status": {"type": "string", "enum": ["open", "all"], "description": "Default all (recent, incl. resolved)."}},
     ),
     _schema("get_slos", "The service's SLOs with SLI, error budget remaining, burn rates and state.", {}),
