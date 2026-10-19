@@ -77,6 +77,7 @@ known-first-party = ["reqly"]
 
 [tool.mypy]
 files = ["reqly"]
-python_version = "3.9"
+# The oldest mypy can check; ruff (target-version) still covers 3.9 syntax.
+python_version = "3.10"
 # Framework and driver packages ship partial or no stubs.
 ignore_missing_imports = true

@@ -67,8 +67,17 @@ Dashboard on http://localhost:5173, collector API docs on http://localhost:8000/
    docker compose up timescaledb -d
    cd collector && pip install -e ".[dev]" && pytest
 
-   # Dashboard: type-check and build
-   cd dashboard && npm ci && npm run build
+   # Dashboard: unit tests, type-check and build
+   cd dashboard && npm ci && npm test && npm run build
+
+   # Lint and type-check (Python)
+   pip install ruff mypy
+   ruff check collector sdk e2e
+   (cd collector && mypy) && (cd sdk && mypy)
+
+   # End to end: both SDKs -> a collector process -> TimescaleDB -> the API
+   # (collector and SDK installed, Node SDK built with npm run build)
+   pytest e2e
    ```
 
    Changed the collector's dependencies in `pyproject.toml`? Recompile its lock, `collector/requirements.txt`, with the `uv pip compile` command at the top of that file; the Docker image installs exactly what it pins, and CI fails when the two disagree.
