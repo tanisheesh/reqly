@@ -22,6 +22,7 @@ Closes #
 - [ ] ✨ New feature
 - [ ] 🐛 Bug fix
 - [ ] 🎊 Improvement
+- [ ] ⚡ Performance
 - [ ] ♻️ Refactor (no behaviour change)
 - [ ] 📚 Docs
 - [ ] 🔨 Chore / config / CI

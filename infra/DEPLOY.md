@@ -19,7 +19,7 @@ Your app ships data to the collector, which writes to TimescaleDB on EC2 and run
 ## Prerequisites
 
 - AWS account with CLI configured (`aws configure`)
-- Groq API key (free at https://console.groq.com/keys) — optional, skip for plain-text insights
+- An LLM for AI reports and Ask Reqly — optional: a Groq key (free at https://console.groq.com/keys) or any OpenAI-compatible API (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`); without one, reports are plain text
 
 ---
 
@@ -100,7 +100,7 @@ docker run -d \
 ```
 
 Prebuilt images (linux/amd64 and arm64) are published to GitHub Packages; pin a version
-(`:0.8.0`) instead of `latest` in production.
+(`:0.14.1`) instead of `latest` in production. `ghcr.io/tanisheesh/reqly` is the all-in-one image: the collector serving the dashboard on the same port, so you can skip the dashboard step below.
 
 **Option B — Separate server / Render / Fly.io**
 
@@ -166,7 +166,9 @@ ssh -i your-key.pem ec2-user@<ec2-ip>
 # Check TimescaleDB inside EC2
 docker exec -it timescaledb psql -U reqly -d reqly
 
-# Trigger insights manually (without waiting for Sunday)
+# Trigger insights manually (without waiting for Sunday). The read key works while
+# PUBLIC_DASHBOARD=true; otherwise sign in and send
+# -H "Authorization: Bearer <token from POST /v1/auth/login>" instead.
 curl -X POST "https://your-collector-url/v1/insights/generate?service_name=my-api" \
   -H "X-Reqly-Key: your_read_key"
 
