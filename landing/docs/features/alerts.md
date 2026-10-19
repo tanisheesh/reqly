@@ -84,8 +84,8 @@ Set any combination. Channels that aren't set are skipped.
 
 Set `ALERTS_ENABLED=false` to turn the hourly check off. [SLO burn-rate alerts](slos.md#burn-rate-alerts) and [LLM cost alerts](#llm-cost-alerts) go to the same channels.
 
-!!! note "Run one collector"
-    The scheduler runs inside the collector process. With two collector instances, every check runs twice.
+!!! note "More than one collector"
+    The scheduler runs inside the collector process. With two collectors on one database (a rolling deploy, a second replica), each run is claimed in the database first, so every check, alert and weekly report still happens once (collector 0.14.1+). Rate limits and the Ask Reqly daily budget are still per process, which is why one collector is the supported setup.
 
 ## Client error alerts
 

@@ -7,9 +7,10 @@ one); an open alert resolves after RESOLVE_AFTER without a detection.
 Notifications go out on open, every RENOTIFY_AFTER while it keeps firing,
 and on resolve.
 
-Run from a single collector instance: alert state lives in the database, but
-two collectors checking the same hour at the same moment could both open an
-alert before either commits (the unique index then rejects one).
+Two collectors on one database don't both run it: the scheduler claims each
+hour in scheduled_runs first (insights/scheduler.py). The unique open-alert
+index and the FOR UPDATE below would also keep a second run from opening or
+re-notifying an alert twice.
 """
 
 from __future__ import annotations
