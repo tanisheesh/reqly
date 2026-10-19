@@ -50,6 +50,16 @@ On the dashboard, a signed-in user sees these under each open alert. They only c
 
 The public read key can't do any of these: they need a signed-in user with access to the service's project, or a key with the `admin` scope.
 
+### Traces
+
+When requests carry a trace id (the SDKs read `traceparent`, `sentry-trace` or `x-b3-traceid`; OTLP spans have one anyway), error and client error alerts list up to 5 traces from that hour on that route, failed ones first, then the slowest:
+
+```
+• traces: `4bf92f3577b34da6a3ce929d0e0e4736`, `771a43a4192642f0b136d5159a501700`
+```
+
+Copy one into Tempo, Jaeger or Sentry. With `TRACE_URL_TEMPLATE` set (e.g. `https://grafana.example.com/explore?left=...{trace_id}...`), the dashboard links them. Only 4xx/5xx responses and requests slower than `TRACE_ID_SLOW_MS` (default 1000) keep their trace id.
+
 ### Root-cause hints
 
 Hints are computed from your data, not guessed by a model:

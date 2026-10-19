@@ -3,7 +3,7 @@ title: Ingest spec
 description: The /v1/ingest contract every Reqly SDK implements.
 ---
 
-# Ingest spec (v3)
+# Ingest spec (v4)
 
 The contract every Reqly SDK implements. Write SDKs for other languages against
 this document, not against the Python SDK's code.
@@ -103,6 +103,7 @@ Unknown top-level fields are ignored, so newer SDKs can talk to older collectors
 | `llm_input_tokens` | int | no | 0–10,000,000 | **v2.** |
 | `llm_output_tokens` | int | no | 0–10,000,000 | **v2.** |
 | `llm_usage` | array | no | ≤ 16 items | **v3.** One `{"model", "input_tokens", "output_tokens"}` per model when the request called several, so each is priced at its own rate. When present it wins: the collector sets `llm_model` to the model with the most tokens and the `llm_*_tokens` to the totals. Keep sending those three too, for collectors before 0.13. |
+| `trace_id` | string | no | 16 or 32 hex digits | **v4.** The request's trace id (W3C `traceparent`, else `sentry-trace` or `x-b3-traceid`), so alerts can point at traces. The collector keeps it only for 4xx/5xx and slow requests (`TRACE_ID_SLOW_MS`); a malformed one is dropped, not the event. Send it only for failed or slow (500 ms+) requests. |
 
 Any other fields on an event are ignored.
 
@@ -137,6 +138,7 @@ meet all of them.
 
 ## Changelog
 
+- **v4** (collector 0.14.0): the event's `trace_id`. Optional; v3 payloads are unchanged.
 - **v3** (collector 0.13.0): gzip request bodies (`Content-Encoding: gzip`) and the event's
   `llm_usage` (per-model tokens of a multi-model request). Both optional; v2 payloads are
   unchanged and still accepted.

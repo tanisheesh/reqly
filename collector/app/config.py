@@ -97,6 +97,8 @@ class Settings:
     alert_renotify_hours: float
     llm_cost_alert_min_usd: float | None
     client_error_alert_statuses: tuple[int, ...]
+    trace_id_slow_ms: float
+    trace_url_template: str | None
     consumer_limit_per_day: int
     dashboard_url: str | None
     public_dashboard: bool
@@ -198,6 +200,11 @@ class Settings:
             llm_cost_alert_min_usd=_positive_or_none(os.environ.get("LLM_COST_ALERT_MIN_USD", "1.0")),
             # 4xx status codes whose spikes open alerts; empty turns them off.
             client_error_alert_statuses=_status_codes(os.environ.get("CLIENT_ERROR_ALERT_STATUSES", "401,403,422,429")),
+            # Trace ids are kept for 4xx/5xx responses and requests at least
+            # this slow; the template turns one into a link in alerts, e.g.
+            # https://grafana.example.com/explore?...{trace_id}...
+            trace_id_slow_ms=float(os.environ.get("TRACE_ID_SLOW_MS", "1000")),
+            trace_url_template=os.environ.get("TRACE_URL_TEMPLATE") or None,
             # Distinct consumers kept per service per UTC day; later new ones
             # are stored as "__other__". 0 turns the cap off.
             consumer_limit_per_day=int(os.environ.get("CONSUMER_LIMIT_PER_DAY", "1000")),

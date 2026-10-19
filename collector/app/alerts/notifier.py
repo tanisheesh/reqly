@@ -174,6 +174,11 @@ def _release_line(context: dict) -> str | None:
     return line
 
 
+def _traces_line(details: dict) -> str | None:
+    traces = details.get("trace_ids") or []
+    return "• traces: " + ", ".join(f"`{t}`" for t in traces[:3]) if traces else None
+
+
 def _format_client_errors(event: str, service_name: str, route: str, details: dict) -> str:
     if event == RESOLVED:
         return f"✅ *Resolved* — `{service_name}` `{route}` client errors are back to normal."
@@ -191,6 +196,9 @@ def _format_client_errors(event: str, service_name: str, route: str, details: di
     release = _release_line(details.get("release_context") or {})
     if release:
         lines.append(release)
+    traces = _traces_line(details)
+    if traces:
+        lines.append(traces)
     return "\n".join(lines)
 
 
@@ -229,6 +237,9 @@ def format_text(event: str, service_name: str, route: str, details: dict, dashbo
         if top:
             line += " — most: " + ", ".join(f"`{c['consumer_id']}` ({c['errors']})" for c in top[:3])
         lines.append(line)
+    traces = _traces_line(details)
+    if traces:
+        lines.append(traces)
     if dashboard_url:
         lines.append(f"<{dashboard_url}|Open dashboard>")
     return "\n".join(lines)

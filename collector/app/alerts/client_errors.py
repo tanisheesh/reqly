@@ -20,6 +20,7 @@ import asyncpg
 
 from ..insights.anomaly_detection import Z_THRESHOLD, _poisson_upper_tail
 from ..insights.deploys import add_release_context
+from ..traces import add_trace_ids
 from . import actions, notifier
 from .hourly import BASELINE_WEEKS, apply_detections
 
@@ -121,6 +122,7 @@ async def check_service(
     if findings:
         # Was a new release behind it? The usual cause of a sudden 401/422 wave.
         await add_release_context(pool, service_name, findings)
+        await add_trace_ids(pool, service_name, findings)
         for extra in enrich or ():
             await extra(pool, service_name, findings)
     events = await apply_detections(pool, service_name, hour, findings, now, renotify_after, kind=KIND)

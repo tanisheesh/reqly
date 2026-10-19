@@ -112,6 +112,8 @@ export interface Anomaly {
   release_context?: ReleaseContext | null;
   hints?: Hint[];
   affected_consumers?: AffectedConsumers;
+  trace_ids?: string[]; // collector 0.14+: failed or slow requests of that hour
+  trace_urls?: string[]; // with TRACE_URL_TEMPLATE
 }
 
 export interface AffectedConsumers {
@@ -215,6 +217,8 @@ export interface ClientErrorAlertDetails extends ClientErrorStatus {
   day_of_week: string;
   hour_range: string;
   release_context?: ReleaseContext | null;
+  trace_ids?: string[];
+  trace_urls?: string[];
 }
 
 export interface AlertMute {

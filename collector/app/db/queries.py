@@ -25,13 +25,14 @@ EVENT_COLUMNS: tuple[str, ...] = (
     "llm_model",
     "llm_input_tokens",
     "llm_output_tokens",
+    "trace_id",
 )
 _TIME_INDEX = EVENT_COLUMNS.index("time")
 
 # Postgres type of each EVENT_COLUMNS entry, for the unnest() bulk insert.
 _COLUMN_TYPES = (
     "uuid", "timestamptz", "text", "text", "text", "smallint", "float8", "boolean", "text", "text",
-    "text", "text", "text", "bigint", "bigint", "text", "integer", "integer",
+    "text", "text", "text", "bigint", "bigint", "text", "integer", "integer", "text",
 )
 assert len(_COLUMN_TYPES) == len(EVENT_COLUMNS)
 

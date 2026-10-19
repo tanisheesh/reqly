@@ -24,6 +24,7 @@ from ..consumers.queries import add_affected_consumers
 from ..insights.anomaly_detection import detect_anomalies
 from ..insights.deploys import add_release_context
 from ..insights.hints import add_hints
+from ..traces import add_trace_ids
 from . import actions, notifier
 
 logger = logging.getLogger("reqly.collector")
@@ -153,7 +154,7 @@ async def check_service(
         a.to_dict()
         for a in detect_anomalies(rows, now=hour + timedelta(hours=1), recent_window=timedelta(hours=1))
     ]
-    for enrich in (add_release_context, add_hints, add_affected_consumers):
+    for enrich in (add_release_context, add_hints, add_affected_consumers, add_trace_ids):
         try:
             await enrich(pool, service_name, anomalies)
         except Exception:

@@ -1,6 +1,7 @@
 import { Anomaly, ClientErrorAlertDetails, LlmCostAlertDetails, SloAlertDetails } from "../api/client";
 import { useAlerts } from "../hooks/useMetrics";
 import { AlertActions } from "./AlertActions";
+import { TraceLinks } from "./TraceLinks";
 import { formatMs, formatPercent, formatUsd } from "../format";
 
 export function AlertsBanner({ serviceName }: { serviceName: string }) {
@@ -58,6 +59,7 @@ export function AlertsBanner({ serviceName }: { serviceName: string }) {
                     {c.release_context.previous_release && <> (previous {c.release_context.previous_release})</>}
                   </div>
                 )}
+                <TraceLinks ids={c.trace_ids} urls={c.trace_urls} />
                 <AlertActions alert={a} />
               </li>
             );
@@ -128,6 +130,7 @@ export function AlertsBanner({ serviceName }: { serviceName: string }) {
                   )}
                 </div>
               )}
+              <TraceLinks ids={d.trace_ids} urls={d.trace_urls} />
               <AlertActions alert={a} />
             </li>
           );
