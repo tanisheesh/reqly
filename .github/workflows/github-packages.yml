@@ -43,13 +43,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [reqly-collector, reqly-dashboard]
+        image: [reqly-collector, reqly-dashboard, reqly]
         arch: [amd64, arm64]
         include:
           - image: reqly-collector
             context: collector
+            file: collector/Dockerfile
           - image: reqly-dashboard
             context: dashboard
+            file: dashboard/Dockerfile
+          - image: reqly
+            context: .
+            file: deploy/all-in-one/Dockerfile
           - arch: amd64
             runner: ubuntu-latest
           - arch: arm64
@@ -76,6 +81,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
           platforms: linux/${{ matrix.arch }}
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }},push-by-digest=true,name-canonical=true,push=true
@@ -107,6 +113,8 @@ jobs:
             description: Reqly collector — ingest, OTLP, metrics, alerts, SLOs and Ask Reqly API
           - image: reqly-dashboard
             description: Reqly dashboard — set REQLY_COLLECTOR_URL and REQLY_READ_KEY at run time
+          - image: reqly
+            description: Reqly all-in-one — the collector serving the dashboard on one port
     steps:
       - uses: actions/checkout@v7
 

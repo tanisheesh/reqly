@@ -1,0 +1,11 @@
+# Build context is the repository root; send only what the image needs.
+*
+!collector/requirements.txt
+!collector/pyproject.toml
+!collector/app/**
+!collector/migrations/**
+!dashboard/**
+dashboard/node_modules
+dashboard/dist
+**/__pycache__
+**/*.tsbuildinfo

@@ -81,6 +81,7 @@ The database must be TimescaleDB with the Toolkit: the `timescale/timescaledb-ha
 
 | Variable | Default | Notes |
 |---|---|---|
+| `DASHBOARD_DIR` | empty (set in the all-in-one image) | The collector serves the built dashboard from this directory on its own origin ([all-in-one](deploy.md#all-in-one-two-containers)) |
 | `VITE_COLLECTOR_URL` | `http://localhost:8000` | Collector URL **as seen from the browser**, at build time |
 | `VITE_READ_KEY` | `demo-read-key` | At build time |
 | `REQLY_COLLECTOR_URL` / `REQLY_READ_KEY` | — | The same two settings at run time, for the prebuilt image |

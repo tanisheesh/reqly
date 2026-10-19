@@ -83,6 +83,7 @@ class Settings:
     metrics_enabled: bool
     metrics_token: str | None
     demo_mode: bool
+    dashboard_dir: str | None
 
     @property
     def llm_enabled(self) -> bool:
@@ -177,6 +178,8 @@ class Settings:
             metrics_enabled=_env_flag("METRICS_ENABLED", True),
             metrics_token=os.environ.get("METRICS_TOKEN") or None,
             demo_mode=demo_mode,
+            # All-in-one: serve the built dashboard from this directory.
+            dashboard_dir=os.environ.get("DASHBOARD_DIR") or None,
         )
 
     def missing_keys(self) -> list[str]:

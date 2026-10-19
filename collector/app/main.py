@@ -12,6 +12,7 @@ from slowapi.errors import RateLimitExceeded
 
 from .body_limit import BodySizeLimitMiddleware
 from .config import settings
+from .dashboard import mount_dashboard
 from .db.late_data import run_refresh_loop
 from .db.pool import close_pool, create_pool, get_pool
 from .insights.scheduler import start_scheduler
@@ -114,3 +115,8 @@ async def ready():
     except Exception:
         return JSONResponse({"status": "unavailable", "database": "unreachable"}, status_code=503)
     return {"status": "ready", "database": "ok"}
+
+
+# Last, so every API route above matches first.
+if settings.dashboard_dir:
+    mount_dashboard(app, settings.dashboard_dir)
