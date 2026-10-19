@@ -21,7 +21,7 @@ A valid key used for something its scopes don't allow gets **403**; an unknown k
 
 ## Turn on sign-in
 
-For a shared collector, turn the public dashboard off and create the first admin:
+Outside demo mode (collector 0.14+) the dashboard already needs a sign-in: `PUBLIC_DASHBOARD` defaults to `false`. Docker Compose runs in demo mode, where it defaults to `true`; for a shared collector, turn it off and create the first admin:
 
 ```bash
 PUBLIC_DASHBOARD=false
@@ -35,6 +35,8 @@ The admin is created at start-up when there are no users yet. More users, and pa
 docker compose exec collector python -m app.users create-user alice           # add --admin for an admin
 docker compose exec collector python -m app.users set-password alice
 ```
+
+Both ask for the password in the terminal; in a script, pass it in `REQLY_NEW_PASSWORD` instead (never as an argument, where it would land in the shell history).
 
 Passwords are hashed with argon2id. A sign-in is a bearer session (7 days by default, `SESSION_TTL_HOURS`); changing a password ends all of that user's sessions.
 

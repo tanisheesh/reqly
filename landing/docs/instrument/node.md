@@ -168,10 +168,12 @@ process.on("SIGTERM", async () => {
 - **Fail-open:** nothing the SDK does can throw into your request path. An internal error disables instrumentation and logs once.
 - **Non-blocking:** events are queued in memory and sent in batches by a timer that never keeps the process alive. The queue is bounded, and the oldest events are dropped first.
 - **Retries:** 408, 429, 5xx and network errors are retried with backoff. Other 4xx responses drop the batch.
+- **Compressed:** batches above 1 KB are gzipped, on libuv's thread pool rather than your event loop. A collector before 0.13 that can't read gzip gets the batch again as plain JSON, and the client stops compressing.
 - **Abandoned requests:** a request the client gives up on before the response finishes is recorded as `499` (client closed request), not as an error.
 
 ## Runtimes
 
 - **Node.js 20+**: every integration.
+- **Collector**: consumer and LLM views need 0.8.0+, `pushOpenapi` 0.7.0+, gzip and per-model LLM cost 0.13.0+ (older ones get plain JSON), trace ids 0.14.0+.
 - **Bun**: Hono on `Bun.serve` and `reqlyHttp` on Bun's node:http are tested in CI.
 - **Cloudflare Workers, Deno Deploy and other edge runtimes**: not supported yet. A Worker can't keep a background flush timer between requests, so use [OpenTelemetry](opentelemetry.md) there.

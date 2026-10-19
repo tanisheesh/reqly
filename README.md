@@ -26,14 +26,14 @@
   <img src="https://img.shields.io/badge/React-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React">
   <img src="https://img.shields.io/badge/TimescaleDB-FDB515?style=flat-square&logo=postgresql&logoColor=black" alt="TimescaleDB">
   <img src="https://img.shields.io/badge/OpenTelemetry-000000?style=flat-square&logo=opentelemetry&logoColor=white" alt="OpenTelemetry">
-  <img src="https://img.shields.io/badge/Groq-F55036?style=flat-square" alt="Groq">
+  <img src="https://img.shields.io/badge/LLM-any_OpenAI--compatible-412991?style=flat-square" alt="Any OpenAI-compatible LLM">
   <img src="https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker">
   <a href="#license"><img src="https://img.shields.io/badge/license-AGPL--3.0_%C2%B7_SDKs_MIT-06b6d4?style=flat-square" alt="License: AGPL-3.0, SDKs MIT"></a>
 </p>
 
 ## What is Reqly?
 
-Reqly watches every request your APIs serve and explains problems instead of just charting them: when a route starts failing it says which release was running, which host or client the errors came from, and whether you are burning your error budget — and you can ask it why in plain English. It is a lightweight, self-hosted alternative to Datadog-style APMs for teams that want their data on their own Postgres: one `docker compose up` (or `helm install`), a one-line SDK, or plain OpenTelemetry.
+Reqly watches every request your APIs serve and explains problems instead of just charting them: when a route starts failing it says which release was running, which host or client the errors came from, and whether you are burning your error budget — and you can ask it why in plain English. It is a lightweight, self-hosted alternative to Datadog-style APMs for teams that want their data on their own Postgres: one `docker compose up` (or `helm install`, or a single all-in-one container), a one-line SDK, or plain OpenTelemetry.
 
 ```python
 import reqly
@@ -47,10 +47,10 @@ reqly.instrument(app, service_name="checkout-api")   # FastAPI, Flask, Django, S
 ## What you get
 
 - **Metrics that are right** — p50/p95/p99 per route and per service from mergeable percentile sketches, error rates, status codes, deploy markers and per-release health
-- **It explains what broke** — hourly alerts to Slack/Discord/webhooks against a weekday × hour baseline, with the release that was running, root-cause leads (*"92% of errors came from pod-7"*) and the clients that were hit; a weekly AI report narrates the findings
+- **It explains what broke** — hourly alerts against a weekday × hour baseline, for errors, latency and sudden 401/403/422/429 waves, with the release that was running, root-cause leads (*"92% of errors came from pod-7"*), the clients that were hit and traces to open; to Slack, Discord, Teams, PagerDuty, Opsgenie, email or webhooks, acknowledged or muted from the dashboard; a weekly AI report narrates the findings
 - **Ask Reqly** — *"why did /orders start failing?"* answered from the collector's own data through read-only query tools, with every query shown and any number not found in the results flagged
-- **API-level depth** — SLOs with burn-rate alerts, OpenAPI drift (undocumented, unused and deprecated-but-used endpoints), API consumers, and LLM token cost per route with alerts when it spikes
-- **Any stack, small footprint** — Python SDK, Node.js SDK (Express, Fastify, Hono, Koa, NestJS) or OTLP from any language; the SDKs add ~5–33 µs per request ([benchmark](bench/README.md)) and never crash your app; projects, per-team API keys and sign-in for shared collectors
+- **API-level depth** — SLOs with burn-rate alerts, OpenAPI drift (undocumented, unused and deprecated-but-used endpoints), API consumers, and LLM token cost per route and model (counted straight from your OpenAI or Anthropic client) with alerts when it spikes
+- **Any stack, small footprint** — Python SDK, Node.js SDK (Express, Fastify, Hono, Koa, NestJS) or OTLP from any language; the SDKs add ~6–33 µs per request ([benchmark](bench/README.md)) and never crash your app; projects, per-team API keys and sign-in for shared collectors; safe by default, with Prometheus metrics for the collector itself
 
 
 ## Stack
@@ -62,7 +62,7 @@ reqly.instrument(app, service_name="checkout-api")   # FastAPI, Flask, Django, S
 | Database | TimescaleDB (pg16, Toolkit) · hypertables · continuous aggregates · UddSketch |
 | Dashboard | React 19 · Vite · TypeScript · Tailwind CSS 4 · Recharts · TanStack Query |
 | AI | Any OpenAI-compatible API (Groq by default; OpenAI, OpenRouter, Ollama) · gpt-oss-120b (tool calling) · statistics-first anomaly detection |
-| Infra | Docker Compose · Helm chart · EC2 (TimescaleDB) · Render · GHCR images · PyPI / npm trusted publishing |
+| Infra | Docker Compose · Helm chart · all-in-one image · EC2 (TimescaleDB) · Render · GHCR images · PyPI / npm trusted publishing · CI with ruff, mypy, vitest and an end-to-end test |
 
 
 ## Engineering Decisions
@@ -79,8 +79,11 @@ The read key ships in the dashboard, so generated SQL would make it a SQL consol
 **Why measure SDK overhead?**
 "Zero overhead" was a claim; the benchmark made it a number — and found a Node bug that sent one collector request per app request under steady traffic, plus Python work that could move off the request path (overhead halved).
 
+**Why claim scheduled runs in the database?**
+Every collector runs the scheduler. Each run first inserts its (job, slot) row, and only the one whose insert lands goes ahead, so a rolling deploy or a stray second replica can't send alerts twice or pay for the weekly AI report twice, whatever the timing.
+
 **What would you do differently in v2?**
-Build the alert and SLO evaluation for several collector instances from the start: the scheduler and rate limits assume one instance today, which is fine for self-hosting but caps horizontal scaling.
+Design rate limits and the Ask Reqly budget as shared state from the start: they're per process today, which is fine for self-hosting but caps horizontal scaling.
 
 
 ## Docs

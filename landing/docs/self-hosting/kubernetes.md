@@ -75,6 +75,9 @@ secrets:
   groqApiKey: "gsk_..."                     # weekly AI report and Ask Reqly
   # or llmApiKey, with LLM_BASE_URL / LLM_MODEL under collector.config
   slackWebhookUrl: "https://hooks.slack.com/services/..."
+  # also: discordWebhookUrl, teamsWebhookUrl, webhookUrl, pagerdutyRoutingKey,
+  # opsgenieApiKey, smtpPassword, resendApiKey (email: ALERT_EMAIL_TO / ALERT_EMAIL_FROM /
+  # SMTP_HOST under collector.config)
 ```
 
 Any other collector setting goes under `collector.config` (plain values) or `collector.extraEnv`. Every setting is listed in [Configuration](configuration.md).
@@ -95,7 +98,7 @@ The database must be TimescaleDB with the Toolkit. The collector applies its mig
 
 | Resource | Notes |
 |---|---|
-| Collector Deployment + Service | Always **1 replica** with the `Recreate` strategy: rate limits, the Ask Reqly budget and caches are per process. (Scheduled checks are claimed in the database, so even two replicas run each once.) Probes on `/v1/health`; the startup probe allows a few minutes for migrations. With the bundled database, an init container waits until it accepts connections |
+| Collector Deployment + Service | Always **1 replica** with the `Recreate` strategy: rate limits, the Ask Reqly budget and caches are per process. (Scheduled checks are claimed in the database, so even two replicas run each once.) Liveness and startup probes on `/v1/health` (the startup probe allows a few minutes for migrations), readiness on `/v1/ready`, so a collector that loses its database leaves the Service without restarting. With the bundled database, an init container waits until it accepts connections |
 | Dashboard Deployment + Service | Static; scale with `dashboard.replicas` |
 | TimescaleDB StatefulSet + Service | One instance with a `10Gi` PersistentVolumeClaim (`timescaledb.persistence`) |
 | Secret | Keys, the database URL and optional secrets. Generated values survive `helm upgrade` |
@@ -114,7 +117,9 @@ Pods run as a non-root user (uid 1000). Pods restart when the chart's config or 
 | `dashboard.collectorUrl` | from the ingress, else `http://localhost:8000` | The URL the browser calls |
 | `timescaledb.enabled` | `true` | `false` with `externalDatabaseUrl` |
 | `timescaledb.persistence.size` | `10Gi` | Raw events are kept 14 days, aggregates 90–180 |
-| `secrets.*` | generated / empty | See above |
+| `secrets.*` | generated / empty | `ingestKey`, `readKey` (generated when empty) and the optional ones above |
+| `collector.extraEnv` | `[]` | More environment entries, e.g. from your own Secrets |
+| `*.nodeSelector` / `*.tolerations` / `*.affinity`, `imagePullSecrets`, `*.image.pullPolicy` | empty / `IfNotPresent` | The usual scheduling and image settings, per component |
 | `ingress.*` | disabled | |
 
 The full list with comments is in [`values.yaml`](https://github.com/tanisheesh/reqly/blob/main/deploy/helm/reqly/values.yaml).

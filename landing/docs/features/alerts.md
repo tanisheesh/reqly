@@ -21,6 +21,7 @@ Each alert includes:
 - **release context:** the release that was running and, for a new one, before/after numbers against the previous release
 - **root-cause hints**
 - **affected consumers**, if [consumer tracking](consumers.md) is on
+- **sample [traces](#traces)** from that hour, when requests carry a trace id
 
 An alert from the demo data:
 
@@ -33,7 +34,7 @@ An alert from the demo data:
 
 ### Lifecycle
 
-- **One open alert per route.** A new detection opens one and sends a notification.
+- **One open alert per route and kind** (anomaly, client errors, LLM cost, SLO). A new detection opens one and sends a notification.
 - **Reminders:** while it keeps firing, a reminder goes out every `ALERT_RENOTIFY_HOURS` (default 6).
 - **Resolved:** after 2 clean hours the alert resolves, with a final message.
 - Open alerts are shown on the dashboard. `GET /v1/alerts?status=all` also returns recent resolved ones.
@@ -45,8 +46,8 @@ On the dashboard, a signed-in user sees these under each open alert. They only c
 | Action | Effect | API |
 |---|---|---|
 | **Acknowledge** | Someone is on it: no more reminders. The resolve message still goes out | `POST /v1/alerts/{id}/acknowledge` |
-| **Silence** | No notifications at all for this alert for 1-168 hours (`0` lifts it) | `POST /v1/alerts/{id}/silence {"hours": 4}` |
-| **Mute** | No notifications for a service, one of its routes, or one kind of alert (`anomaly`, `client_errors`, `llm_cost`, `slo`), for up to 30 days. New alerts still open and show | `POST /v1/alert-mutes {"service_name", "route"?, "kind"?, "hours", "reason"?}`; `GET` lists active ones, `DELETE /v1/alert-mutes/{id}` ends one |
+| **Silence** | No notifications at all for this alert for up to 168 hours (`0` lifts it). The dashboard offers 1, 4 and 24 hours | `POST /v1/alerts/{id}/silence {"hours": 4}` |
+| **Mute** | No notifications for a service, one of its routes, or one kind of alert (`anomaly`, `client_errors`, `llm_cost`, `slo`), for up to 30 days. New alerts still open and show. The dashboard's "Mute route 24h" mutes the alert's route | `POST /v1/alert-mutes {"service_name", "route"?, "kind"?, "hours", "reason"?}`; `GET` lists active ones, `DELETE /v1/alert-mutes/{id}` ends one |
 
 The public read key can't do any of these: they need a signed-in user with access to the service's project, or a key with the `admin` scope.
 

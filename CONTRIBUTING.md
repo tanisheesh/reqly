@@ -38,6 +38,9 @@ Dashboard on http://localhost:5173, collector API docs on http://localhost:8000/
 | `landing/` | reqly.tanisheesh.in and the docs site (`landing/docs/`, served at `/docs/`) | HTML, MkDocs Material |
 | `infra/` | EC2 bootstrap for the database, AWS deploy guide | shell |
 | `deploy/helm/reqly/` | Helm chart (`helm lint` runs in CI) | Helm |
+| `deploy/all-in-one/` | The all-in-one image (collector serving the dashboard) and its compose file | Docker |
+| `e2e/` | End-to-end test: both SDKs → a collector process → TimescaleDB → the API | Python, Node |
+| `examples/` | Example apps (OpenTelemetry → Reqly) | various |
 
 ---
 
@@ -110,7 +113,8 @@ Commits follow an emoji-prefixed format:
 |---|---|---|
 | ✨ | New feature | `✨ sdk: add consumer tracking` |
 | 🐛 | Bug fix that affects users | `🐛 #42 collector: refuse events older than the raw retention` |
-| 🎊 | Improvement | `🎊 sdk: halve the per-request overhead` |
+| 🎊 | Improvement | `🎊 dashboard: show trace links on alerts` |
+| ⚡ | Performance | `⚡ ingest: insert a batch in one unnest() statement` |
 | ♻️ | Refactor, no behaviour change | `♻️ extract scoring into its own module` |
 | 🧪 | Tests only | `🧪 cover otlp spans without http.route` |
 | 📚 | Docs only | `📚 update architecture for projects and keys` |
@@ -130,7 +134,7 @@ Breaking changes add a line `🚨 BREAKING CHANGE: <what breaks>` in the commit 
 ## Code style
 
 - Follow the existing file structure and patterns. `.editorconfig` sets indentation (4 spaces for Python, 2 for TypeScript) and line endings.
-- Python: snake_case, type hints on public functions. TypeScript: camelCase, strict mode.
+- Python: snake_case, type hints on public functions; `ruff check` and `mypy` pass (CI runs both). TypeScript: camelCase, strict mode, no unused locals or parameters.
 - The SDKs must never raise into the host app, and must never capture request bodies, query strings or headers.
 - No secrets in code. `.env*` stays gitignored; add new variables to `.env.example` (names only) and to `docs/SETUP.md`.
 - Update docs when behaviour, setup or env vars change: in the same PR as the code they describe. User-facing docs live in `landing/docs/` (preview with `cd landing && pip install -r requirements-docs.txt && mkdocs serve`); design docs in `docs/`.
@@ -140,7 +144,7 @@ Breaking changes add a line `🚨 BREAKING CHANGE: <what breaks>` in the commit 
 ## Pull request checklist
 
 - [ ] Branch is up to date with `main`
-- [ ] Tests (and the dashboard build) pass locally for the parts you touched
+- [ ] Tests, `ruff`, `mypy` and the dashboard build pass locally for the parts you touched
 - [ ] Commits follow the format above
 - [ ] Docs / `.env.example` / `CHANGELOG.md` updated if needed
 - [ ] PR description explains **what** and **why**

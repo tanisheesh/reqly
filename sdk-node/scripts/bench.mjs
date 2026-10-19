@@ -10,6 +10,7 @@
 
 import { createServer, Agent, request as httpRequest } from "node:http";
 import { writeFileSync } from "node:fs";
+import { gunzipSync } from "node:zlib";
 import os from "node:os";
 
 import express from "express";
@@ -29,10 +30,12 @@ const ROUNDS = Number(opt("rounds", 10));
 // --- stand-in collector -----------------------------------------------------------
 let shipped = 0;
 const sink = createServer((req, res) => {
-  let body = "";
-  req.on("data", (c) => (body += c));
+  const chunks = [];
+  req.on("data", (c) => chunks.push(c));
   req.on("end", () => {
-    shipped += JSON.parse(body).events.length;
+    const raw = Buffer.concat(chunks); // batches above 1 KB arrive gzipped (SDK 0.4+)
+    const body = req.headers["content-encoding"] === "gzip" ? gunzipSync(raw) : raw;
+    shipped += JSON.parse(body.toString()).events.length;
     res.writeHead(202).end("{}");
   });
 });

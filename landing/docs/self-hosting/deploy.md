@@ -60,7 +60,7 @@ docker run -d -p 8000:8000 \
   -e REQLY_INGEST_KEY=... \
   -e REQLY_READ_KEY=... \
   -e CORS_ORIGINS=https://reqly-dashboard.example.com \
-  ghcr.io/tanisheesh/reqly-collector:0.10.0
+  ghcr.io/tanisheesh/reqly-collector:0.14.2
 ```
 
 Images are built for linux/amd64 and arm64. Pin a version rather than `latest`.
@@ -86,7 +86,7 @@ Check it with `GET /v1/health`, which returns `{"status": "ok"}`, and `GET /v1/r
     docker run -d -p 5173:5173 \
       -e REQLY_COLLECTOR_URL=https://reqly.example.com \
       -e REQLY_READ_KEY=... \
-      ghcr.io/tanisheesh/reqly-dashboard:0.10.0
+      ghcr.io/tanisheesh/reqly-dashboard:0.14.2
     ```
 
 === "Static host"
@@ -102,18 +102,18 @@ Add the dashboard's URL to the collector's `CORS_ORIGINS`.
 
 ## Verify
 
-- [ ] `GET /v1/health` returns 200
+- [ ] `GET /v1/ready` returns `{"status": "ready", "database": "ok"}`
 - [ ] Send traffic from an instrumented app; the service appears on the dashboard within a minute or two
 - [ ] With an LLM configured, Ask Reqly answers a question
-- [ ] A test alert reaches your Slack, Discord or webhook
+- [ ] A test alert reaches your channels (Slack, Discord, Teams, PagerDuty, Opsgenie, email or webhook)
 
 ## Upgrade and roll back
 
-- **Upgrade:** run the new collector image. Pending migrations apply on start-up.
+- **Upgrade:** run the new collector image. Pending migrations apply on start-up. Read the [changelog](https://github.com/tanisheesh/reqly/blob/main/CHANGELOG.md) first: 0.14.0 changed the defaults outside demo mode (keys required, sign-in, no CORS).
 - **Roll back:** run the previous image tag. Migrations are forward-only, so an older collector keeps working on a newer schema only when the change was additive. Back up the database before upgrading across several versions.
 
 ## Limits to know
 
-- **One collector instance:** the scheduler, rate limits and caches are per process.
+- **One collector instance:** rate limits, the Ask Reqly budget and caches are per process. (Scheduled checks are claimed in the database, so a second instance during a rolling deploy doesn't repeat them.)
 - **Freshness:** the most recent ~1 minute of data isn't in the aggregates yet.
 - **Public dashboard:** with `PUBLIC_DASHBOARD` on, anyone with the dashboard URL can read every project. It's meant for demos.

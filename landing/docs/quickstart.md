@@ -5,7 +5,7 @@ description: Run Reqly locally with Docker Compose and instrument your first app
 
 # Quickstart
 
-Run the full stack locally, then point an app at it. You need Docker with Compose, plus Python 3.9+ or Node 20+ for the app you instrument.
+Run the full stack locally, then point an app at it. You need Docker with Compose 2.24+, plus Python 3.9+ or Node 20+ for the app you instrument.
 
 ## 1. Start the stack
 
@@ -15,7 +15,7 @@ cd reqly
 docker compose up -d
 ```
 
-No `.env` is needed; the defaults work locally. The first build takes a couple of minutes. Compose starts four containers:
+No `.env` is needed: Compose runs the collector in demo mode (`REQLY_DEMO_MODE=true`), with the public demo keys and a dashboard anyone can open. Outside demo mode the collector requires its keys and a sign-in, see [Deploy](self-hosting/deploy.md). The first build takes a couple of minutes. Compose starts four containers:
 
 | Container | Address | What it does |
 |---|---|---|
@@ -91,10 +91,10 @@ Copy `.env.example` to `.env` and set what you need, then `docker compose up -d`
 ```bash
 GROQ_API_KEY=gsk_...                 # AI weekly report and Ask Reqly (free key: console.groq.com/keys)
 # or any OpenAI-compatible API: LLM_BASE_URL=... LLM_API_KEY=... LLM_MODEL=...
-ALERT_SLACK_WEBHOOK_URL=https://...  # or ALERT_DISCORD_WEBHOOK_URL / ALERT_WEBHOOK_URL
+ALERT_SLACK_WEBHOOK_URL=https://...  # or Discord, Teams, PagerDuty, Opsgenie, email, a webhook
 ```
 
-Without an LLM, the weekly report is a plain statistical summary and Ask Reqly is off. Every setting is listed in [Configuration](self-hosting/configuration.md).
+Without an LLM, the weekly report is a plain statistical summary and Ask Reqly is off. Every setting is listed in [Configuration](self-hosting/configuration.md), and the alert channels in [Alerts](features/alerts.md#channels).
 
 ## Stop or reset
 

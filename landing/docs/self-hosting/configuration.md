@@ -48,7 +48,7 @@ The weekly report and Ask Reqly use any OpenAI-compatible chat completions API: 
 
 | Variable | Default | Notes |
 |---|---|---|
-| `ALERTS_ENABLED` | `true` | Hourly anomaly check at :15 |
+| `ALERTS_ENABLED` | `true` | The hourly anomaly, client error and LLM cost checks at :15 and the SLO check every 5 minutes. `false` turns them all off |
 | `ALERT_SLACK_WEBHOOK_URL` | empty | |
 | `ALERT_DISCORD_WEBHOOK_URL` | empty | |
 | `ALERT_WEBHOOK_URL` | empty | Generic JSON webhook ([payload](../features/alerts.md#channels)) |
@@ -63,7 +63,7 @@ The weekly report and Ask Reqly use any OpenAI-compatible chat completions API: 
 | `TRACE_URL_TEMPLATE` | empty | Link for a trace id in the dashboard's alerts, with `{trace_id}` where it goes (Tempo, Jaeger, Sentry) |
 | `CLIENT_ERROR_ALERT_STATUSES` | `401,403,422,429` | 4xx codes whose sudden spikes on a route open an [alert](../features/alerts.md#client-error-alerts). Empty turns them off |
 | `LLM_COST_ALERT_MIN_USD` | `1.0` | The smallest extra LLM spend per route-hour, in USD, worth an [alert](../features/alerts.md#llm-cost-alerts). `0` turns LLM cost alerts off. The local Compose stack uses `0.4` |
-| `DASHBOARD_URL` | `http://localhost:5173` | Linked from Slack alerts |
+| `DASHBOARD_URL` | empty (`http://localhost:5173` in Compose) | The dashboard's address, linked from alert messages. Empty: no link |
 | `INSIGHTS_SCHEDULER_ENABLED` | `true` | `false` turns off the weekly insights report |
 | `LATE_DATA_REFRESH_SECONDS` | `60` | How often late-arriving events are materialized into the aggregates |
 
@@ -73,6 +73,7 @@ The weekly report and Ask Reqly use any OpenAI-compatible chat completions API: 
 |---|---|---|
 | `DATABASE_URL` | set by Compose | `postgresql://reqly:<password>@<host>:5432/reqly`. Add `?sslmode=require` for a remote database |
 | `POSTGRES_PASSWORD` | `localdev` | Local Compose only |
+| `DB_POOL_MIN_SIZE` / `DB_POOL_MAX_SIZE` | `2` / `10` | The collector's database connection pool. Raise the maximum for heavy ingest or many dashboard users; keep it under the database's `max_connections` |
 
 The database must be TimescaleDB with the Toolkit: the `timescale/timescaledb-ha:pg16` image includes both. The collector applies its migrations on start-up.
 
@@ -101,5 +102,6 @@ The database must be TimescaleDB with the Toolkit: the `timescale/timescaledb-ha
 |---|---|---|
 | `BACKFILL_WEEKS` | `8` | Weeks of synthetic history the load generator creates on first run |
 | `BACKFILL_EVENTS_PER_HOUR` | `30` | Synthetic events per hour during the backfill |
+| `LIVE_RPS` | `2` | Live requests per second the load generator sends after the backfill |
 
 SDK settings (`REQLY_SERVICE_NAME`, `REQLY_API_KEY`, …) are listed on the [Python](../instrument/python.md#configuration) and [Node.js](../instrument/node.md#configuration) pages.

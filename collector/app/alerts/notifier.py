@@ -203,8 +203,10 @@ def _format_client_errors(event: str, service_name: str, route: str, details: di
 
 
 def format_text(event: str, service_name: str, route: str, details: dict, dashboard_url: str | None = None) -> str:
-    """One plain-text message used for Slack and Discord (both render the
-    *bold* / `code` subset the same way closely enough)."""
+    """The one message every channel is built from: sent as is to Slack and
+    Discord (both render the *bold* / `code` subset closely enough), turned
+    into an Adaptive Card for Teams, and stripped of markup for PagerDuty,
+    Opsgenie and email."""
     service_name, route, details = _clean(service_name), _clean(route), _clean(details)
     if details.get("kind") in ("slo", "llm_cost", "client_errors"):
         if details["kind"] == "slo":

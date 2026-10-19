@@ -21,6 +21,12 @@ services:
   collector:
     build:
       context: ./collector
+    # Every setting in .env reaches the collector (Compose 2.24+). The entries
+    # under `environment` set the local demo's defaults and take precedence;
+    # most of them read the same variable from .env.
+    env_file:
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: postgresql://reqly:${POSTGRES_PASSWORD:-localdev}@timescaledb:5432/reqly
       # The local stack is a demo: public demo keys, public dashboard, CORS *.

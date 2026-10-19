@@ -709,7 +709,7 @@
         <div>
           <div class="hero-badge">
             <span class="hero-badge-dot"></span>
-            Python SDK 0.5 · Node SDK 0.3 · Open source
+            Python SDK 0.7 · Node SDK 0.5 · Open source
           </div>
           <h1>API monitoring that tells you <em>what broke</em> — and which deploy did it</h1>
           <p class="hero-sub">
@@ -904,7 +904,7 @@ app.<span class="fn">use</span>(<span class="fn">reqlyExpress</span>({ serviceNa
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
           </div>
           <div class="card-title">Deploy-aware alerts</div>
-          <div class="card-desc">Hourly checks against each route's weekday × hour baseline. Slack, Discord or a webhook — with the release, the host and the clients behind it.</div>
+          <div class="card-desc">Hourly checks against each route's weekday × hour baseline, 401/403 waves included — with the release, the host, the clients and the traces behind it. Slack, Discord, Teams, PagerDuty, Opsgenie or email; acknowledge or mute from the dashboard.</div>
           <div class="err-gauge">
             <div class="err-gauge-val"><span id="mn-err">0.8</span>%</div>
             <div class="err-gauge-sub">error rate · /checkout · last hour</div>
@@ -972,7 +972,7 @@ app.<span class="fn">use</span>(<span class="fn">reqlyExpress</span>({ serviceNa
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
           </div>
           <div class="card-title">LLM cost per route</div>
-          <div class="card-desc">Record token usage where you call a model; see tokens and cost per route, model and day — and get an alert when a route's cost jumps, with what drove it.</div>
+          <div class="card-desc">Wrap your OpenAI or Anthropic client once; see tokens and cost per route, model and day — and get an alert when a route's cost jumps, with what drove it.</div>
         </div>
 
         <!-- teams -->
@@ -1005,7 +1005,7 @@ app.<span class="fn">use</span>(<span class="fn">reqlyExpress</span>({ serviceNa
         </div>
         <div class="pipe-card">
           <div class="pipe-card-title">Root-cause leads</div>
-          <div class="pipe-card-body">Errors concentrated on one host, environment, status code or error type relative to its traffic share — surfaced in alerts and reports.</div>
+          <div class="pipe-card-body">Errors concentrated on one host, environment, status code or error type relative to its traffic share — surfaced in alerts and reports, with the traces to open.</div>
         </div>
         <div class="pipe-card">
           <div class="pipe-card-title">Who it hit</div>
@@ -1089,7 +1089,7 @@ app.<span class="fn">use</span>(<span class="fn">reqlyExpress</span>({ serviceNa
     <span class="af-dash">[Dashboard]</span>            <span class="af-lmb">[Scheduler]</span>             <span class="af-coll">[Ask Reqly]</span>
   <span class="af-dim">React 19 · sign-in      hourly alerts · SLO      9 read-only tools</span>
   <span class="af-dim">settings · projects     burn rates · weekly      → LLM → verified</span>
-  <span class="af-dim">GET /v1/metrics/*       report → Slack/Discord   answer</span></pre></div>
+  <span class="af-dim">GET /v1/metrics/*       report → Slack, Teams…   answer</span></pre></div>
       </div>
       <p class="scroll-hint">← swipe to see the whole diagram →</p>
     </div>
@@ -1103,13 +1103,13 @@ app.<span class="fn">use</span>(<span class="fn">reqlyExpress</span>({ serviceNa
       <p class="section-sub">Time each SDK adds to a request (p50), same app with and without Reqly, consumer tracking on and the shipper running. Rerun in CI on every SDK change.</p>
       <div class="bench">
         <div class="bench-card">
-          <div class="bench-title">Python · reqly 0.5.5</div>
+          <div class="bench-title">Python · reqly 0.7</div>
           <div class="bench-row"><span class="bench-name">FastAPI</span><div class="bench-track"><div class="bench-fill" style="width:39%"></div></div><span class="bench-val">~13 µs</span></div>
           <div class="bench-row"><span class="bench-name">Starlette</span><div class="bench-track"><div class="bench-fill" style="width:45%"></div></div><span class="bench-val">~15 µs</span></div>
           <div class="bench-row"><span class="bench-name">Flask</span><div class="bench-track"><div class="bench-fill" style="width:100%"></div></div><span class="bench-val">~33 µs</span></div>
         </div>
         <div class="bench-card">
-          <div class="bench-title">Node.js · reqly-node 0.3.2</div>
+          <div class="bench-title">Node.js · reqly-node 0.5</div>
           <div class="bench-row"><span class="bench-name">Fastify</span><div class="bench-track"><div class="bench-fill" style="width:30%"></div></div><span class="bench-val">~10 µs</span></div>
           <div class="bench-row"><span class="bench-name">Hono</span><div class="bench-track"><div class="bench-fill" style="width:18%"></div></div><span class="bench-val">~6 µs</span></div>
           <div class="bench-row"><span class="bench-name">Express</span><div class="bench-track"><div class="bench-fill" style="width:82%"></div></div><span class="bench-val">~27 µs</span></div>
@@ -1130,11 +1130,11 @@ app.<span class="fn">use</span>(<span class="fn">reqlyExpress</span>({ serviceNa
           <thead><tr><th>Layer</th><th>Technology &amp; reason</th></tr></thead>
           <tbody>
             <tr><td>SDKs</td><td>Python 3.9+ — pure ASGI/WSGI middleware, httpx, background thread · Node.js 20+ — TypeScript, zero dependencies, ESM + CJS · OTLP/HTTP for everything else</td></tr>
-            <tr><td>Collector</td><td>FastAPI · asyncpg · APScheduler · Pydantic v2 · argon2 — async throughout, no ORM; native ingest plus an OTLP receiver</td></tr>
+            <tr><td>Collector</td><td>FastAPI · asyncpg · APScheduler · Pydantic v2 · argon2 — async throughout, no ORM; native ingest (gzip, one bulk insert per batch) plus an OTLP receiver; Prometheus metrics and JSON logs for itself</td></tr>
             <tr><td>Database</td><td>TimescaleDB (pg16, Toolkit) — hypertables, continuous aggregates, UddSketch percentiles</td></tr>
             <tr><td>Dashboard</td><td>React 19 · Vite · TypeScript · Tailwind CSS 4 · Recharts · TanStack Query</td></tr>
             <tr><td>AI</td><td>Any OpenAI-compatible API (Groq, OpenAI, OpenRouter, Ollama) · gpt-oss-120b by default, with tool calling — statistics first, the LLM explains and answers only from query results</td></tr>
-            <tr><td>Infra</td><td>Docker Compose · prebuilt images on GHCR (amd64 + arm64) · PyPI and npm trusted publishing</td></tr>
+            <tr><td>Infra</td><td>Docker Compose · Helm chart · prebuilt images on GHCR (amd64 + arm64), including an all-in-one collector + dashboard · PyPI and npm trusted publishing · CI with lint, type checks and an end-to-end test</td></tr>
           </tbody>
         </table>
       </div>

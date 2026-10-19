@@ -25,7 +25,7 @@ The read key ships in the dashboard, so letting a model write SQL would turn it 
 | `compare_periods` | The same stats for two periods side by side, optionally per route |
 | `get_breakdown` | Traffic and errors by host, environment, release, status code, error type, method or consumer |
 | `list_releases` | Releases with first/last seen, volume, error rate and p95 |
-| `get_alerts` | Open and recent alerts: anomalies, SLO burn and LLM cost spikes |
+| `get_alerts` | Open and recent alerts: anomalies, client error spikes, SLO burn and LLM cost spikes, with sample trace ids |
 | `get_slos` | SLOs with SLI, budget left and burn rates |
 | `get_api_drift` | Undocumented, unused and deprecated-but-called endpoints |
 | `get_consumers` | Top API consumers |

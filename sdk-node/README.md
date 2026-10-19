@@ -54,12 +54,12 @@ ESM and CommonJS (`require("reqly-node")`) both work.
 |---|---|
 | 📈 **Real percentiles** | p50 / p95 / p99 per route and per service, merged exactly across routes and time |
 | 🚀 **Deploy-aware** | The release is picked up from your CI or host (`GITHUB_SHA`, `RENDER_GIT_COMMIT`, …); every alert says which release was running |
-| 🔔 **Alerts that explain** | Hourly checks against each route's weekday × hour baseline, naming the host, error type and clients behind a spike; to Slack, Discord or a webhook |
+| 🔔 **Alerts that explain** | Hourly checks against each route's weekday × hour baseline, naming the host, error type and clients behind a spike, with sample trace ids; 401/403/422/429 waves too; to Slack, Discord, Teams, PagerDuty, Opsgenie, email or a webhook |
 | 💬 **Ask Reqly** | *"Why did /orders start failing?"* answered from your own data, every number checked |
 | 🎯 **SLOs** | Availability and latency objectives with error budgets and burn-rate alerts |
 | 🧾 **OpenAPI drift** | Undocumented, unused and deprecated-but-called endpoints (`pushOpenapi`) |
 | 👥 **API consumers** | Who calls your API and who an incident hit, with ids hashed in the SDK |
-| 💸 **LLM cost per route** | Tokens and cost per route and model, and an alert when it spikes |
+| 💸 **LLM cost per route** | Tokens and cost per route and model, counted straight from your OpenAI or Anthropic client, and an alert when it spikes |
 
 ## Your framework
 
@@ -164,7 +164,7 @@ or before `process.exit()`, `await reqly.client.shutdown()` first.
 | Runtimes | Node.js 20+, Bun. Edge runtimes (Cloudflare Workers): use [OpenTelemetry](https://reqly.tanisheesh.in/docs/instrument/opentelemetry/) |
 | Frameworks | Express 4/5 · Fastify 4/5 · Hono · Koa 2/3 · NestJS · node:http |
 | Modules | ESM and CommonJS, TypeScript types included |
-| Collector | consumer and LLM views need 0.8.0+, `pushOpenapi` 0.7.0+ |
+| Collector | consumer and LLM views need 0.8.0+, `pushOpenapi` 0.7.0+, gzip and per-model LLM cost 0.13.0+ (older ones get plain JSON), trace ids 0.14.0+ |
 
 On Python too? There's a [Python SDK](https://pypi.org/project/reqly/), and any language can
 report through [OpenTelemetry](https://reqly.tanisheesh.in/docs/instrument/opentelemetry/).

@@ -10,11 +10,12 @@ Companion to [PRD.md](PRD.md): the PRD says what Reqly does, this says how.
 |---|---|
 | Python SDK | Python 3.9+ · pure ASGI middleware (FastAPI, Starlette, Litestar) · Flask hooks · Django middleware · generic WSGI/ASGI wrappers · httpx · one background flush thread |
 | Node.js SDK | TypeScript, Node 20+, no runtime dependencies · Express / Fastify / Hono / Koa middleware, NestJS helper · `AsyncLocalStorage` · `fetch` |
-| Collector | FastAPI · Uvicorn · asyncpg · APScheduler 3 · slowapi · Pydantic v2 · argon2-cffi · opentelemetry-proto · httpx |
+| Collector | FastAPI · Uvicorn · asyncpg · APScheduler 3 · slowapi · Pydantic v2 · argon2-cffi · opentelemetry-proto · httpx · openai (any OpenAI-compatible API) · prometheus-client; dependencies hash-pinned in `requirements.txt` |
 | Database | TimescaleDB on PostgreSQL 16 (`timescale/timescaledb-ha`, with the Toolkit) · hypertables · continuous aggregates · UddSketch · retention policies |
 | Dashboard | React 19 · Vite · TypeScript · Tailwind CSS 4 · Recharts · TanStack Query |
 | AI | Any OpenAI-compatible API (Groq by default) · `openai/gpt-oss-120b` (reports and tool calling) · statistics-first detection (Poisson tail / z-score) |
-| Infra (local) | Docker Compose: timescaledb, collector, dashboard, load-generator |
+| Infra (local) | Docker Compose: timescaledb, collector, dashboard, load-generator (demo mode) |
+| Infra (all-in-one) | `ghcr.io/tanisheesh/reqly`: the collector serving the dashboard; `deploy/all-in-one/docker-compose.yml` adds TimescaleDB |
 | Infra (Kubernetes) | Helm chart `deploy/helm/reqly`: collector, dashboard, optional TimescaleDB StatefulSet; published to `oci://ghcr.io/tanisheesh/charts` |
 | Infra (live demo) | TimescaleDB on an EC2 t3.micro (TLS) · collector and dashboard on Render · GHCR images · PyPI and npm trusted publishing |
 
@@ -27,13 +28,17 @@ reqly/
   sdk/                   Python SDK (PyPI: reqly)
   sdk-node/              Node.js SDK (npm: reqly-node)
   collector/app/         FastAPI collector
-    routers/             ingest, otlp, metrics, alerts, slos, insights, ask, openapi, usage, projects, auth
+    routers/             ingest, otlp, metrics, alerts (+ on-call actions), slos, insights, ask, openapi, usage, projects, auth
     db/                  pool + migrations runner, queries, late-data refresher
-    insights/ alerts/    detection, release context, hints, weekly report, hourly + SLO alerts, notifier
+    insights/ alerts/    detection, release context, hints, weekly report, scheduler; hourly, client-error, LLM cost
+                         and SLO alerts, on-call actions, notifier (Slack, Discord, Teams, PagerDuty, Opsgenie, email, webhook)
     ask/                 Ask Reqly agent, tools, number verification
     slo/ openapi/ consumers/ llm/ projects/ users/   feature modules
-  collector/migrations/  001-009 SQL, applied on start-up (tracked in schema_migrations)
-  dashboard/             React SPA
+    traces.py observability.py logs.py dashboard.py gzip_body.py   trace ids, /metrics, JSON logs, all-in-one, gzip
+  collector/migrations/  001-014 SQL, applied on start-up (tracked in schema_migrations)
+  dashboard/             React SPA (vitest unit tests)
+  e2e/                   both SDKs -> a collector process -> TimescaleDB -> the API, in CI
+  deploy/                Helm chart, all-in-one image (Dockerfile + compose)
   load_generator/        demo traffic with deliberate incidents (bad deploy, bad pod, Monday spike)
   bench/                 SDK overhead benchmarks
   demo/                  EventFlow, the instrumented demo app
@@ -42,31 +47,32 @@ reqly/
 
 ### SDKs (`sdk/`, `sdk-node/`)
 
-Middleware records each request when the response finishes: method, the framework's matched route template (never the raw path; no match → `__unmatched__`), status, duration, error type, sizes, an optional consumer id (from a header or a function, HMAC-hashed with the app's salt) and LLM tokens recorded during the request (`record_llm_usage`). The event goes into a bounded in-memory queue (oldest dropped when full) and the request returns; a background flusher sends batches to `/v1/ingest` with short timeouts and retries on 408/429/5xx (the collector dedups on `event_id`). Anything that fails inside the SDK is logged and never raised into the app. Release and environment are sent once per batch, the release auto-detected from CI variables (`GITHUB_SHA`, `RENDER_GIT_COMMIT`, ...). Per-request overhead is measured in [bench/](../bench/README.md).
+Middleware records each request when the response finishes: method, the framework's matched route template (never the raw path; no match → `__unmatched__`), status, duration, error type, sizes, an optional consumer id (from a header or a function, HMAC-hashed with the app's salt) LLM tokens per model recorded during the request (`record_llm_usage`, or automatically by `instrument_openai` / `instrument_anthropic`), and, for failed or slow requests, the trace id from `traceparent` / `sentry-trace` / `x-b3-traceid`. The event goes into a bounded in-memory queue (oldest dropped when full) and the request returns; a background flusher sends batches to `/v1/ingest`, gzipped above 1 KB (plain JSON again, for good, if the collector can't read gzip), with short timeouts and retries on 408/429/5xx (the collector dedups on `event_id`). Anything that fails inside the SDK is logged and never raised into the app. Release and environment are sent once per batch, the release auto-detected from CI variables (`GITHUB_SHA`, `RENDER_GIT_COMMIT`, ...). Per-request overhead is measured in [bench/](../bench/README.md).
 
 ### Collector (`collector/app/`)
 
 One FastAPI service:
 
-- **Ingest:** `POST /v1/ingest` (SDK batches, per-event validation) and `POST /otlp/v1/traces` (OTLP/HTTP; HTTP server spans become events, and GenAI spans under them add the request's LLM model and tokens). Both refuse events older than 13 days (unless the batch is a backfill) or in the future, and enforce which project a service belongs to.
+- **Ingest:** `POST /v1/ingest` (SDK batches, plain or gzipped, one bulk `unnest()` insert, per-event validation only when the batch fails as a whole) and `POST /otlp/v1/traces` (OTLP/HTTP; HTTP server spans become events, and GenAI spans under them add the request's LLM model and tokens). Both refuse events older than 13 days (unless the batch is a backfill) or in the future, and enforce which project a service belongs to.
 - **Reads:** metrics summary, services, routes, releases, alerts, SLOs, consumers, LLM usage, OpenAPI drift, latest report — reading from the continuous aggregates, raw events only where freshness or detail requires it.
 - **Configuration:** SLOs, OpenAPI specs, projects, API keys, members (admin).
 - **AI:** Ask Reqly and on-demand weekly reports.
 - **Auth:** sign-in, sessions, password changes.
+- **Operations:** Prometheus metrics at `/metrics`, `LOG_FORMAT=json`, and (all-in-one) the dashboard itself from `DASHBOARD_DIR`.
 
-On start it creates the asyncpg pool, applies pending migrations, creates the first admin if configured, and starts two background loops: the late-data refresher (materializes events older than the aggregates' look-back, e.g. backfills, in 7-day slices) and APScheduler (weekly report, hourly anomaly check at :15, SLO check every 5 minutes).
+On start it refuses to run without both keys (outside `REQLY_DEMO_MODE`), creates the asyncpg pool, applies pending migrations, creates the first admin if configured, and starts two background loops: the late-data refresher (materializes events older than the aggregates' look-back, e.g. backfills, in 7-day slices) and APScheduler (weekly report, hourly anomaly / client-error / LLM cost check at :15, SLO check every 5 minutes). Each scheduled run first claims its (job, slot) in `scheduled_runs`, so a second collector on the same database skips it.
 
 ### TimescaleDB
 
-`request_events` is a hypertable (1-day chunks, 14-day retention). Continuous aggregates roll it up: `api_latency_1min` (UddSketch per minute, service, environment, route and method — the main source of latency and error charts; 90 days), the older `route_latency_1min`, `route_errors_1hour` and `route_status_distribution_1hour` (also the fallback when the Toolkit is absent), and `consumer_usage_1hour` / `llm_usage_1hour` (90 days). Configuration and state live in plain tables (see §4).
+`request_events` is a hypertable (1-day chunks, 14-day retention). Continuous aggregates roll it up: `api_latency_1min` (UddSketch per minute, service, environment, route and method — the main source of latency and error charts; 90 days), the older `route_latency_1min`, `route_errors_1hour` and `route_status_distribution_1hour` (also the fallback when the Toolkit is absent), `consumer_usage_1hour` / `llm_usage_1hour`, and `llm_usage_splits_1hour` over the `llm_usage_splits` hypertable (per-model tokens of multi-model requests; 90 days). Configuration and state live in plain tables (see §4).
 
 ### Dashboard (`dashboard/src/`)
 
-A static React SPA that calls the collector from the browser with a session token (signed-in users) or the read key (public dashboard). TanStack Query polls every 30–60 s. Panels for SLOs, consumers, LLM cost, API surface and alerts only appear when their data exists. The prebuilt image reads `REQLY_COLLECTOR_URL` / `REQLY_READ_KEY` at start-up, so one image works for any collector.
+A static React SPA that calls the collector from the browser with a session token (signed-in users) or the read key (public dashboard). TanStack Query polls every 30–60 s. Panels for SLOs, consumers, LLM cost, API surface and alerts only appear when their data exists. The prebuilt image reads `REQLY_COLLECTOR_URL` / `REQLY_READ_KEY` at start-up, so one image works for any collector; in the all-in-one image the collector serves it and writes `/config.js` pointing at its own origin. Signed-in users can acknowledge, silence and mute alerts.
 
 ### Hourly alerts
 
-At :15 past every hour the collector refreshes the last completed hour in `route_errors_1hour` and compares it with the same weekday-hour in the previous 8 weeks using the same detector as the weekly report (`recent_window=1h`). Anomalies get the same release context and hints, then `app/alerts/hourly.py` keeps at most one open alert per (service, route) in the `alerts` table: a new detection opens one and notifies, repeats update it (reminder every `ALERT_RENOTIFY_HOURS`), and two clean hours resolve it with a final notification. Messages go to Slack, Discord and/or a generic JSON webhook, built from the statistics only (no LLM in the alert path). Each run is first claimed in `scheduled_runs` (job, slot), so a second collector on the same database skips it; rate limits and the Ask budget are still per process, so one collector remains the supported setup.
+At :15 past every hour the collector refreshes the last completed hour in `route_errors_1hour` and compares it with the same weekday-hour in the previous 8 weeks using the same detector as the weekly report (`recent_window=1h`). Anomalies get the same release context and hints, then `app/alerts/hourly.py` keeps at most one open alert per (service, route) in the `alerts` table: a new detection opens one and notifies, repeats update it (reminder every `ALERT_RENOTIFY_HOURS`), and two clean hours resolve it with a final notification. The same run looks for 401 / 403 / 422 / 429 spikes per route in `route_status_distribution_1hour` (`app/alerts/client_errors.py`, kind `client_errors`), and error and client-error alerts list up to 5 of the hour's trace ids. Messages go to Slack, Discord, Microsoft Teams, PagerDuty (one incident per alert), Opsgenie, email and/or a generic JSON webhook, built from the statistics only (no LLM in the alert path). Before anything is sent, `app/alerts/actions.py` drops notifications for acknowledged (reminders only), silenced and muted alerts. Each run is first claimed in `scheduled_runs` (job, slot), so a second collector on the same database skips it; rate limits and the Ask budget are still per process, so one collector remains the supported setup.
 
 ### SLOs and error budgets
 
@@ -117,7 +123,7 @@ A service's spec (`api_specs`, one per service, uploaded with the ingest key or 
 [Dashboard] --GET /v1/metrics/summary, /consumers, /llm-usage, ...------+--> charts, tables, panels
 [Dashboard] --POST /v1/ask--> LLM tool calls --> read-only queries --> answer + verified numbers
 
-[Scheduler] :15 hourly   --> last hour vs 8 weekday-hours (errors, p95, LLM cost) --> alerts table --> Slack / Discord / webhook
+[Scheduler] :15 hourly   --> last hour vs 8 weekday-hours (errors, p95, 4xx, LLM cost) --> alerts table --> ack/silence/mute --> Slack / Discord / Teams / PagerDuty / Opsgenie / email / webhook
             every 5 min  --> SLO burn rates               --> alerts table --> same channels
             Sunday 23:00 --> week vs baseline --> LLM narrative --> insight_reports
 ```
@@ -132,13 +138,16 @@ A service's spec (`api_specs`, one per service, uploaded with the ingest key or 
 
 ## 4. Database Schema
 
-- `request_events` — hypertable: `event_id`, `time`, `service_name`, `method`, `route`, `status_code`, `duration_ms`, `is_error`, `error_type`, `host`, and (schema v2) `release`, `environment`, `consumer_id`, `request_bytes`, `response_bytes`, `llm_model`, `llm_input_tokens`, `llm_output_tokens`. PK `(time, event_id)`, 14-day retention.
+- `request_events` — hypertable: `event_id`, `time`, `service_name`, `method`, `route`, `status_code`, `duration_ms`, `is_error`, `error_type`, `host`, and (schema v2) `release`, `environment`, `consumer_id`, `request_bytes`, `response_bytes`, `llm_model`, `llm_input_tokens`, `llm_output_tokens`, and (v4) `trace_id`, kept only for 4xx/5xx and slow requests. PK `(time, event_id)`, 14-day retention.
+- `llm_usage_splits` — hypertable of per-model token deltas for requests that called several models (they sum to zero per request); `llm_usage_splits_1hour` rolls them up. Cost queries add them to `llm_usage_1hour`, so each model is priced at its own rate.
 - `api_latency_1min` — continuous aggregate (with the Toolkit): `uddsketch(1000, 0.005)` of duration plus request and error counts per minute, service, environment, route, method. 90 days.
 - `route_latency_1min`, `route_errors_1hour`, `route_status_distribution_1hour` — the original aggregates (90 / 180 / 180 days); `route_errors_1hour` feeds the anomaly detector. With the Toolkit, `route_latency_1min` is no longer refreshed (migration 010): nothing reads it once `api_latency_1min` exists.
 - `consumer_usage_1hour`, `llm_usage_1hour` — hourly rollups by consumer / by LLM model (90 days).
 - `deployments` — first and last seen per service, environment and release.
 - `insight_reports` — one weekly report per service (`anomalies_json`, `report_text`).
-- `alerts` — `kind` (`anomaly`, `slo` or `llm_cost`), service, route, first/last hour, resolved time, details JSON; at most one open alert per service, route and kind.
+- `alerts` — `kind` (`anomaly`, `client_errors`, `slo` or `llm_cost`), service, route, first/last hour, resolved time, details JSON, `acknowledged_at` / `acknowledged_by`, `silenced_until`; at most one open alert per service, route and kind.
+- `alert_mutes` — service, optional route and kind, `muted_until`, reason, who.
+- `scheduled_runs` — one row per (job, slot) a collector claimed, so each scheduled run happens once.
 - `slos` — objective (`availability` / `latency`), target, threshold, window per service or route.
 - `api_specs` — one OpenAPI spec (JSONB) and base path per service.
 - `users`, `sessions` — argon2id password hashes; SHA-256 of session tokens with expiry.
@@ -185,6 +194,8 @@ The LLM call has a 30 s timeout. On any exception (timeout, rate limit, provider
 | Method | Route | Auth | Description |
 |---|---|---|---|
 | `GET` | `/v1/health` | None | Liveness probe — returns `{"status": "ok"}` |
+| `GET` | `/v1/ready` | None | Readiness: 503 while the database doesn't answer |
+| `GET` | `/metrics` | None or `METRICS_TOKEN` | The collector's own Prometheus metrics |
 | `GET` | `/v1/auth/config` | None | Whether the dashboard is public (`PUBLIC_DASHBOARD`) |
 | `POST` | `/v1/auth/login` | None (10/min per IP) | Username + password → session token (bearer) |
 | `POST` | `/v1/auth/logout` | Session | Ends the session |
@@ -200,10 +211,13 @@ The LLM call has a 30 s timeout. On any exception (timeout, rate limit, provider
 | `POST` | `/otlp/v1/traces` | Ingest key | OTLP/HTTP trace receiver (protobuf or JSON, gzip) — HTTP server spans become request events; see [OpenTelemetry](https://reqly.tanisheesh.in/docs/instrument/opentelemetry/) |
 | `GET` | `/v1/services` | Read key or session | List all service names with recorded traffic |
 | `GET` | `/v1/services/{service_name}/routes` | Read key or session | List all route templates for a service |
+| `GET` | `/v1/services/{service_name}/environments` | Read key or session | Environments the service reported (90 days) |
 | `GET` | `/v1/metrics/summary` | Read key or session | Latency series, error rate series, status distribution, top routes, requests/min for a service+window |
 | `GET` | `/v1/services/{service_name}/releases` | Read key or session | Recent releases with first/last seen, request volume, error rate and p95 (14-day raw window) |
 | `GET` | `/v1/insights/latest` | Read key or session | Latest weekly AI report for a service |
-| `GET` | `/v1/alerts` | Read key or session | Open (or recent, `status=all`) alerts — hourly anomalies and SLO burn — optionally per service |
+| `GET` | `/v1/alerts` | Read key or session | Open (or recent, `status=all`) alerts — anomalies, client errors, SLO burn, LLM cost — with their on-call state |
+| `POST` | `/v1/alerts/{id}/acknowledge`, `/silence` | Signed-in user or admin key | Stop reminders / all notifications for an alert |
+| `GET` / `POST` / `DELETE` | `/v1/alert-mutes[/{id}]` | Read / signed-in user or admin key | Mute a service, route or kind of alert for up to 30 days |
 | `GET` | `/v1/slos` | Read key or session | SLOs with live status: SLI, error budget left, burn rates (5m / 30m / 1h / 6h), state |
 | `PUT` | `/v1/slos` | Ingest key or admin session | Create or update an SLO (by service + name) |
 | `DELETE` | `/v1/slos/{id}` | Ingest key or admin session | Delete an SLO |
@@ -222,13 +236,13 @@ The LLM call has a 30 s timeout. On any exception (timeout, rate limit, provider
 
 - **Users and sessions:** dashboard users sign in with a username and password (argon2id, hashed off the event loop; a login takes the same time whether or not the user exists). A session is a random 256-bit bearer token, stored only as its SHA-256, valid `SESSION_TTL_HOURS` (default 7 days); changing a password ends all of the user's sessions. Bearer tokens rather than cookies because the dashboard and collector are usually different sites, where browsers block third-party cookies. "Read" endpoints accept a session, or the read key while `PUBLIC_DASHBOARD` is on (a public demo); with it off the read key is refused. Changing SLOs and OpenAPI specs takes the ingest key or an admin's session. The first admin comes from `REQLY_ADMIN_PASSWORD` when there are no users; more users and password resets: `python -m app.users create-user NAME [--admin]` / `set-password NAME`.
 - **Projects and API keys:** every service belongs to one project (`project_services`); services that had data before projects existed are in `default`, and a new service joins the project of the key that sends its first events — after that, another project's keys get 403 for it (OTLP: those spans are rejected as a partial success). Project keys (`rqk_` + 256 random bits, stored as SHA-256, prefix shown) carry scopes `ingest` / `read` / `admin` and only reach their project's services; revoking takes effect at once on the instance that did it and within 60 s elsewhere (lookup cache). Every request resolves to a principal — scopes plus the projects it may touch: the env ingest key (ingest + admin) and admin users (read + admin) reach every project, the public read key reads every project, other users read the projects they are members of. Endpoints about one service check it through the `service_name` in their path or query; list endpoints filter. Projects, service moves and memberships need an admin of every project; a project's keys can be managed by that project's admin keys. A valid key used for something its scopes don't allow gets 403 (an unknown key 401).
-- **API keys:** `REQLY_INGEST_KEY` (write) and `REQLY_READ_KEY` (read) are separate keys, passed via the `X-Reqly-Key` header and compared in constant time. The read key is compiled into the dashboard bundle, so it is effectively public to dashboard viewers; it never falls back to the ingest key, and the collector warns at startup if the two are equal. Defaults: `demo-key` / `demo-read-key`, with a startup warning.
+- **API keys:** `REQLY_INGEST_KEY` (write) and `REQLY_READ_KEY` (read) are separate keys, passed via the `X-Reqly-Key` header and compared in constant time. The read key is compiled into the dashboard bundle, so it is effectively public to dashboard viewers; it never falls back to the ingest key, and the collector warns at startup if the two are equal. Outside `REQLY_DEMO_MODE` both keys are required (the collector won't start without them); demo mode (docker-compose) uses `demo-key` / `demo-read-key`, with a startup warning, a public dashboard and CORS `*`. Acknowledging, silencing and muting alerts takes a signed-in user or an admin-scoped key, never the read key.
 - **Ingest validation:** Every event in a batch is validated with Pydantic before writing. `duration_ms` is clamped (0–300 000 ms). Batch size is hard-capped at 1 000 events per call, and string fields are length-capped (`service_name` 128, `route` 512, `method` 16).
-- **Rate limiting:** slowapi enforces 600 req/min per client IP on ingest; insights generation is separately limited at 5/min and returns this week's report as is if it was generated in the last 10 minutes (each generation is an LLM call on a public key). Behind a proxy, set `FORWARDED_ALLOW_IPS` so the real client IP is used.
+- **Rate limiting:** slowapi limits ingest per key — 600 req/min per project key, 6,000 for the shared env key — under a 6,000/min cap per client IP; Ask Reqly and sign-in are limited per IP; insights generation is separately limited at 5/min and returns this week's report as is if it was generated in the last 10 minutes (each generation is an LLM call on a public key). Behind a proxy, set `FORWARDED_ALLOW_IPS` so the real client IP is used.
 - **Request size:** every request body is counted as it arrives and refused with 413 above 16 MB (`app/body_limit.py`), chunked bodies included — Starlette would otherwise buffer a body whole before any handler sees it.
 - **Event age:** ingest and OTLP refuse events older than 13 days (unless the batch is an explicit `backfill`) or more than 15 minutes in the future. Raw events are kept 14 days and aggregates 90–180, so materializing a straggler older than the raw data would replace days of aggregate history with it.
 - **Collector secrets:** `GROQ_API_KEY` / `LLM_API_KEY`, `DATABASE_URL` are env vars only — never committed. `.env.example` ships with empty values.
-- **CORS:** `CORS_ORIGINS` lists the dashboard origins allowed to call the collector (unset: none; the docker-compose file sets `*` for local use). Allowed headers: `Content-Type`, `X-Reqly-Key`, `Authorization`.
+- **CORS:** `CORS_ORIGINS` lists the dashboard origins allowed to call the collector (unset: none, `*` in demo mode; the all-in-one image needs none, the dashboard is on the collector's origin). Allowed headers: `Content-Type`, `X-Reqly-Key`, `Authorization`.
 - **No PII:** The SDKs capture method, route template, status, duration, error type, sizes, release and environment — never request bodies, query strings or headers. Consumer ids are optional and HMAC-SHA256-hashed with the app's salt inside the SDK, so API keys never reach the collector.
 
 ---
@@ -244,18 +258,22 @@ The LLM call has a 30 s timeout. On any exception (timeout, rate limit, provider
 | LLM API failure | Falls back to plain-text stats report; insight pipeline does not fail |
 | DB write fails | asyncpg raises; collector returns 500 — SDK will retry the batch on next flush cycle |
 | Malformed event in batch | Validated independently; one bad event increments `rejected` counter and is skipped; rest of batch is accepted |
+| Collector can't read gzip (before 0.13) | The SDK resends the batch as plain JSON and stops compressing |
+| Two collectors on one database | Each scheduled run is claimed in `scheduled_runs`; the second skips it |
 
 ---
 
 ## 9. Deployment
 
-**Local:** `docker compose up -d` starts TimescaleDB, the collector, the dashboard and the load generator. The collector applies `collector/migrations/*.sql` on start-up; the load generator backfills weeks of history (as an explicit backfill), then sends live traffic.
+**Local:** `docker compose up -d` starts TimescaleDB, the collector (in demo mode), the dashboard and the load generator. The collector applies `collector/migrations/*.sql` on start-up; the load generator backfills weeks of history (as an explicit backfill), then sends live traffic.
 
 **Live demo:**
 1. TimescaleDB (`timescaledb-ha`, Toolkit, TLS) in Docker on an EC2 t3.micro, set up by `infra/ec2-userdata.sh`.
-2. The collector on Render, `DATABASE_URL` with `sslmode=require`, `FORWARDED_ALLOW_IPS=*` so rate limits see real client IPs, `GROQ_API_KEY` for AI features, `PUBLIC_DASHBOARD` on.
+2. The collector on Render, `DATABASE_URL` with `sslmode=require`, `FORWARDED_ALLOW_IPS=*` so rate limits see real client IPs, `GROQ_API_KEY` for AI features, `PUBLIC_DASHBOARD=true` and `CORS_ORIGINS=*` set explicitly.
 3. The dashboard on Render, built with `VITE_COLLECTOR_URL` and `VITE_READ_KEY`.
-4. Releases: PyPI (`sdk-v*` tags) and npm (`node-v*` tags) via trusted publishing; container images on GHCR (`collector-v*` tags).
+4. Releases: PyPI (`sdk-v*` tags) and npm (`node-v*` tags) via trusted publishing; container images (`reqly-collector`, `reqly-dashboard`, all-in-one `reqly`) and the Helm chart on GHCR (`collector-v*` tags).
+
+**All-in-one:** `deploy/all-in-one/docker-compose.yml` — TimescaleDB plus `ghcr.io/tanisheesh/reqly`, one port for the API and the dashboard.
 
 Step-by-step AWS setup in [infra/DEPLOY.md](../infra/DEPLOY.md).
 
@@ -265,7 +283,7 @@ Step-by-step AWS setup in [infra/DEPLOY.md](../infra/DEPLOY.md).
 
 - **Trace views** — OTLP spans are reduced to request events; no span waterfall.
 - **Request bodies, query strings, headers** — never captured.
-- **Multiple collector instances** — scheduler, rate limits and caches are per process; run one collector.
+- **Multiple collector instances** — scheduled runs are claimed in the database, but rate limits, the Ask budget and caches are per process; run one collector.
 - **OIDC / SSO** — username + password sign-in only.
 - **Real-time push** — the dashboard polls; no WebSockets or SSE.
 

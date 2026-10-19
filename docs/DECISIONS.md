@@ -131,7 +131,7 @@ the tradeoff each answer cost.
 
 **Decision:** Benchmarks for both SDKs (`bench/`) run the same app with and without Reqly, in-process where the framework allows, with consumer tracking on and the shipper sending throughout, in alternating rounds; a workflow reruns them on every SDK change.
 
-**Reason:** The first run found a Node bug (a flush sent each event arriving during a send as its own batch: one collector request per app request under steady traffic) and Python work that could move off the request path. Overhead went from up to +330 µs to ~5–33 µs per request.
+**Reason:** The first run found a Node bug (a flush sent each event arriving during a send as its own batch: one collector request per app request under steady traffic) and Python work that could move off the request path. Overhead went from up to +330 µs to ~5–33 µs per request. Later it caught a 3-4 µs Node regression from compressing batches synchronously on the event loop (fixed in 0.5.2), after the workflow itself was fixed to fail when a benchmark crashes.
 
 **Tradeoff:** Shared CI runners are noisy, so the numbers are only comparable within a run (baseline vs instrumented), and Express is measured over loopback, which makes its p99 unreliable.
 
@@ -149,12 +149,72 @@ the tradeoff each answer cost.
 
 ---
 
+## Decision 13 — One OpenAI-compatible client for every LLM provider
+
+**Context:** Reports and Ask Reqly called Groq through Groq's own SDK. Self-hosters asked for OpenAI, OpenRouter and local models (Ollama, vLLM), and Groq retires models.
+
+**Decision:** The collector talks to any OpenAI-compatible chat completions API through the `openai` package: `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`. `GROQ_API_KEY` alone still means Groq, and that key is only ever sent to Groq's URL.
+
+**Reason:** Every provider worth supporting speaks this API, so one client covers them and the agent code didn't change. Keeping the Groq-only setting working meant no existing deployment had to change.
+
+**Tradeoff:** Provider-specific features (Anthropic's native API, reasoning parameters) aren't available, and `max_tokens` is used because it has the widest support, so OpenAI's reasoning models, which want `max_completion_tokens`, aren't a fit.
+
+---
+
+## Decision 14 — Multi-model LLM cost through zero-sum split rows
+
+**Context:** A request that called two models was stored as the one with the most tokens, carrying all the tokens, so a cheap model's tokens were priced at the expensive one's rate. `llm_usage_1hour` held 90 days of history in that shape, and old SDKs keep sending it.
+
+**Decision:** `request_events` keeps the main model and the totals. For a multi-model request, `llm_usage_splits` gets one row per model with the tokens to move: the other models' tokens off the main one, and each model's own tokens added. They sum to zero per request; cost queries add `llm_usage_splits_1hour` to `llm_usage_1hour`.
+
+**Reason:** Pricing is linear, so the deltas make every model's tokens exact without touching the existing table, the 90-day aggregate or the request counts, and old data and old SDKs simply have no split rows.
+
+**Tradeoff:** Two aggregates to keep aligned (same schedule and retention), and a model's row can briefly carry negative tokens that only make sense next to its split.
+
+---
+
+## Decision 15 — Safe defaults, with a demo mode for the demo
+
+**Context:** A collector started without configuration accepted the public `demo-key`, showed every project to anyone with the dashboard and allowed CORS from anywhere: right for `docker compose up`, wrong for a container someone puts on a VPS.
+
+**Decision:** Without `REQLY_DEMO_MODE=true` the collector refuses to start until both keys are set, `PUBLIC_DASHBOARD` defaults to `false` and CORS to closed. The compose file sets demo mode; the Helm chart sets everything explicitly.
+
+**Reason:** Insecure-by-default is the failure that hurts people who never read the docs; the quickstart keeps working because it's the one place that opts in.
+
+**Tradeoff:** A breaking change for anyone who ran the image with the defaults (shipped in 0.14.0 with an upgrade note), and the public demo now has to set `PUBLIC_DASHBOARD=true` itself.
+
+---
+
+## Decision 16 — Claim each scheduled run in the database, not a lock
+
+**Context:** The scheduler runs inside every collector. Two collectors on one database (a rolling deploy, a second replica by mistake) both ran the hourly checks and the weekly report, and the report is an LLM call.
+
+**Decision:** Each run inserts `(job, slot)` into `scheduled_runs` (the hour, the 5-minute bucket or the week) with `ON CONFLICT DO NOTHING`; only the collector whose insert lands runs it.
+
+**Reason:** An advisory lock only stops runs that overlap: a collector finishing in two seconds and another starting five seconds later (the scheduler allows late starts) would both run. A claim on the slot holds whatever the timing, and doesn't hold a connection for the length of the job.
+
+**Tradeoff:** A run that crashes keeps its claim, so that slot isn't retried (as with one collector). Rate limits and the Ask budget stay per process, so this makes a second collector harmless, not supported.
+
+---
+
+## Decision 17 — Trace ids for correlation, not a trace store
+
+**Context:** An alert says what broke; the next step is a trace in Tempo, Jaeger or Sentry. Reqly has request events, not traces, and storing a trace id on every request would mostly store ids nobody looks up.
+
+**Decision:** The SDKs read `traceparent`, `sentry-trace` or `x-b3-traceid`, only for 4xx/5xx or slow requests; the collector keeps them for those requests (`TRACE_ID_SLOW_MS`), and alerts list up to five of the hour's traces, failed ones first, linked through `TRACE_URL_TEMPLATE`.
+
+**Reason:** The traces worth opening are the failed and slow ones, so that's all that is kept; a fast 200 never pays for parsing a header.
+
+**Tradeoff:** No trace for a request that was fine, and a slow request below the SDK's threshold (`REQLY_TRACE_SLOW_MS`, default 500 ms) has none unless it arrived over OTLP.
+
+---
+
 ## What I'd do differently in v2
 
 - **Configurable anomaly threshold per service** — the global z > 4.0 threshold (with count-based error tests and minimum effect sizes) keeps false positives near one every ~20 weeks, but low-volume services need large shifts to clear it. Per-service thresholds or adaptive thresholds based on historical false-positive rates would improve signal quality.
 - **Structured logging from the SDK** — currently the SDK uses Python's stdlib `logging` at WARNING level. Structured JSON logs (with service name, event counts, error types) would make SDK health far easier to observe in a log aggregator.
 - **Collector connection pooling configuration exposed** — the asyncpg pool min/max sizes are env vars but not documented in the SDK README. Under high ingest volume, pool exhaustion is a silent failure; exposing this more clearly would help operators.
-- **Design for several collector instances from the start** — alert/SLO jobs, rate limits and the key and service caches are per process. State is already in Postgres; leader election for the jobs and a shared rate limiter would let the collector scale out.
+- **Design for several collector instances from the start** — scheduled runs are claimed in Postgres now (Decision 16), but rate limits, the Ask budget and the key and service caches are per process; a shared rate limiter would let the collector scale out.
 
 ---
 

@@ -53,7 +53,7 @@ Every 5 minutes, Reqly applies the multi-window burn-rate rules from the Google 
 
 The longer window also needs at least 20 requests. The short window makes the alert stop soon after the problem does.
 
-There is one open alert per SLO. It goes to the same channels as [anomaly alerts](alerts.md#channels) and resolves after 30 minutes out of burn.
+There is one open alert per SLO. It goes to the same channels as [anomaly alerts](alerts.md#channels), can be [acknowledged, silenced or muted](alerts.md#acknowledge-silence-mute) (kind `slo`), and resolves after 30 minutes out of burn.
 
 ## How it's computed
 

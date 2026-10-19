@@ -28,7 +28,7 @@ Endpoints about one service check it against the caller's projects; list endpoin
 
 | Method | Path | Access | Description |
 |---|---|---|---|
-| `POST` | `/v1/ingest` | Ingest | Batch of request events, ≤ 1,000 per call, validated one by one. [Spec](ingest-spec.md) |
+| `POST` | `/v1/ingest` | Ingest | Batch of request events, ≤ 1,000 per call, plain or gzipped JSON, validated one by one. [Spec](ingest-spec.md) |
 | `POST` | `/otlp/v1/traces` | Ingest | OTLP/HTTP traces, protobuf or JSON, gzip. [OpenTelemetry](../instrument/opentelemetry.md) |
 
 ## Metrics
@@ -45,7 +45,12 @@ Endpoints about one service check it against the caller's projects; list endpoin
 
 | Method | Path | Access | Description |
 |---|---|---|---|
-| `GET` | `/v1/alerts?service_name=&status=` | Read | Open alerts, or recent ones with `status=all`: hourly anomalies, SLO burn and LLM cost spikes |
+| `GET` | `/v1/alerts?service_name=&status=` | Read | Open alerts, or recent ones with `status=all`: hourly anomalies, client error spikes, SLO burn and LLM cost spikes, with their acknowledged / silenced / muted state |
+| `POST` | `/v1/alerts/{id}/acknowledge` | Signed-in user or Admin | No more reminders for this alert; the resolve still notifies |
+| `POST` | `/v1/alerts/{id}/silence` | Signed-in user or Admin | `{"hours": 0-168}`: no notifications for this alert for that long (`0` lifts it) |
+| `GET` | `/v1/alert-mutes?service_name=` | Read | Active mutes |
+| `POST` | `/v1/alert-mutes` | Signed-in user or Admin | `{"service_name", "route"?, "kind"?, "hours", "reason"?}`: no notifications for a service, route or kind of alert, up to 30 days |
+| `DELETE` | `/v1/alert-mutes/{id}` | Signed-in user or Admin | End a mute |
 | `GET` | `/v1/slos?service_name=` | Read | SLOs with SLI, budget left, burn rates and state |
 | `PUT` | `/v1/slos` | Admin | Create or update an SLO. [Fields](../features/slos.md#define-an-slo) |
 | `DELETE` | `/v1/slos/{id}` | Admin | Delete an SLO |
@@ -92,9 +97,12 @@ Endpoints about one service check it against the caller's projects; list endpoin
 |---|---|---|---|
 | `GET` | `/v1/health` | none | Liveness: `{"status": "ok"}` while the process is up |
 | `GET` | `/v1/ready` | none | Readiness: `{"status": "ready"}`, or `503` when the database doesn't answer |
+| `GET` | `/metrics` | none, or `Authorization: Bearer <METRICS_TOKEN>` | The collector's own Prometheus metrics ([settings](../self-hosting/configuration.md#monitoring-the-collector)) |
+
+In [all-in-one mode](../self-hosting/deploy.md#all-in-one-two-containers) every other `GET` path serves the dashboard, and `/config.js` its runtime settings.
 
 ## Limits
 
-- Ingest: 600 requests/min per client IP.
+- Ingest: 600 requests/min per project key (`RATE_LIMIT_PER_MINUTE`), 6,000 for the shared `REQLY_INGEST_KEY`, under a 6,000/min cap per client IP. Ask Reqly, insights and sign-in are limited per IP. [Settings](../self-hosting/configuration.md#keys-and-access)
 - Request bodies over 16 MB are refused with 413, chunked bodies included.
 - Errors are JSON: `{"detail": "..."}`. 401 means an unknown or missing key; 403 means a valid key without the right scope or project.

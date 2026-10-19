@@ -1,6 +1,6 @@
 # Reqly — Product Requirements Document
 
-**Status:** Final (v2 — shipped; collector 0.12, Python SDK 0.5, Node SDK 0.3)
+**Status:** Final (v2 — shipped; collector 0.14, Python SDK 0.7, Node SDK 0.5)
 **Owner:** Tanish Poddar
 **One-liner:** Self-hosted API monitoring that tells you what broke, when, and which deploy did it — for Python, Node.js and any OpenTelemetry stack.
 
@@ -17,22 +17,22 @@ Teams running a handful of HTTP APIs have two bad options for knowing whether th
 1. One-line instrumentation for Python (FastAPI, Flask, Django, Starlette, Litestar, any WSGI/ASGI app) and Node.js (Express, Fastify, Hono, Koa, NestJS); any other language through OpenTelemetry (OTLP/HTTP) with exporter settings only.
 2. Correct latency percentiles at every level (route, service, 1h to 7d) and error rates that are current to the minute.
 3. Explanations, not just charts: every alert carries the release that was running, root-cause leads (host, environment, error type, status code) and the API consumers it hit.
-4. Hourly anomaly alerts against a weekday × hour baseline, deduplicated and auto-resolved, delivered to Slack, Discord or a webhook; a weekly AI-written report.
+4. Hourly anomaly and client-error (4xx) alerts against a weekday × hour baseline, deduplicated and auto-resolved, delivered to Slack, Discord, Microsoft Teams, PagerDuty, Opsgenie, email or a webhook, and acknowledged, silenced or muted from the dashboard; a weekly AI-written report.
 5. Questions in plain English (Ask Reqly) answered only from the collector's own data, with the queries behind every answer visible.
 6. API-level views: SLOs and error budgets, OpenAPI drift, consumers, LLM cost per route.
-7. Self-hostable with `docker compose up` or a Helm chart; a shared collector can serve several teams with projects, scoped API keys and sign-in.
+7. Self-hostable with `docker compose up`, a Helm chart, or one all-in-one image plus TimescaleDB; safe by default outside demo mode; a shared collector can serve several teams with projects, scoped API keys and sign-in.
 8. The SDKs are fail-open and their per-request overhead is measured and published.
 
 ---
 
 ## 3. Non-Goals (explicit scope cuts)
 
-- **Trace views / distributed tracing UI** — Reqly ingests OTLP spans but keeps only HTTP server spans as request events; there is no span waterfall. Request-level metrics are the product.
+- **Trace views / distributed tracing UI** — Reqly ingests OTLP spans but keeps only HTTP server spans as request events; there is no span waterfall. Request-level metrics are the product; failed and slow requests keep their trace id, so an alert can point at traces in Tempo, Jaeger or Sentry.
 - **Logs** — Reqly stores no log lines; it links to nothing outside its own data.
 - **Request bodies, query strings, headers** — never captured. Consumer ids are hashed in the SDK; the collector never sees API keys.
 - **Hosted SaaS and billing** — Reqly is self-hosted; projects and keys exist for teams sharing one collector, not for customers.
 - **SSO / OIDC sign-in** — username and password only; OIDC would come when a real deployment needs it.
-- **Horizontal scaling of the collector** — the alert scheduler and rate limits assume one collector instance (state is in Postgres, but jobs and limits are per process).
+- **Horizontal scaling of the collector** — scheduled jobs are claimed in Postgres, so a second collector never repeats them, but rate limits and the Ask Reqly budget are per process: one collector is the supported setup.
 - **Real-time push to the dashboard** — polling every 30–60 s is enough for this use case.
 
 ---
@@ -52,7 +52,7 @@ Teams running a handful of HTTP APIs have two bad options for knowing whether th
 3. *As a developer,* I ask "why was checkout slow yesterday afternoon?" and get an answer with the numbers and the queries behind it, so that I can verify it rather than trust it.
 4. *As a team lead,* I define a 99.5% availability SLO on `/checkout` and get an alert when the error budget burns too fast, so that we react to user impact, not to every blip.
 5. *As an API owner,* I upload our OpenAPI spec and see which endpoints get traffic without being documented, which documented ones nobody calls, and which clients still use deprecated ones, so that I can clean up the API safely.
-6. *As a developer of an LLM feature,* I record token usage per request and see cost per route and per 1k requests, so that I know which endpoint is expensive.
+6. *As a developer of an LLM feature,* I wrap my OpenAI or Anthropic client once (or record usage myself) and see cost per route, model and 1k requests, with each model priced at its own rate, so that I know which endpoint is expensive.
 7. *As an admin of a shared collector,* I create a project per team with its own keys and members, so that teams only see and write their own services.
 8. *As a Node, Go or Java developer,* I point my OpenTelemetry exporter at Reqly and get the same per-route metrics without installing a Reqly SDK.
 
@@ -64,13 +64,13 @@ Teams running a handful of HTTP APIs have two bad options for knowing whether th
 
 - Python: auto-detects FastAPI, Starlette, Litestar and Flask from `reqly.instrument(app)`; Django via middleware; any WSGI/ASGI app via `instrument_wsgi` / `instrument_asgi` with a route resolver.
 - Node.js: `reqlyExpress`, `reqlyFastify`, `reqlyHono`, `reqlyKoa`, `reqlyNest` and `reqlyHttp` (plain node:http, Bun); ESM and CommonJS builds.
-- Records method, route template (never the raw path; unmatched requests become `__unmatched__`), status, duration, error type, request/response size, release (auto-detected from CI variables), environment, optional consumer id (HMAC-hashed with the app's salt) and optional LLM token usage.
-- Never raises into the host app; bounded queue; batches shipped in the background with retries on 408/429/5xx.
+- Records method, route template (never the raw path; unmatched requests become `__unmatched__`), status, duration, error type, request/response size, release (auto-detected from CI variables), environment, optional consumer id (HMAC-hashed with the app's salt), LLM token usage per model (recorded by hand or by `instrument_openai` / `instrument_anthropic`), and the trace id of failed or slow requests (`traceparent`, `sentry-trace`, `x-b3-traceid`).
+- Never raises into the host app; bounded queue; batches shipped in the background, gzipped above 1 KB (plain JSON for older collectors), with retries on 408/429/5xx.
 - FastAPI and Litestar apps can upload their own OpenAPI spec (`push_openapi=True`).
 
 ### 6.2 Ingest
 
-- `POST /v1/ingest` validates each event independently (one bad event drops only itself) and reports reasons for rejections.
+- `POST /v1/ingest` takes plain or gzipped JSON, validates each event independently (one bad event drops only itself) and reports reasons for rejections.
 - `POST /otlp/v1/traces` accepts OTLP/HTTP protobuf or JSON (gzip), maps HTTP server spans to events (stable and legacy semantic conventions).
 - Events older than 13 days are refused unless the batch is an explicit backfill; events more than 15 minutes in the future are refused.
 - A new service joins the project of the key that sends its first events; another project's keys can't write to it.
@@ -84,8 +84,10 @@ Teams running a handful of HTTP APIs have two bad options for knowing whether th
 ### 6.4 Detection and alerts
 
 - Hourly check of the last complete hour of every route against the same weekday-hour in the previous 8 weeks; error rates tested with a Poisson tail on counts, p95 only on hours with ≥ 100 requests, z ≥ 4 with minimum effect sizes.
-- Each alert includes release context (new release, before/after numbers), root-cause hints and affected consumers; one open alert per route, reminders every 6 h, resolved after 2 clean hours.
-- Weekly report over the whole week with the same statistics, narrated by an LLM (plain-text fallback without a key).
+- A sudden spike of 401 / 403 / 422 / 429 on a route (same baseline and test) opens a client-error alert.
+- Each alert includes release context (new release, before/after numbers), root-cause hints, affected consumers and sample trace ids; one open alert per route and kind, reminders every 6 h, resolved after 2 clean hours.
+- On-call actions: acknowledge (no reminders), silence an alert (up to 7 days), mute a service, route or kind (up to 30 days); the read key can't use them.
+- Weekly report over the whole week with the same statistics, narrated by any OpenAI-compatible LLM (plain-text fallback without one).
 
 ### 6.5 AI
 
@@ -97,11 +99,12 @@ Teams running a handful of HTTP APIs have two bad options for knowing whether th
 - SLOs: availability or latency objectives per service or route over 1–90 days; SLI, budget remaining, burn rates (5m/30m/1h/6h); fast/slow burn alerts (Google SRE workbook rules).
 - OpenAPI drift: spec upload (OpenAPI 3 / Swagger 2, JSON or YAML) compared with 30 days of traffic.
 - Consumers: top consumers, one consumer's routes, who an incident hit, who still calls deprecated operations.
-- LLM cost: tokens and estimated cost per route, model and day from an editable price table; hourly alerts when a route's cost per request or LLM traffic jumps, with the factor that rose.
+- LLM cost: tokens and estimated cost per route, model and day from an editable price table, each model of a multi-model request at its own rate; hourly alerts when a route's cost per request or LLM traffic jumps, with the factor that rose.
 
 ### 6.7 Access control
 
 - Ingest key (writes), read key (public dashboard reads while `PUBLIC_DASHBOARD` is on), project keys with `ingest` / `read` / `admin` scopes, dashboard users (admins see everything, members see their projects).
+- Safe defaults: outside `REQLY_DEMO_MODE` the collector won't start without both keys, the dashboard needs a sign-in, and CORS is closed.
 
 ---
 
@@ -112,7 +115,8 @@ Teams running a handful of HTTP APIs have two bad options for knowing whether th
 - **Correctness:** percentiles from mergeable sketches; a stray old event can't overwrite aggregate history.
 - **Security:** keys and session tokens stored only as hashes; passwords argon2id; secrets only in env vars; request bodies capped at 16 MB.
 - **Cost guard:** LLM calls are rate-limited per IP and capped per day (Ask), and report regeneration is cached for 10 minutes.
-- **Reliability:** scheduled jobs tolerate a busy event loop (generous misfire grace); alert and SLO state live in Postgres.
+- **Reliability:** scheduled jobs tolerate a busy event loop (generous misfire grace) and run once per slot even with two collectors; alert and SLO state live in Postgres.
+- **Operability:** the collector exposes Prometheus metrics (`/metrics`) and can log JSON (`LOG_FORMAT=json`); its image installs from a hash-pinned lock.
 
 ---
 
@@ -132,7 +136,7 @@ Teams running a handful of HTTP APIs have two bad options for knowing whether th
 
 - **LLM price table** — checked against the providers' pricing pages in 2026-10; prices change, so it needs re-checking with new models (`LLM_PRICES_FILE` overrides it). Unknown models are unpriced, never matched to a similar name.
 - **Public read key** — with `PUBLIC_DASHBOARD` on, anyone with the dashboard URL can read every project; it's meant for demos only.
-- **Single instance** — the scheduler, rate limits and caches are per process; running two collectors duplicates jobs.
+- **Single instance** — rate limits, the Ask Reqly budget and caches are per process, so two collectors double them (scheduled jobs are claimed in Postgres and still run once).
 - **Provider dependence** — AI features need an LLM provider (Groq by default, any OpenAI-compatible API); models get retired (Llama 3.3 already was), so the model is configurable and the reports fall back to plain text.
 - **Open question:** should anomaly thresholds become per-service for low-traffic routes?
 
@@ -140,8 +144,10 @@ Teams running a handful of HTTP APIs have two bad options for knowing whether th
 
 ## 10. v2 Candidates
 
-- **Node SDK** — a generic `http` wrapper and streamed byte counts; built when a real user asks (OTLP covers them today).
-- **OIDC sign-in** and multi-instance collectors.
+- **Reqly MCP server** — the Ask Reqly tools for Claude Code, Cursor and other MCP clients.
+- **Serverless / edge mode** for `reqly-node` (`waitUntil`, Next.js App Router, Cloudflare Workers).
+- **Go SDK**, a **CLI + GitHub Action** (deploy markers, spec upload from CI) and a **reverse-proxy log ingestor**.
+- **OIDC sign-in**, and shared rate limits for multi-instance collectors.
 
 ---
 

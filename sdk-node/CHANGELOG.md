@@ -2,6 +2,14 @@
 
 All notable changes to `reqly-node`.
 
+## 0.5.2 — 2026-10-19
+
+### Fixed
+- Since 0.4.0, batches were gzipped with `gzipSync` on the app's event loop, so every flush
+  blocked it: about 3-4 µs more per request on Fastify and Hono in the benchmark. Compression
+  now runs on libuv's thread pool, and events are built without object spreads; overhead is
+  back to 0.3.2's (Fastify +11.8 µs, Hono +7.2 µs, Express +26 µs per request).
+
 ## 0.5.1 — 2026-10-19
 
 ### Added
