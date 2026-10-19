@@ -1,4 +1,5 @@
 import type { RequestInfo } from "./context.js";
+import { TRACE_SLOW_MS } from "./traces.js";
 
 export interface ReqlyOptions {
   /** Service name shown in Reqly. Default: REQLY_SERVICE_NAME, else npm_package_name, else "unnamed-service". */
@@ -36,6 +37,12 @@ export interface ReqlyOptions {
    * framework (Fastify with @fastify/swagger). Default: REQLY_PUSH_OPENAPI.
    */
   pushOpenapi?: boolean | object | (() => unknown);
+  /**
+   * Requests at least this slow send their trace id (4xx/5xx always do).
+   * Default: REQLY_TRACE_SLOW_MS or 500. Match the collector's
+   * TRACE_ID_SLOW_MS when lowering it.
+   */
+  traceSlowMs?: number;
 }
 
 export interface ResolvedConfig {
@@ -54,6 +61,7 @@ export interface ResolvedConfig {
   consumerSalt?: string;
   hashConsumer: boolean;
   pushOpenapi: boolean | object | (() => unknown);
+  traceSlowMs: number;
 }
 
 // Commit SHA variables set by common CI/CD and hosting platforms (same list
@@ -127,5 +135,6 @@ export function resolveConfig(options: ReqlyOptions = {}): ResolvedConfig {
     consumerSalt: options.consumerSalt ?? env("REQLY_CONSUMER_SALT"),
     hashConsumer: options.hashConsumer ?? envBool("REQLY_HASH_CONSUMER") ?? true,
     pushOpenapi: options.pushOpenapi ?? envBool("REQLY_PUSH_OPENAPI") ?? false,
+    traceSlowMs: Math.max(0, options.traceSlowMs ?? envNumber("REQLY_TRACE_SLOW_MS") ?? TRACE_SLOW_MS),
   };
 }

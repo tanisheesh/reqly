@@ -88,6 +88,17 @@ test("failed and slow requests carry the trace id from traceparent, sentry-trace
   await collector.close();
 });
 
+test("traceSlowMs lowers what counts as slow for trace ids", async () => {
+  const collector = await fakeCollector();
+  const client = new ReqlyClient(options(collector.url, { traceSlowMs: 100 }));
+  const headers = { traceparent: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01" };
+  client.record(request({ durationMs: 250, requestInfo: () => ({ method: "GET", path: "/x", headers, raw: null }) }));
+  client.record(request({ durationMs: 50, requestInfo: () => ({ method: "GET", path: "/x", headers, raw: null }) }));
+  await client.shutdown();
+  assert.deepEqual(collector.events().map((e) => e.trace_id), ["4bf92f3577b34da6a3ce929d0e0e4736", undefined]);
+  await collector.close();
+});
+
 test("an unreachable collector never throws into the app", async () => {
   const client = new ReqlyClient(options("http://127.0.0.1:1"));
   client.record(request());

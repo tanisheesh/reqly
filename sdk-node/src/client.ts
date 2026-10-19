@@ -6,7 +6,7 @@ import { ReqlyOptions, ResolvedConfig, resolveConfig } from "./config.js";
 import { LlmSummary, RequestInfo } from "./context.js";
 import { traceIdFromHeaders, wantsTraceId } from "./traces.js";
 
-export const SDK_VERSION = "0.5.0";
+export const SDK_VERSION = "0.5.1";
 export const UNMATCHED_ROUTE = "__unmatched__";
 
 const HOST = hostname();
@@ -190,7 +190,7 @@ export class ReqlyClient {
   }
 
   private traceId(requestInfo: (() => RequestInfo) | undefined, statusCode: number, durationMs: number): string | undefined {
-    if (!requestInfo || !wantsTraceId(statusCode, durationMs)) return undefined;
+    if (!requestInfo || !wantsTraceId(statusCode, durationMs, this.config.traceSlowMs)) return undefined;
     try {
       return traceIdFromHeaders(requestInfo().headers);
     } catch {
