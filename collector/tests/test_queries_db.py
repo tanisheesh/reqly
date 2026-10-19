@@ -44,7 +44,7 @@ async def _refresh_all(pool):
     from app.db.late_data import existing_aggregates
 
     async with pool.acquire() as conn:
-        for view, _ in await existing_aggregates(conn):
+        for view, _ in await existing_aggregates(conn, include_legacy=True):
             await conn.execute(f"CALL refresh_continuous_aggregate('{view}', NULL, NULL)")
 
 

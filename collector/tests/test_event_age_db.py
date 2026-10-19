@@ -22,6 +22,14 @@ def _event(service, ts):
     )
 
 
+async def _request_count(pool, service):
+    """Requests in the latency aggregate the late-data refresh keeps current."""
+    view = queries._latency_view(await queries.sketches_available(pool))
+    return await pool.fetchval(
+        f"SELECT coalesce(sum(request_count), 0) FROM {view} WHERE service_name = $1", service
+    )
+
+
 @pytest.mark.parametrize("backfill", [False, True])
 def test_old_late_event_does_not_wipe_aggregates(backfill):
     """History 20 days back is in the aggregates but its raw chunks are gone
@@ -33,9 +41,7 @@ def test_old_late_event_does_not_wipe_aggregates(backfill):
     hour = (now - timedelta(days=20)).replace(minute=0, second=0, microsecond=0)
 
     async def count(pool):
-        return await pool.fetchval(
-            "SELECT coalesce(sum(request_count), 0) FROM route_latency_1min WHERE service_name = $1", service
-        )
+        return await _request_count(pool, service)
 
     async def run():
         pool = await pool_module.create_pool()
@@ -80,9 +86,7 @@ def test_backfill_only_rebuilds_the_hours_it_sends():
     hour_a = (now - timedelta(days=40)).replace(minute=0, second=0, microsecond=0)
 
     async def count(pool, service):
-        return await pool.fetchval(
-            "SELECT coalesce(sum(request_count), 0) FROM route_latency_1min WHERE service_name = $1", service
-        )
+        return await _request_count(pool, service)
 
     async def run():
         pool = await pool_module.create_pool()

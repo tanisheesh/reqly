@@ -134,7 +134,7 @@ A service's spec (`api_specs`, one per service, uploaded with the ingest key or 
 
 - `request_events` — hypertable: `event_id`, `time`, `service_name`, `method`, `route`, `status_code`, `duration_ms`, `is_error`, `error_type`, `host`, and (schema v2) `release`, `environment`, `consumer_id`, `request_bytes`, `response_bytes`, `llm_model`, `llm_input_tokens`, `llm_output_tokens`. PK `(time, event_id)`, 14-day retention.
 - `api_latency_1min` — continuous aggregate (with the Toolkit): `uddsketch(1000, 0.005)` of duration plus request and error counts per minute, service, environment, route, method. 90 days.
-- `route_latency_1min`, `route_errors_1hour`, `route_status_distribution_1hour` — the original aggregates (90 / 180 / 180 days); `route_errors_1hour` feeds the anomaly detector.
+- `route_latency_1min`, `route_errors_1hour`, `route_status_distribution_1hour` — the original aggregates (90 / 180 / 180 days); `route_errors_1hour` feeds the anomaly detector. With the Toolkit, `route_latency_1min` is no longer refreshed (migration 010): nothing reads it once `api_latency_1min` exists.
 - `consumer_usage_1hour`, `llm_usage_1hour` — hourly rollups by consumer / by LLM model (90 days).
 - `deployments` — first and last seen per service, environment and release.
 - `insight_reports` — one weekly report per service (`anomalies_json`, `report_text`).

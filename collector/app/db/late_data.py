@@ -59,7 +59,8 @@ REFRESH_SLICE = timedelta(days=7)
 # (view, end_offset of its refresh policy). Buckets newer than the end
 # offset are left to the policy, matching how the views are defined.
 # api_latency_1min only exists when the TimescaleDB Toolkit is installed
-# (migration 003); views that don't exist are skipped.
+# (migration 003); views that don't exist are skipped, and so is
+# route_latency_1min when api_latency_1min replaces it (migration 010).
 AGGREGATES: tuple[tuple[str, timedelta], ...] = (
     ("route_latency_1min", timedelta(minutes=1)),
     ("route_errors_1hour", timedelta(hours=1)),
@@ -203,11 +204,20 @@ class LateDataTracker:
 tracker = LateDataTracker()
 
 
-async def existing_aggregates(conn: asyncpg.Connection) -> tuple[tuple[str, timedelta], ...]:
+_LEGACY_LATENCY = "route_latency_1min"
+
+
+async def existing_aggregates(
+    conn: asyncpg.Connection, include_legacy: bool = False
+) -> tuple[tuple[str, timedelta], ...]:
+    """The aggregates in use. include_legacy: also route_latency_1min when
+    the sketch aggregate has replaced it (for tests of the fallback queries)."""
     present = []
     for view, end_offset in AGGREGATES:
         if await conn.fetchval("SELECT to_regclass($1) IS NOT NULL", view):
             present.append((view, end_offset))
+    if not include_legacy and any(view == "api_latency_1min" for view, _ in present):
+        present = [(view, end_offset) for view, end_offset in present if view != _LEGACY_LATENCY]
     return tuple(present)
 
 
