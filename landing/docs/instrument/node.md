@@ -116,8 +116,9 @@ Ids are hashed with HMAC-SHA256 and your salt before they leave the process, so 
 ## LLM cost per route
 
 ```js
-import { recordLlmResponse, recordLlmUsage } from "reqly-node";
+import { instrumentOpenAI, recordLlmResponse, recordLlmUsage } from "reqly-node";
 
+const openai = instrumentOpenAI(new OpenAI());  // every call counted (instrumentAnthropic too), or:
 const completion = await openai.chat.completions.create({ model: "gpt-4o-mini", messages });
 recordLlmResponse(completion);             // OpenAI- or Anthropic-style responses
 recordLlmUsage("gpt-4o-mini", 1200, 240);  // or explicitly

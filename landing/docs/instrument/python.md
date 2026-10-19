@@ -108,9 +108,10 @@ See [API consumers](../features/consumers.md).
 
 ## LLM cost per route
 
-Record token usage where you call a model. The collector prices it per route.
+Instrument the client once, or record token usage where you call a model. The collector prices it per route.
 
 ```python
+client = reqly.instrument_openai(OpenAI())   # every call counted (instrument_anthropic too), or:
 completion = client.chat.completions.create(model="gpt-4o-mini", messages=messages)
 reqly.record_llm_response(completion)   # OpenAI- or Anthropic-style responses, or:
 reqly.record_llm_usage("gpt-4o-mini", input_tokens=1200, output_tokens=240)
