@@ -48,6 +48,8 @@ interface WireEvent {
   llm_model: string | null;
   llm_input_tokens: number | null;
   llm_output_tokens: number | null;
+  /** Several models in one request; omitted otherwise (ignored by collectors before 0.13). */
+  llm_usage?: { model: string; input_tokens: number; output_tokens: number }[];
 }
 
 // Clients with queued events are flushed when the process is about to exit
@@ -151,6 +153,15 @@ export class ReqlyClient {
         llm_model: request.llm?.model ?? null,
         llm_input_tokens: request.llm?.inputTokens ?? null,
         llm_output_tokens: request.llm?.outputTokens ?? null,
+        ...(request.llm?.byModel
+          ? {
+              llm_usage: request.llm.byModel.map((m) => ({
+                model: m.model,
+                input_tokens: m.inputTokens,
+                output_tokens: m.outputTokens,
+              })),
+            }
+          : {}),
       });
       this.stats.recorded += 1;
       if (this.queue.length > this.config.maxQueueSize) {
