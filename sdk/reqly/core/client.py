@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any, Callable
 
 from .buffer import EventBuffer
 from .capture import build_event
@@ -163,13 +164,13 @@ class ReqlyClient:
             pass
 
 
-def _once(factory):
+def _once(factory: Callable[[], Any] | None) -> Callable[[], Any] | None:
     """The request info built at most once, however many need it."""
     if factory is None:
         return None
-    cache: list = []
+    cache: list[Any] = []
 
-    def get():
+    def get() -> Any:
         if not cache:
             cache.append(factory())
         return cache[0]

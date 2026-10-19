@@ -84,6 +84,7 @@ matched become `__unmatched__`, so 404 scanners can't flood your data.
 ```python
 reqly.instrument(app, consumer_header="X-API-Key", consumer_salt=os.environ["REQLY_CONSUMER_SALT"])
 
+client = reqly.instrument_openai(OpenAI())    # every call counted (instrument_anthropic too), or:
 completion = client.chat.completions.create(model="gpt-4o-mini", messages=messages)
 reqly.record_llm_response(completion)          # OpenAI / Anthropic responses, or:
 reqly.record_llm_usage("gpt-4o-mini", input_tokens=1200, output_tokens=240)
