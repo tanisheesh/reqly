@@ -6,10 +6,15 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 
 ---
 
-## [Unreleased]
+## [0.14.2] — 2026-10-19
 
-Node SDK 0.5.2 (collector unchanged)
+Collector 0.14.2 · Helm chart 0.14.2 · Node SDK 0.5.2
 
+- Ask Reqly's `get_alerts` reads client error alerts properly (the status code, its share of requests,
+  the release, sample traces); it used to read them as error-rate anomalies and return empty numbers
+- `docker compose` passes every setting in `.env` to the collector (and the all-in-one compose file
+  too): the alert channels, `METRICS_TOKEN`, `LOG_FORMAT`, the trace settings, `REQLY_CONSUMER_SALT`,
+  the rate limits and more were set in `.env` but never reached it. Needs Compose 2.24+
 - Node: batches are gzipped on libuv's thread pool instead of the event loop, fixing a 3-4 µs per-request
   regression since 0.4.0 (found by re-running the benchmark, whose CI job had stopped failing on a crash)
 - Docs brought up to date with 0.13-0.14: README, landing page, PRD, architecture, decisions 13-17, setup,
@@ -374,7 +379,8 @@ Python SDK 0.1.5
 
 ---
 
-[Unreleased]: https://github.com/tanisheesh/reqly/compare/collector-v0.14.1...HEAD
+[Unreleased]: https://github.com/tanisheesh/reqly/compare/collector-v0.14.2...HEAD
+[0.14.2]: https://github.com/tanisheesh/reqly/tree/collector-v0.14.2
 [0.14.1]: https://github.com/tanisheesh/reqly/tree/collector-v0.14.1
 [0.14.0]: https://github.com/tanisheesh/reqly/tree/collector-v0.14.0
 [0.13.0]: https://github.com/tanisheesh/reqly/tree/collector-v0.13.0
