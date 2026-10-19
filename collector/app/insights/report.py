@@ -6,9 +6,9 @@ Pure module (no app config, no I/O).
 from __future__ import annotations
 
 # The LLM is given ONLY the structured, pre-computed anomaly JSON -- never
-# raw events. Weekly batch job, so Groq's famous low-latency inference
-# doesn't actually matter here; report quality is worth more than speed in
-# this one spot, hence a 70b model rather than an instant/small one.
+# raw events. Weekly batch job, so latency doesn't matter here; report
+# quality is worth more than speed in this one spot, hence a large model
+# rather than an instant/small one.
 SYSTEM_PROMPT = """You are a site-reliability analyst. You will be given pre-computed \
 statistical anomalies for an API service's past week. Write a concise report \
 (3-6 bullet points) explaining what was observed.
@@ -93,7 +93,7 @@ def fallback_report(service_name: str, week_start: str, anomalies: list[dict], d
     """
     lines = [
         f"AI Insights for **{service_name}**, week of {week_start} "
-        "(raw statistical findings -- GROQ_API_KEY not configured or call failed):"
+        "(raw statistical findings -- no LLM configured or the call failed):"
     ]
     for a in anomalies:
         line = (

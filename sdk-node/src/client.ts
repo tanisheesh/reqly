@@ -1,10 +1,11 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { hostname } from "node:os";
+import { gzipSync } from "node:zlib";
 
 import { ReqlyOptions, ResolvedConfig, resolveConfig } from "./config.js";
 import { LlmSummary, RequestInfo } from "./context.js";
 
-export const SDK_VERSION = "0.3.2";
+export const SDK_VERSION = "0.4.0";
 export const UNMATCHED_ROUTE = "__unmatched__";
 
 const HOST = hostname();
@@ -12,6 +13,11 @@ const MAX_RETRIES = 3;
 const REQUEST_TIMEOUT_MS = 3000;
 /** Longest `shutdown()` may take: a down collector must not hold up a deploy. */
 const SHUTDOWN_FLUSH_MS = 5000;
+// Bodies at least this big are gzipped. A collector older than 0.13 can't
+// read gzip and answers 400/415/422; the batch is then resent as plain JSON
+// and the client stops compressing.
+const GZIP_MIN_BYTES = 1024;
+const GZIP_REJECTED = new Set([400, 415, 422]);
 
 export interface RecordedRequest {
   method: string;
@@ -42,6 +48,8 @@ interface WireEvent {
   llm_model: string | null;
   llm_input_tokens: number | null;
   llm_output_tokens: number | null;
+  /** Several models in one request; omitted otherwise (ignored by collectors before 0.13). */
+  llm_usage?: { model: string; input_tokens: number; output_tokens: number }[];
 }
 
 // Clients with queued events are flushed when the process is about to exit
@@ -78,6 +86,7 @@ export class ReqlyClient {
   private flushing: Promise<void> | undefined;
   private disabled = false;
   private stopping = false; // shutdown() started: flushes stop retrying
+  private gzip = true;
   // The same few API keys / tenants call over and over: hash each once.
   private readonly hashedConsumers = new Map<string, string>();
   private openapiSource: (() => unknown) | undefined;
@@ -144,6 +153,15 @@ export class ReqlyClient {
         llm_model: request.llm?.model ?? null,
         llm_input_tokens: request.llm?.inputTokens ?? null,
         llm_output_tokens: request.llm?.outputTokens ?? null,
+        ...(request.llm?.byModel
+          ? {
+              llm_usage: request.llm.byModel.map((m) => ({
+                model: m.model,
+                input_tokens: m.inputTokens,
+                output_tokens: m.outputTokens,
+              })),
+            }
+          : {}),
       });
       this.stats.recorded += 1;
       if (this.queue.length > this.config.maxQueueSize) {
@@ -213,16 +231,10 @@ export class ReqlyClient {
       ...(this.config.environment ? { environment: this.config.environment } : {}),
       events,
     });
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (this.config.apiKey) headers["X-Reqly-Key"] = this.config.apiKey;
+    const compressed = Buffer.byteLength(body) >= GZIP_MIN_BYTES ? gzipSync(body) : undefined;
     for (let attempt = 0; attempt < retries; attempt++) {
       try {
-        const response = await fetch(`${this.config.collectorUrl}/v1/ingest`, {
-          method: "POST",
-          headers,
-          body,
-          signal: AbortSignal.timeout(timeoutMs),
-        });
+        const response = await this.post(body, compressed, timeoutMs);
         if (response.ok) {
           this.stats.shipped += events.length;
           return true;
@@ -244,6 +256,24 @@ export class ReqlyClient {
       }
     }
     return false;
+  }
+
+  private async post(body: string, compressed: Buffer | undefined, timeoutMs: number): Promise<Response> {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (this.config.apiKey) headers["X-Reqly-Key"] = this.config.apiKey;
+    const url = `${this.config.collectorUrl}/v1/ingest`;
+    const plain = () => fetch(url, { method: "POST", headers, body, signal: AbortSignal.timeout(timeoutMs) });
+    if (!compressed || !this.gzip) return plain();
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { ...headers, "Content-Encoding": "gzip" },
+      body: compressed,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!GZIP_REJECTED.has(response.status)) return response;
+    const retried = await plain();
+    if (retried.ok) this.gzip = false; // the collector can't read gzip
+    return retried;
   }
 
   /** Uploads the app's OpenAPI spec once. Never throws; failures are logged. */

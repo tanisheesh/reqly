@@ -6,7 +6,53 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 
 ---
 
-## [Unreleased]
+## [0.13.0] — 2026-10-19
+
+Collector 0.13.0 · Helm chart 0.13.0 · Python SDK 0.6.0 · Node SDK 0.4.0
+
+### ✨ Added
+- **Any OpenAI-compatible LLM** for the weekly report and Ask Reqly: `LLM_BASE_URL`, `LLM_API_KEY`
+  and `LLM_MODEL` point the collector at OpenAI, OpenRouter, a local Ollama or vLLM, or anything
+  else that speaks the chat completions API. `GROQ_API_KEY` alone still means Groq, as before, and
+  is only ever sent to Groq. Helm: `secrets.llmApiKey`
+- **Multi-model LLM cost:** a request that calls several models now prices each model's tokens at
+  that model's rate, instead of all of them at the rate of the model with the most tokens. The
+  SDKs send each model's tokens (`llm_usage`, ingest spec v3); OTLP GenAI spans get the same. Past
+  data and older SDKs keep the old attribution
+- **The collector's own metrics** at `GET /metrics` (Prometheus): requests and latency per
+  collector route, events ingested and rejected per source, database pool connections and the
+  late-data backlog, with no service, project or consumer names in them. `METRICS_TOKEN` puts
+  them behind a bearer token, `METRICS_ENABLED=false` turns them off
+- **`LOG_FORMAT=json`:** one JSON object per log line, uvicorn's access lines included
+- **Gzip ingest:** `/v1/ingest` accepts `Content-Encoding: gzip` (capped at 32 MB decompressed),
+  and both SDKs compress batches above 1 KB. Against an older collector they resend the batch as
+  plain JSON and stop compressing, so mixed versions keep working
+
+### ⚡ Performance
+- A batch is inserted with one `unnest()` statement instead of one `INSERT` per event
+- A clean batch is validated in one call; events are only validated one by one to find the bad
+  ones when that fails
+- OTLP protobuf exports are mapped straight from the parsed message, without converting it to a
+  dict first (about 3× faster on a real Express export)
+- With the TimescaleDB Toolkit, `route_latency_1min` is no longer refreshed every minute: nothing
+  reads it once the sketch aggregate exists (migration 010)
+
+### 🔧 Changed
+- The collector image installs its dependencies from a hash-pinned lock
+  (`collector/requirements.txt`), so every build gets the same packages; CI checks it matches
+  `pyproject.toml`
+- The `groq` package is replaced by `openai` (the client for every provider)
+- CI: ruff and mypy for the collector and Python SDK, dashboard unit tests (vitest), and an end to
+  end test that sends from both SDKs through a real collector and TimescaleDB to the read API
+
+### ⬆️ Upgrading
+- Migrations 010 and 011 run on start-up. Nothing to change in your settings
+- `/metrics` is on and unauthenticated by default. It holds no tenant data, but set
+  `METRICS_TOKEN` (or `METRICS_ENABLED=false`) if the collector is reachable from the internet
+
+---
+
+## [0.12.3] — 2026-10-19
 
 Collector 0.12.3 · Helm chart 0.12.3
 
@@ -260,7 +306,9 @@ Python SDK 0.1.5
 
 ---
 
-[Unreleased]: https://github.com/tanisheesh/reqly/compare/collector-v0.12.2...HEAD
+[Unreleased]: https://github.com/tanisheesh/reqly/compare/collector-v0.13.0...HEAD
+[0.13.0]: https://github.com/tanisheesh/reqly/tree/collector-v0.13.0
+[0.12.3]: https://github.com/tanisheesh/reqly/tree/collector-v0.12.3
 [0.12.2]: https://github.com/tanisheesh/reqly/tree/collector-v0.12.2
 [0.12.1]: https://github.com/tanisheesh/reqly/tree/collector-v0.12.1
 [0.12.0]: https://github.com/tanisheesh/reqly/tree/collector-v0.12.0

@@ -20,9 +20,15 @@ from .hourly import BASELINE_WEEKS, apply_detections
 
 KIND = "llm_cost"
 
+# The splits give multi-model requests' tokens to each model (and count no
+# requests): see migrations/011_llm_usage_splits.sql.
 _ROWS_SQL = """
 SELECT bucket, route, llm_model, request_count, input_tokens, output_tokens
 FROM llm_usage_1hour
+WHERE service_name = $1 AND bucket = ANY($2::timestamptz[])
+UNION ALL
+SELECT bucket, route, llm_model, 0, input_tokens, output_tokens
+FROM llm_usage_splits_1hour
 WHERE service_name = $1 AND bucket = ANY($2::timestamptz[])
 """
 
@@ -30,11 +36,13 @@ WHERE service_name = $1 AND bucket = ANY($2::timestamptz[])
 async def refresh_hour(pool: asyncpg.Pool, hour: datetime) -> None:
     # Like route_errors_1hour, the policy stops an hour short of now.
     async with pool.acquire() as conn:
-        await conn.execute(
-            "CALL refresh_continuous_aggregate('llm_usage_1hour', $1::timestamptz, $2::timestamptz)",
-            hour,
-            hour + timedelta(hours=1),
-        )
+        for view in ("llm_usage_1hour", "llm_usage_splits_1hour"):
+            await conn.execute(
+                "CALL refresh_continuous_aggregate($1::regclass, $2::timestamptz, $3::timestamptz)",
+                view,
+                hour,
+                hour + timedelta(hours=1),
+            )
 
 
 async def hour_rows(pool: asyncpg.Pool, service_name: str, hour: datetime) -> list[dict]:

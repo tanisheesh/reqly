@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import math
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 import asyncpg
 
@@ -178,7 +179,7 @@ async def compare_periods(pool, service: str, args: dict, now: datetime) -> dict
     ranges = {
         label: time_range(args, now, retention, prefix=f"{label}_") for label in ("before", "after")
     }
-    out = {"route": route or "all routes"}
+    out: dict[str, Any] = {"route": route or "all routes"}
     for label, (start, end) in ranges.items():
         rows = await _stats(pool, service, start, end, route, environment, "none")
         out[label] = {"range": [_ts(start), _ts(end)], **(rows[0] if rows else {"requests": 0})}

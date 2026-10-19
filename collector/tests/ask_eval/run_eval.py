@@ -1,7 +1,7 @@
 """Ask Reqly eval: canned questions over the load generator's demo data,
 each with facts the answer must contain.
 
-Not part of the default test run -- it needs a collector with GROQ_API_KEY
+Not part of the default test run -- it needs a collector with an LLM (LLM_BASE_URL or GROQ_API_KEY)
 and fresh load-generator data (the scenarios are relative to when the
 generator started). Run it by hand after changing prompts, tools or models:
 

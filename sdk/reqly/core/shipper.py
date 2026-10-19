@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import gzip
+import json
 import logging
 import random
 import time
@@ -12,6 +14,11 @@ logger = logging.getLogger("reqly")
 
 _MAX_RETRIES = 3
 _BACKOFF_BASE_SECONDS = 0.5
+# Bodies at least this big are gzipped. A collector older than 0.13 can't
+# read gzip and answers 400/415/422; the batch is then resent as plain JSON
+# and the shipper stops compressing.
+_GZIP_MIN_BYTES = 1024
+_GZIP_REJECTED = (400, 415, 422)
 
 
 def _is_retryable(status_code: int) -> bool:
@@ -48,6 +55,7 @@ class Shipper:
         }
         self.dropped_batches = 0
         self.shipped_events = 0
+        self._gzip = True
 
         headers = {"Content-Type": "application/json"}
         if api_key:
@@ -83,9 +91,12 @@ class Shipper:
             "events": [e.to_dict() for e in events],
         }
 
+        body = json.dumps(payload, separators=(",", ":")).encode()
+        compressed = gzip.compress(body, compresslevel=6) if len(body) >= _GZIP_MIN_BYTES else None
+
         for attempt in range(retries):
             try:
-                response = self._client.post("/v1/ingest", json=payload)
+                response = self._post(body, compressed)
                 if response.status_code < 400:
                     self.shipped_events += len(events)
                     return True
@@ -129,6 +140,18 @@ class Shipper:
             retries,
         )
         return False
+
+    def _post(self, body: bytes, compressed: bytes | None) -> httpx.Response:
+        if compressed is None or not self._gzip:
+            return self._client.post("/v1/ingest", content=body)
+        response = self._client.post("/v1/ingest", content=compressed, headers={"Content-Encoding": "gzip"})
+        if response.status_code not in _GZIP_REJECTED:
+            return response
+        plain = self._client.post("/v1/ingest", content=body)
+        if plain.status_code < 400:
+            logger.debug("reqly: collector does not accept gzip, sending plain JSON from now on")
+            self._gzip = False
+        return plain
 
     def close(self) -> None:
         try:

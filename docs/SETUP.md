@@ -46,8 +46,8 @@ cp .env.example .env
 | `REQLY_INGEST_KEY` | `demo-key` | Any secret string — sent by the SDK as `X-Reqly-Key` on ingest |
 | `REQLY_READ_KEY` | `demo-read-key` | Sent by the dashboard to read metrics. It is compiled into the dashboard bundle, so treat it as public to dashboard viewers — it must differ from `REQLY_INGEST_KEY` |
 | `GROQ_API_KEY` | *(empty)* | [console.groq.com/keys](https://console.groq.com/keys) — free tier; leave empty to use plain-text fallback for AI insights |
-| `GROQ_MODEL` | `openai/gpt-oss-120b` | See Groq docs for available models |
-| `ASK_MODEL` | `GROQ_MODEL` | Model for Ask Reqly; needs tool calling |
+| `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | *(empty)* | Any OpenAI-compatible API instead of Groq (OpenAI, OpenRouter, Ollama) |
+| `ASK_MODEL` | `LLM_MODEL` | Model for Ask Reqly; needs tool calling |
 | `PUBLIC_DASHBOARD` | `true` | `true`: anyone with the dashboard can read (public demo). `false`: sign-in required |
 | `REQLY_ADMIN_USERNAME` / `REQLY_ADMIN_PASSWORD` | `admin` / *(empty)* | First admin, created at start-up when there are no users (password 12+ characters) |
 | `SESSION_TTL_HOURS` | `168` | How long a sign-in lasts |
@@ -134,7 +134,7 @@ The database image moved to `timescale/timescaledb-ha:pg16`, which runs as a dif
 ## Known local-only limitations
 
 - The load generator is a Docker service, not a real app — it generates synthetic traffic patterns. To see AI insights from real traffic, instrument your own app or run the [EventFlow demo](https://github.com/tanisheesh/EventFlow).
-- `GROQ_API_KEY` is required for AI-written insights. Without it the insights panel shows plain-text statistical findings — fully functional, just not LLM-narrated.
+- An LLM (`GROQ_API_KEY`, or `LLM_BASE_URL` + `LLM_MODEL`) is required for AI-written insights. Without it the insights panel shows plain-text statistical findings — fully functional, just not LLM-narrated.
 - The continuous aggregate `end_offset` is 1 minute, so the most recent ~1 minute of data may not appear in dashboard queries (it's in the raw table but not yet in the aggregate). This is expected TimescaleDB behavior.
 - On first start, the load generator backfills weeks of history. The collector materializes it into the aggregates in the background (about a minute per few weeks of demo data), so the 7d chart and AI insights fill in shortly after the backfill finishes. Re-running the backfill doesn't duplicate data — events are deterministic and deduplicated.
 

@@ -3,7 +3,7 @@
 import asyncio
 import dataclasses
 
-from app.insights import groq_client
+from app.insights import llm_report
 from app.insights.report import fallback_report, summarize_drift
 
 DRIFT = {
@@ -46,8 +46,8 @@ def test_fallback_report_has_an_api_surface_section():
 
 
 def test_a_quiet_week_with_drift_still_gets_a_report(monkeypatch):
-    monkeypatch.setattr(groq_client, "settings", dataclasses.replace(groq_client.settings, groq_api_key=None))
-    text = asyncio.run(groq_client.generate_report("shop", "2026-10-05", [], summarize_drift(DRIFT)))
+    monkeypatch.setattr(llm_report, "settings", dataclasses.replace(llm_report.settings, llm_base_url=None))
+    text = asyncio.run(llm_report.generate_report("shop", "2026-10-05", [], summarize_drift(DRIFT)))
     assert "API surface" in text
-    quiet = asyncio.run(groq_client.generate_report("shop", "2026-10-05", [], None))
+    quiet = asyncio.run(llm_report.generate_report("shop", "2026-10-05", [], None))
     assert quiet.startswith("No significant anomalies")

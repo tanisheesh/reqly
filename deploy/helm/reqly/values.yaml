@@ -5,12 +5,13 @@
 # Leave a value empty to have the chart generate it once (and keep it across
 # upgrades), or point existingSecret at a Secret you manage with these keys:
 #   ingest-key, read-key, database-url, postgres-password,
-#   groq-api-key, admin-password, slack-webhook-url, discord-webhook-url, webhook-url
+#   groq-api-key, llm-api-key, admin-password, slack-webhook-url, discord-webhook-url, webhook-url
 secrets:
   existingSecret: ""
   ingestKey: ""        # REQLY_INGEST_KEY: SDKs and admin API calls (write)
   readKey: ""          # REQLY_READ_KEY: the dashboard's key; public to dashboard viewers
-  groqApiKey: ""       # AI weekly report and Ask Reqly (optional)
+  groqApiKey: ""       # AI weekly report and Ask Reqly on Groq (optional)
+  llmApiKey: ""        # or any OpenAI-compatible API: set with LLM_BASE_URL / LLM_MODEL below
   adminPassword: ""    # first admin when publicDashboard is false (12+ characters)
   slackWebhookUrl: ""
   discordWebhookUrl: ""
@@ -34,7 +35,8 @@ collector:
     LLM_COST_ALERT_MIN_USD: "1.0"
     FORWARDED_ALLOW_IPS: "*"    # the collector is only reachable through the cluster
     # DASHBOARD_URL: https://reqly.example.com
-    # GROQ_MODEL: openai/gpt-oss-120b
+    # LLM_BASE_URL: https://openrouter.ai/api/v1   # unset: Groq (groqApiKey) or OpenAI (llmApiKey)
+    # LLM_MODEL: openai/gpt-oss-120b
   extraEnv: []                  # [{name: ..., value: ...}] for anything else
   resources:
     requests: { cpu: 100m, memory: 256Mi }

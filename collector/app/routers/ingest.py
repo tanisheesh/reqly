@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import AwareDatetime, BaseModel, Field, ValidationError, field_validator
+from pydantic import AwareDatetime, BaseModel, Field, TypeAdapter, ValidationError, field_validator, model_validator
 
 from ..auth import Principal, verify_ingest_key, writable_service
 from ..config import settings
@@ -12,10 +12,14 @@ from ..consumers.cap import consumer_cap
 from ..db.late_data import event_time_problem
 from ..db.late_data import tracker as late_data_tracker
 from ..db.pool import get_pool
-from ..db.queries import event_row, insert_events, record_deployments, row_time
+from ..db.queries import event_row, insert_events, insert_llm_splits, record_deployments, row_time
+from ..gzip_body import GzipRoute
+from ..llm.splits import MAX_MODELS_PER_REQUEST, split_rows, summarize_models
+from ..observability import INGEST_EVENTS
 from ..rate_limit import INGEST_IP_LIMIT, ingest_key, ingest_limit, limiter
 
-router = APIRouter()
+# The SDKs gzip larger batches (Content-Encoding: gzip).
+router = APIRouter(route_class=GzipRoute)
 
 _MAX_BATCH_SIZE = 1000
 _MAX_DURATION_MS = 300_000  # 5 minutes -- anything longer is clearly corrupt
@@ -30,6 +34,12 @@ _MAX_ENVIRONMENT_LEN = 32
 _MAX_CONSUMER_ID_LEN = 128
 _MAX_BYTES = 10 * 1024**3  # 10 GiB -- larger is clearly corrupt
 _MAX_TOKENS = 10_000_000
+
+
+class LlmModelUsageIn(BaseModel):
+    model: str = Field(min_length=1, max_length=_MAX_SHORT_TEXT_LEN)
+    input_tokens: int = Field(default=0, ge=0, le=_MAX_TOKENS)
+    output_tokens: int = Field(default=0, ge=0, le=_MAX_TOKENS)
 
 
 class EventIn(BaseModel):
@@ -51,6 +61,10 @@ class EventIn(BaseModel):
     llm_model: str | None = Field(default=None, max_length=_MAX_SHORT_TEXT_LEN)
     llm_input_tokens: int | None = Field(default=None, ge=0, le=_MAX_TOKENS)
     llm_output_tokens: int | None = Field(default=None, ge=0, le=_MAX_TOKENS)
+    # v3: each model's own tokens when the request called several. When
+    # present it is the source of truth: llm_model / llm_*_tokens are
+    # recomputed from it (main model, totals) so the two can't disagree.
+    llm_usage: list[LlmModelUsageIn] | None = Field(default=None, max_length=MAX_MODELS_PER_REQUEST)
 
     @field_validator("duration_ms")
     @classmethod
@@ -58,6 +72,47 @@ class EventIn(BaseModel):
         if v < 0 or v > _MAX_DURATION_MS:
             raise ValueError("duration_ms out of plausible range")
         return v
+
+    @model_validator(mode="after")
+    def totals_from_llm_usage(self) -> EventIn:
+        if self.llm_usage:
+            model, tokens_in, tokens_out, _ = summarize_models(
+                [(m.model, m.input_tokens, m.output_tokens) for m in self.llm_usage]
+            )
+            if tokens_in > _MAX_TOKENS or tokens_out > _MAX_TOKENS:
+                raise ValueError("llm_usage token totals out of plausible range")
+            self.llm_model, self.llm_input_tokens, self.llm_output_tokens = model, tokens_in, tokens_out
+        return self
+
+    def per_model_usage(self) -> list[tuple[str, int, int]]:
+        if not self.llm_usage:
+            return []
+        return summarize_models([(m.model, m.input_tokens, m.output_tokens) for m in self.llm_usage])[3]
+
+
+# Validates a whole batch in one pydantic-core call; per-event validation
+# only runs when this fails, to find which events to drop.
+_BATCH_ADAPTER = TypeAdapter(list[EventIn])
+
+
+def _validate_events(raw_events: list[dict]) -> tuple[list[EventIn], int, list[str]]:
+    """Returns (valid events, rejected count, up to 5 reasons)."""
+    try:
+        return _BATCH_ADAPTER.validate_python(raw_events), 0, []
+    except ValidationError:
+        pass
+    valid: list[EventIn] = []
+    rejected = 0
+    reasons: list[str] = []
+    for raw_event in raw_events:
+        try:
+            valid.append(EventIn.model_validate(raw_event))
+        except ValidationError as exc:
+            rejected += 1
+            if len(reasons) < 5:
+                first = exc.errors()[0]
+                reasons.append(f"{'.'.join(str(p) for p in first['loc'])}: {first['msg']}")
+    return valid, rejected, reasons
 
 
 class IngestRequest(BaseModel):
@@ -92,19 +147,10 @@ async def ingest(request: Request, body: IngestRequest, principal: Principal = D
     if not await writable_service(principal, body.service_name):
         raise HTTPException(status_code=403, detail="this service belongs to another project")
 
+    parsed, rejected, reasons = _validate_events(body.events)
     valid: list[EventIn] = []
-    rejected = 0
-    reasons: list[str] = []
     now = datetime.now(timezone.utc)
-    for raw_event in body.events:
-        try:
-            e = EventIn.model_validate(raw_event)
-        except ValidationError as exc:
-            rejected += 1
-            if len(reasons) < 5:
-                first = exc.errors()[0]
-                reasons.append(f"{'.'.join(str(p) for p in first['loc'])}: {first['msg']}")
-            continue
+    for e in parsed:
         problem = event_time_problem(e.timestamp, now, body.backfill)
         if problem:
             rejected += 1
@@ -118,7 +164,9 @@ async def ingest(request: Request, body: IngestRequest, principal: Principal = D
         pool, body.service_name, [(e.timestamp, e.consumer_id) for e in valid], settings.consumer_limit_per_day
     )
     rows = []
+    splits: list[tuple] = []
     for e, consumer_id in zip(valid, consumers):
+        splits += split_rows(str(e.event_id), e.timestamp, body.service_name, e.route, e.per_model_usage())
         rows.append(
             event_row(
                 event_id=str(e.event_id),
@@ -143,13 +191,16 @@ async def ingest(request: Request, body: IngestRequest, principal: Principal = D
         )
 
     await insert_events(pool, rows)
+    await insert_llm_splits(pool, splits)
     if rows:
         await record_deployments(pool, rows)
         if body.backfill:
             late_data_tracker.note_backfill(row_time(r) for r in rows)
         else:
             late_data_tracker.note(min(row_time(r) for r in rows))
-    response = {"accepted": len(rows), "rejected": rejected}
+    INGEST_EVENTS.labels("sdk", "accepted").inc(len(rows))
+    INGEST_EVENTS.labels("sdk", "rejected").inc(rejected)
+    response: dict[str, object] = {"accepted": len(rows), "rejected": rejected}
     if reasons:
         response["reasons"] = reasons
     return response

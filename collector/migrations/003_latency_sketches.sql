@@ -13,8 +13,8 @@
 -- with the plain timescale/timescaledb image. Without it this migration is a
 -- no-op and the collector keeps using the percentile_cont views (it checks for
 -- api_latency_1min at runtime). To enable it later: install the Toolkit, then
--- DELETE FROM schema_migrations WHERE filename = '003_latency_sketches.sql'
--- and restart the collector.
+-- DELETE FROM schema_migrations WHERE filename IN ('003_latency_sketches.sql',
+-- '010_retire_route_latency_policy.sql') and restart the collector.
 
 DO $migration$
 BEGIN

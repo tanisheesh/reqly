@@ -46,6 +46,31 @@ test("retries 429 and 5xx, drops on other 4xx", async () => {
   await client2.shutdown();
 });
 
+test("large batches are gzipped; a collector without gzip gets plain JSON from then on", async () => {
+  const collector = await fakeCollector();
+  const client = new ReqlyClient(options(collector.url));
+  client.record(request());
+  await client.flush();
+  for (let i = 0; i < 20; i++) client.record(request({ route: `/items/${i}` }));
+  await client.flush();
+  assert.deepEqual(collector.requests.map((r) => r.headers["content-encoding"]), [undefined, "gzip"]);
+  assert.equal(collector.events().length, 21);
+  await client.shutdown();
+  await collector.close();
+
+  const old = await fakeCollector([], { gzip: false });
+  const client2 = new ReqlyClient(options(old.url));
+  for (let round = 0; round < 2; round++) {
+    for (let i = 0; i < 20; i++) client2.record(request({ route: `/items/${i}` }));
+    await client2.flush();
+  }
+  assert.deepEqual(old.requests.map((r) => r.headers["content-encoding"]), ["gzip", undefined, undefined]);
+  assert.equal(client2.stats.shipped, 40);
+  assert.equal(client2.stats.dropped, 0);
+  await client2.shutdown();
+  await old.close();
+});
+
 test("an unreachable collector never throws into the app", async () => {
   const client = new ReqlyClient(options("http://127.0.0.1:1"));
   client.record(request());

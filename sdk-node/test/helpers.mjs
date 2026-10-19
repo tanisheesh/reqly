@@ -1,16 +1,27 @@
 import { createServer } from "node:http";
 import { createHmac } from "node:crypto";
+import { gunzipSync } from "node:zlib";
 
-/** A collector stand-in. `statuses` scripts its responses (then 202s). */
-export async function fakeCollector(statuses = []) {
+/**
+ * A collector stand-in. `statuses` scripts its responses (then 202s).
+ * `gzip: false` answers gzip bodies with 422, like a collector older than 0.13.
+ */
+export async function fakeCollector(statuses = [], { gzip = true } = {}) {
   const batches = [];
   const requests = [];
   const specs = []; // OpenAPI uploads: { url, spec }
   const server = createServer((req, res) => {
-    let body = "";
-    req.on("data", (chunk) => (body += chunk));
+    const chunks = [];
+    req.on("data", (chunk) => chunks.push(chunk));
     req.on("end", () => {
       requests.push({ url: req.url, headers: req.headers });
+      const gzipped = req.headers["content-encoding"] === "gzip";
+      if (gzipped && !gzip) {
+        res.writeHead(422, { "Content-Type": "application/json" });
+        return res.end("{}");
+      }
+      const raw = Buffer.concat(chunks);
+      const body = (gzipped ? gunzipSync(raw) : raw).toString();
       if (req.method === "PUT" && req.url.endsWith("/openapi")) {
         specs.push({ url: req.url, spec: JSON.parse(body) });
         res.writeHead(200, { "Content-Type": "application/json" });

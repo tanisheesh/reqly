@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import logging
 import threading
-from urllib.parse import quote
 from typing import Callable
+from urllib.parse import quote
 
 import httpx
 

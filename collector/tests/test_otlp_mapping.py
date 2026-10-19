@@ -14,7 +14,7 @@ from google.protobuf.json_format import MessageToDict
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
 
 from app.db.queries import EVENT_COLUMNS
-from app.otlp.mapping import UNMATCHED_ROUTE, map_resource_spans
+from app.otlp.mapping import UNMATCHED_ROUTE, map_export_request, map_resource_spans
 
 FIXTURES = Path(__file__).parent / "fixtures" / "otlp"
 
@@ -22,7 +22,7 @@ FIXTURES = Path(__file__).parent / "fixtures" / "otlp"
 def _proto_fixture(name):
     message = ExportTraceServiceRequest()
     message.ParseFromString((FIXTURES / name).read_bytes())
-    return MessageToDict(message)
+    return message
 
 
 def _events(result):
@@ -59,13 +59,13 @@ def test_express_json_fixture():
 
 
 def test_express_protobuf_fixture_maps_like_json():
-    result = map_resource_spans(_proto_fixture("express_http_protobuf.bin"))
+    result = map_export_request(_proto_fixture("express_http_protobuf.bin"))
     assert sorted(_summary(result)) == sorted(EXPRESS_EXPECTED)
     assert result.skipped == 22
 
 
 def test_python_legacy_semconv_fixture():
-    result = map_resource_spans(_proto_fixture("fastapi_python_legacy.bin"))
+    result = map_export_request(_proto_fixture("fastapi_python_legacy.bin"))
     assert sorted(_summary(result)) == sorted([
         ("GET", "/items/{item_id}", 200, False, None),
         ("GET", "/items/{item_id}", 404, False, None),
@@ -74,6 +74,17 @@ def test_python_legacy_semconv_fixture():
     ])
     e = _events(result)[0]
     assert (e["release"], e["environment"], e["host"]) == ("2026.10.1", "staging", "api-pod-3")
+
+
+def test_protobuf_maps_exactly_like_its_json_form():
+    # The protobuf path reads the message directly; its JSON form (with
+    # base64 ids and enum names, as MessageToDict prints it) must give the
+    # very same rows.
+    for name in ("express_http_protobuf.bin", "fastapi_python_legacy.bin"):
+        message = _proto_fixture(name)
+        direct, via_json = map_export_request(message, "salt"), map_resource_spans(MessageToDict(message), "salt")
+        assert direct.rows == via_json.rows and direct.rows
+        assert (direct.skipped, direct.rejected) == (via_json.skipped, via_json.rejected)
 
 
 def test_event_ids_are_stable_across_retries():
@@ -186,8 +197,13 @@ def test_genai_span_tokens_land_on_the_request_that_made_the_call():
     call2 = _child("3333333333333333", SERVER_ID, {
         "gen_ai.request.model": "gpt-4o", "gen_ai.usage.prompt_tokens": 100,  # legacy names
         "gen_ai.usage.completion_tokens": 20})
-    [event] = _events(map_resource_spans(_tree(server, handler, call1, call2)))
+    result = map_resource_spans(_tree(server, handler, call1, call2))
+    [event] = _events(result)
     assert event["route"] == "/chat"
+    # and split so gpt-4o's tokens are priced as gpt-4o
+    splits = {s[4]: (s[5], s[6]) for s in result.llm_splits}
+    assert splits == {"gpt-4o-mini-2024-07-18": (-100, -20), "gpt-4o": (100, 20)}
+    assert {s[1] for s in result.llm_splits} == {event["event_id"]}
     # tokens summed, attributed to the model with the most tokens (like the SDKs)
     assert (event["llm_model"], event["llm_input_tokens"], event["llm_output_tokens"]) == \
         ("gpt-4o-mini-2024-07-18", 1300, 260)

@@ -7,9 +7,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from app.db import late_data
+from app.db import late_data, queries
 from app.db import pool as pool_module
-from app.db import queries
 from tests.test_queries_db import _db_reachable, _refresh_all
 
 pytestmark = pytest.mark.skipif(not _db_reachable(), reason="TimescaleDB not reachable")
@@ -19,6 +18,14 @@ def _event(service, ts):
     return queries.event_row(
         event_id=str(uuid.uuid4()), time=ts, service_name=service, method="GET", route="/a",
         status_code=200, duration_ms=10.0, is_error=False, error_type=None, host="h",
+    )
+
+
+async def _request_count(pool, service):
+    """Requests in the latency aggregate the late-data refresh keeps current."""
+    view = queries._latency_view(await queries.sketches_available(pool))
+    return await pool.fetchval(
+        f"SELECT coalesce(sum(request_count), 0) FROM {view} WHERE service_name = $1", service
     )
 
 
@@ -33,9 +40,7 @@ def test_old_late_event_does_not_wipe_aggregates(backfill):
     hour = (now - timedelta(days=20)).replace(minute=0, second=0, microsecond=0)
 
     async def count(pool):
-        return await pool.fetchval(
-            "SELECT coalesce(sum(request_count), 0) FROM route_latency_1min WHERE service_name = $1", service
-        )
+        return await _request_count(pool, service)
 
     async def run():
         pool = await pool_module.create_pool()
@@ -80,9 +85,7 @@ def test_backfill_only_rebuilds_the_hours_it_sends():
     hour_a = (now - timedelta(days=40)).replace(minute=0, second=0, microsecond=0)
 
     async def count(pool, service):
-        return await pool.fetchval(
-            "SELECT coalesce(sum(request_count), 0) FROM route_latency_1min WHERE service_name = $1", service
-        )
+        return await _request_count(pool, service)
 
     async def run():
         pool = await pool_module.create_pool()

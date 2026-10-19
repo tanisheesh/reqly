@@ -7,6 +7,30 @@ on:
     branches: [main]
 
 jobs:
+  lint:
+    name: Lint and type-check (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: collector/requirements.txt
+      - name: Install tools and the packages' dependencies (for mypy)
+        run: |
+          pip install ruff==0.14.0 mypy==2.4.0
+          pip install --require-hashes -r collector/requirements.txt
+          pip install -e ./sdk
+      - name: ruff
+        run: ruff check collector sdk e2e
+      - name: mypy (collector)
+        working-directory: collector
+        run: mypy
+      - name: mypy (Python SDK)
+        working-directory: sdk
+        run: mypy
+
   sdk:
     name: SDK tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
@@ -84,10 +108,21 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: collector/pyproject.toml
-      - name: Install dependencies
+          cache-dependency-path: collector/requirements.txt
+      - name: Install dependencies (from the lock)
         working-directory: collector
-        run: pip install . pytest
+        run: |
+          pip install --require-hashes -r requirements.txt
+          pip install --no-deps .
+          pip install pytest
+      - name: Lock matches pyproject.toml
+        working-directory: collector
+        # Re-resolving keeps the existing pins, so this only fails when
+        # pyproject.toml changed and requirements.txt wasn't recompiled.
+        run: |
+          pip install uv
+          uv pip compile pyproject.toml --universal --python-version 3.11 --generate-hashes --quiet -o requirements.txt             --custom-compile-command "uv pip compile pyproject.toml --universal --python-version 3.11 --generate-hashes -o requirements.txt"
+          git diff --exit-code requirements.txt
       - name: Run tests
         working-directory: collector
         run: pytest tests -v
@@ -117,10 +152,11 @@ jobs:
           helm lint deploy/helm/reqly
           helm template ci deploy/helm/reqly > /dev/null
           helm template ci deploy/helm/reqly --set ingress.enabled=true --set secrets.groqApiKey=x > /dev/null
+          helm template ci deploy/helm/reqly --set secrets.llmApiKey=x --set collector.config.LLM_BASE_URL=https://llm.example/v1 > /dev/null
           helm template ci deploy/helm/reqly --set timescaledb.enabled=false             --set externalDatabaseUrl=postgresql://u:p@db:5432/reqly --set dashboard.enabled=false > /dev/null
 
   dashboard:
-    name: Dashboard build
+    name: Dashboard tests and build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -132,6 +168,53 @@ jobs:
       - name: Install dependencies
         working-directory: dashboard
         run: npm ci
+      - name: Unit tests
+        working-directory: dashboard
+        run: npm test
       - name: Type-check and build
         working-directory: dashboard
         run: npm run build
+
+  e2e:
+    name: End to end (SDKs -> collector -> TimescaleDB -> API)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: timescale/timescaledb-ha:pg16
+        env:
+          POSTGRES_DB: reqly
+          POSTGRES_USER: reqly
+          POSTGRES_PASSWORD: reqly
+        options: >-
+          --health-cmd "pg_isready -U reqly -d reqly"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: collector/requirements.txt
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: sdk-node/package-lock.json
+      - name: Install the collector (from its lock) and the Python SDK
+        run: |
+          pip install --require-hashes -r collector/requirements.txt
+          pip install --no-deps ./collector
+          pip install ./sdk pytest
+      - name: Build the Node SDK
+        working-directory: sdk-node
+        run: |
+          npm ci
+          npm run build
+      - name: Run
+        run: pytest e2e -v
+        env:
+          DATABASE_URL: "postgresql://reqly:reqly@localhost:5432/reqly"

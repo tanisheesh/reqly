@@ -927,7 +927,7 @@ app.<span class="fn">use</span>(<span class="fn">reqlyExpress</span>({ serviceNa
           <div style="margin-top:1rem;padding:1rem;background:rgba(139,92,246,.07);border:1px solid rgba(139,92,246,.18);border-radius:6px;font-size:.8125rem;color:var(--text-2);line-height:1.65;font-style:italic">
             “<span style="color:var(--text);font-style:normal">/orders</span> failed 30% of requests on Friday afternoon against a usual 2.2%, starting with release v2 — and every error came from pod-3.”
           </div>
-          <div style="margin-top:1rem;font-size:.75rem;color:var(--text-3)">No Groq key? Reports fall back to a plain statistical summary.</div>
+          <div style="margin-top:1rem;font-size:.75rem;color:var(--text-3)">No LLM configured? Reports fall back to a plain statistical summary.</div>
         </div>
 
         <!-- SLOs -->
@@ -1088,7 +1088,7 @@ app.<span class="fn">use</span>(<span class="fn">reqlyExpress</span>({ serviceNa
           <span class="af-dim">┌──────────────────────┼───────────────────────┐</span>
     <span class="af-dash">[Dashboard]</span>            <span class="af-lmb">[Scheduler]</span>             <span class="af-coll">[Ask Reqly]</span>
   <span class="af-dim">React 19 · sign-in      hourly alerts · SLO      9 read-only tools</span>
-  <span class="af-dim">settings · projects     burn rates · weekly      → Groq → verified</span>
+  <span class="af-dim">settings · projects     burn rates · weekly      → LLM → verified</span>
   <span class="af-dim">GET /v1/metrics/*       report → Slack/Discord   answer</span></pre></div>
       </div>
       <p class="scroll-hint">← swipe to see the whole diagram →</p>
@@ -1133,7 +1133,7 @@ app.<span class="fn">use</span>(<span class="fn">reqlyExpress</span>({ serviceNa
             <tr><td>Collector</td><td>FastAPI · asyncpg · APScheduler · Pydantic v2 · argon2 — async throughout, no ORM; native ingest plus an OTLP receiver</td></tr>
             <tr><td>Database</td><td>TimescaleDB (pg16, Toolkit) — hypertables, continuous aggregates, UddSketch percentiles</td></tr>
             <tr><td>Dashboard</td><td>React 19 · Vite · TypeScript · Tailwind CSS 4 · Recharts · TanStack Query</td></tr>
-            <tr><td>AI</td><td>Groq · gpt-oss-120b with tool calling — statistics first, the LLM explains and answers only from query results</td></tr>
+            <tr><td>AI</td><td>Any OpenAI-compatible API (Groq, OpenAI, OpenRouter, Ollama) · gpt-oss-120b by default, with tool calling — statistics first, the LLM explains and answers only from query results</td></tr>
             <tr><td>Infra</td><td>Docker Compose · prebuilt images on GHCR (amd64 + arm64) · PyPI and npm trusted publishing</td></tr>
           </tbody>
         </table>

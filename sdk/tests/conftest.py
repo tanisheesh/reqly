@@ -1,3 +1,4 @@
+import gzip
 import json
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -11,6 +12,8 @@ class _CapturingHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(length) if length else b"{}"
+        if self.headers.get("Content-Encoding") == "gzip":
+            body = gzip.decompress(body)
         _CapturingHandler.received_batches.append(json.loads(body))
         self.send_response(202)
         self.send_header("Content-Type", "application/json")

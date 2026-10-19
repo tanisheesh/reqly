@@ -133,7 +133,7 @@ Teams running a handful of HTTP APIs have two bad options for knowing whether th
 - **LLM price table** — checked against the providers' pricing pages in 2026-10; prices change, so it needs re-checking with new models (`LLM_PRICES_FILE` overrides it). Unknown models are unpriced, never matched to a similar name.
 - **Public read key** — with `PUBLIC_DASHBOARD` on, anyone with the dashboard URL can read every project; it's meant for demos only.
 - **Single instance** — the scheduler, rate limits and caches are per process; running two collectors duplicates jobs.
-- **Provider dependence** — AI features need Groq; models get retired (Llama 3.3 already was), so the model is configurable and the reports fall back to plain text.
+- **Provider dependence** — AI features need an LLM provider (Groq by default, any OpenAI-compatible API); models get retired (Llama 3.3 already was), so the model is configurable and the reports fall back to plain text.
 - **Open question:** should anomaly thresholds become per-service for low-traffic routes?
 
 ---

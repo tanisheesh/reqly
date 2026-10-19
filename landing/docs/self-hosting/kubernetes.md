@@ -73,12 +73,13 @@ collector:
 secrets:
   adminPassword: "at-least-12-characters"   # first admin, user "admin"
   groqApiKey: "gsk_..."                     # weekly AI report and Ask Reqly
+  # or llmApiKey, with LLM_BASE_URL / LLM_MODEL under collector.config
   slackWebhookUrl: "https://hooks.slack.com/services/..."
 ```
 
 Any other collector setting goes under `collector.config` (plain values) or `collector.extraEnv`. Every setting is listed in [Configuration](configuration.md).
 
-To keep secrets out of values files, create a Secret yourself and pass `secrets.existingSecret`. It needs these keys: `ingest-key`, `read-key`, `database-url`, and optionally `postgres-password`, `groq-api-key`, `admin-password`, `slack-webhook-url`, `discord-webhook-url` and `webhook-url`.
+To keep secrets out of values files, create a Secret yourself and pass `secrets.existingSecret`. It needs these keys: `ingest-key`, `read-key`, `database-url`, and optionally `postgres-password`, `groq-api-key`, `llm-api-key`, `admin-password`, `slack-webhook-url`, `discord-webhook-url` and `webhook-url`.
 
 ## External database
 

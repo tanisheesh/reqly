@@ -109,6 +109,35 @@ test("http: routes from the resolver, 404s, sync and async errors, LLM usage, qu
   await handler.client.shutdown();
 });
 
+test("http: a request that calls several models lists each with its own tokens", async () => {
+  collector.batches.length = 0;
+  const handler = reqlyHttp(
+    (req, res) => {
+      recordLlmUsage("gpt-4o", 1000, 300);
+      if (req.method === "POST") {
+        recordLlmUsage("gpt-4o-mini", 400, 40);
+        recordLlmUsage("gpt-4o", 0, 10);
+      }
+      res.end("ok");
+    },
+    { ...options(collector.url), routeResolver: () => "/agent" },
+  );
+  const { base, close } = await serve(handler);
+  await fetch(`${base}/agent`, { method: "POST" });
+  await fetch(`${base}/agent`); // one model only
+  await close();
+  await handler.client.flush();
+  const [agent, single] = collector.events();
+  assert.deepEqual([agent.llm_model, agent.llm_input_tokens, agent.llm_output_tokens], ["gpt-4o", 1400, 350]);
+  assert.deepEqual(agent.llm_usage, [
+    { model: "gpt-4o", input_tokens: 1000, output_tokens: 310 },
+    { model: "gpt-4o-mini", input_tokens: 400, output_tokens: 40 },
+  ]);
+  assert.equal(single.llm_model, "gpt-4o");
+  assert.equal("llm_usage" in single, false);
+  await handler.client.shutdown();
+});
+
 test("http: no resolver records __unmatched__, a throwing resolver too, never the raw path", async () => {
   collector.batches.length = 0;
   const plain = reqlyHttp((req, res) => res.end("ok"), options(collector.url));

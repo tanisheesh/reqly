@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reqly"
-version = "0.5.6"
+version = "0.6.0"
 description = "Self-hosted API monitoring for FastAPI, Flask, Django, Starlette and Litestar in two lines: latency percentiles, error rates and release tracking per route, with deploy-aware alerts and weekly AI anomaly reports."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -61,3 +61,23 @@ dev = [
 
 [tool.setuptools.packages.find]
 include = ["reqly*"]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 120
+
+[tool.ruff.lint]
+# pyflakes, import order and bugbear. Not B008 (FastAPI's Depends() defaults),
+# B904 (HTTPException translation is deliberate) or B905 (zip strictness).
+select = ["E4", "E7", "E9", "F", "I", "B"]
+ignore = ["B008", "B904", "B905"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["reqly"]
+
+[tool.mypy]
+files = ["reqly"]
+# The oldest mypy can check; ruff (target-version) still covers 3.9 syntax.
+python_version = "3.10"
+# Framework and driver packages ship partial or no stubs.
+ignore_missing_imports = true

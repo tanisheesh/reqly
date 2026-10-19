@@ -13,7 +13,7 @@ const SUGGESTIONS = [
 function describeError(error: unknown): string {
   if (error instanceof HttpError) {
     if (error.status === 401) return "The collector rejected the dashboard's read key (401). Check VITE_READ_KEY.";
-    if (error.status === 503) return "Ask Reqly isn't enabled on this collector — it needs GROQ_API_KEY.";
+    if (error.status === 503) return "Ask Reqly isn't enabled on this collector — it needs an LLM (GROQ_API_KEY or LLM_BASE_URL).";
     if (error.status === 429) return `Rate limited: ${error.message}. Questions are capped at 5 per minute.`;
     return error.message;
   }

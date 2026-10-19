@@ -81,7 +81,7 @@ class EventBuffer:
 
     def add(self, event: RequestEvent) -> None:
         with self._lock:
-            if len(self._queue) >= self._queue.maxlen:
+            if len(self._queue) == self._queue.maxlen:  # full: append drops the oldest
                 self._dropped_events += 1
             self._queue.append(event)
             if len(self._queue) >= self._max_batch_size:
@@ -91,7 +91,7 @@ class EventBuffer:
         with self._lock:
             if full_only and len(self._queue) < self._max_batch_size:
                 return []
-            batch = []
+            batch: list[RequestEvent] = []
             while self._queue and len(batch) < self._max_batch_size:
                 batch.append(self._queue.popleft())
             return batch

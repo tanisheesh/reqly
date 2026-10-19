@@ -36,7 +36,8 @@ def _require_global_admin(principal: Principal) -> None:
 
 
 def _require_project_admin(principal: Principal, project_id: int) -> None:
-    if not principal.can("admin") or not (principal.all_projects or project_id in principal.project_ids):
+    ids = principal.project_ids  # None: all projects
+    if not principal.can("admin") or not (ids is None or project_id in ids):
         raise HTTPException(status_code=403, detail="you can't manage this project")
 
 

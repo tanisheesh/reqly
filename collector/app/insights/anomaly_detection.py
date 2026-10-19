@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import math
 import statistics
-from statistics import NormalDist
 from collections import defaultdict
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
+from statistics import NormalDist
 
 # Deliberately simple and explainable: a z-score threshold against a
 # day-of-week x hour-of-day seasonal baseline. This is NOT STL decomposition,

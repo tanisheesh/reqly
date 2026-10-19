@@ -68,12 +68,14 @@ def normalize_django_route(route: str) -> str:
     return template if template.startswith("/") else "/" + template
 
 
-def _get_client() -> ReqlyClient | None:
+def _get_client() -> ReqlyClient:
     global _client
-    if _client is not None:
-        return _client
+    client = _client
+    if client is not None:
+        return client
     with _client_lock:
-        if _client is None:
+        client = _client
+        if client is None:
             from django.conf import settings
 
             options = dict(getattr(settings, "REQLY", {}) or {})
@@ -81,11 +83,11 @@ def _get_client() -> ReqlyClient | None:
             if unknown:
                 logger.warning("reqly: ignoring unknown REQLY settings %s", sorted(unknown))
             config = Config.resolve(**{key: options.get(key) for key in _CONFIG_KEYS})
-            _client = ReqlyClient(config)
+            client = _client = ReqlyClient(config)
             from .. import enable_spec_push
 
-            enable_spec_push(_client, "Django")
-    return _client
+            enable_spec_push(client, "Django")
+    return client
 
 
 class ReqlyMiddleware:

@@ -4,7 +4,7 @@ unreachable)."""
 import asyncio
 import dataclasses
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient

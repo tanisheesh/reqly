@@ -26,11 +26,16 @@ The collector warns at start-up if the keys are the defaults or if the two keys 
 
 ## AI
 
+The weekly report and Ask Reqly use any OpenAI-compatible chat completions API: Groq, OpenAI, OpenRouter, a local Ollama or vLLM. With none configured, the weekly report is plain text and Ask Reqly is off.
+
 | Variable | Default | Notes |
 |---|---|---|
-| `GROQ_API_KEY` | empty | [console.groq.com/keys](https://console.groq.com/keys), free tier. Empty: plain-text weekly report, Ask Reqly off |
-| `GROQ_MODEL` | `openai/gpt-oss-120b` | Model for the weekly report |
-| `ASK_MODEL` | `GROQ_MODEL` | Model for Ask Reqly; needs tool calling |
+| `LLM_BASE_URL` | see notes | The API's base URL, e.g. `https://openrouter.ai/api/v1` or `http://localhost:11434/v1` (Ollama). Unset: OpenAI when `LLM_API_KEY` is set, else Groq when `GROQ_API_KEY` is set |
+| `LLM_API_KEY` | empty | The API's key. Local servers like Ollama need none |
+| `LLM_MODEL` | `GROQ_MODEL`, else `openai/gpt-oss-120b` | Model for the weekly report, in the provider's naming (`gpt-4.1-mini`, `qwen3:8b`) |
+| `GROQ_API_KEY` | empty | Shortcut for Groq ([console.groq.com/keys](https://console.groq.com/keys), free tier). Only sent to Groq, never to `LLM_BASE_URL` |
+| `GROQ_MODEL` | empty | Older name for `LLM_MODEL` |
+| `ASK_MODEL` | `LLM_MODEL` | Model for Ask Reqly; needs tool calling |
 | `ASK_DAILY_LIMIT` | `200` | Ask Reqly questions per collector per day. `0` turns Ask off |
 | `LLM_PRICES_FILE` | empty | YAML price table that overrides and extends the built-in one ([LLM cost](../features/llm-cost.md#prices)) |
 | `CONSUMER_LIMIT_PER_DAY` | `1000` | Distinct [API consumers](../features/consumers.md#a-cap-on-distinct-consumers) kept per service per day; later new ones are `__other__`. `0` turns the cap off |
@@ -58,6 +63,16 @@ The collector warns at start-up if the keys are the defaults or if the two keys 
 | `POSTGRES_PASSWORD` | `localdev` | Local Compose only |
 
 The database must be TimescaleDB with the Toolkit: the `timescale/timescaledb-ha:pg16` image includes both. The collector applies its migrations on start-up.
+
+## Monitoring the collector
+
+| Variable | Default | Notes |
+|---|---|---|
+| `METRICS_ENABLED` | `true` | Prometheus metrics at `GET /metrics`: requests and latency per collector route, events ingested and rejected per source (SDK, OTLP), database pool connections, and the late-data backlog. No service, project or consumer names appear in them |
+| `METRICS_TOKEN` | empty | When set, `/metrics` needs `Authorization: Bearer <token>` (Prometheus: `authorization: {credentials: <token>}`) |
+| `LOG_FORMAT` | `text` | `json`: one JSON object per line (`time`, `level`, `logger`, `message`; access lines add `method`, `path`, `status`) for Loki, CloudWatch or Datadog |
+
+`GET /v1/health` answers while the process is up; `GET /v1/ready` also checks the database (503 when it doesn't answer).
 
 ## Dashboard
 

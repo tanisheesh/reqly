@@ -9,25 +9,26 @@ with gen_ai.usage.input_tokens / output_tokens) are attributed to the HTTP
 server span they ran under -- the nearest ancestor in the same export -- the
 way the SDKs' record_llm_usage() attributes them to the current request.
 
-Works on the OTLP/JSON shape (camelCase keys). Protobuf payloads are
-converted to the same shape with MessageToDict first, so there is a single
-mapping path. Handles both the stable HTTP semantic conventions
+Both wire formats are read into the same small span model (_Span) -- JSON
+from its camelCase dict, protobuf straight from the parsed message, with no
+detour through a dict -- so there is a single mapping path. Handles both the stable HTTP semantic conventions
 (http.request.method, http.response.status_code) and the legacy names
 (http.method, http.status_code) still emitted by older instrumentations.
 """
 
 from __future__ import annotations
 
-import hashlib
-import hmac
-
 import base64
 import binascii
+import hashlib
+import hmac
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import Any
 
 from ..db.queries import event_row
+from ..llm.splits import split_rows, summarize_models
 
 # Namespace for event ids derived from (traceId, spanId): exporters retry
 # failed exports, and a deterministic id lets the existing ON CONFLICT dedup
@@ -55,6 +56,8 @@ class MappingResult:
     skipped: int = 0  # not HTTP server spans -- ignored by design, not an error
     rejected: int = 0  # HTTP server spans that failed validation
     reasons: list[str] = field(default_factory=list)
+    # llm_usage_splits rows for requests whose spans called several models
+    llm_splits: list[tuple] = field(default_factory=list)
 
     def reject(self, reason: str) -> None:
         self.rejected += 1
@@ -81,6 +84,96 @@ def _attributes(items: list[dict] | None) -> dict:
     return {item.get("key"): _any_value(item.get("value")) for item in items or []}
 
 
+@dataclass(slots=True)
+class _Span:
+    is_server: bool
+    trace_id: str  # lowercase hex
+    span_id: str
+    parent_id: str
+    attrs: dict
+    start_ns: Any  # int from protobuf; a string (or anything) from JSON
+    end_ns: Any
+    status_error: bool
+    exception_type: Any  # exception.type of the first "exception" event
+
+
+@dataclass(slots=True)
+class _Resource:
+    attrs: dict
+    spans: list[_Span]
+
+
+def _json_exception_type(span: dict):
+    for event in span.get("events") or []:
+        if event.get("name") == "exception":
+            return _attributes(event.get("attributes")).get("exception.type")
+    return None
+
+
+def _from_json(payload: dict) -> list[_Resource]:
+    resources = []
+    for resource_spans in payload.get("resourceSpans") or []:
+        spans = [
+            _Span(
+                is_server=span.get("kind") in _SPAN_KIND_SERVER,
+                trace_id=_hex_id(span.get("traceId")),
+                span_id=_hex_id(span.get("spanId")),
+                parent_id=_hex_id(span.get("parentSpanId")),
+                attrs=_attributes(span.get("attributes")),
+                start_ns=span.get("startTimeUnixNano"),
+                end_ns=span.get("endTimeUnixNano"),
+                status_error=(span.get("status") or {}).get("code") in _STATUS_CODE_ERROR,
+                exception_type=_json_exception_type(span),
+            )
+            for scope_spans in resource_spans.get("scopeSpans") or []
+            for span in scope_spans.get("spans") or []
+        ]
+        attrs = _attributes((resource_spans.get("resource") or {}).get("attributes"))
+        resources.append(_Resource(attrs, spans))
+    return resources
+
+
+_PROTO_SCALARS = ("string_value", "bool_value", "int_value", "double_value")
+
+
+def _proto_attributes(items) -> dict:
+    out = {}
+    for item in items:
+        kind = item.value.WhichOneof("value")
+        out[item.key] = getattr(item.value, kind) if kind in _PROTO_SCALARS else None
+    return out
+
+
+def _proto_exception_type(span):
+    for event in span.events:
+        if event.name == "exception":
+            return _proto_attributes(event.attributes).get("exception.type")
+    return None
+
+
+def _from_proto(message) -> list[_Resource]:
+    """message: a parsed ExportTraceServiceRequest."""
+    resources = []
+    for resource_spans in message.resource_spans:
+        spans = [
+            _Span(
+                is_server=span.kind == 2,  # SPAN_KIND_SERVER
+                trace_id=span.trace_id.hex(),
+                span_id=span.span_id.hex(),
+                parent_id=span.parent_span_id.hex(),
+                attrs=_proto_attributes(span.attributes),
+                start_ns=span.start_time_unix_nano,
+                end_ns=span.end_time_unix_nano,
+                status_error=span.status.code == 2,  # STATUS_CODE_ERROR
+                exception_type=_proto_exception_type(span),
+            )
+            for scope_spans in resource_spans.scope_spans
+            for span in scope_spans.spans
+        ]
+        resources.append(_Resource(_proto_attributes(resource_spans.resource.attributes), spans))
+    return resources
+
+
 def _first(attrs: dict, *names: str):
     for name in names:
         value = attrs.get(name)
@@ -90,8 +183,8 @@ def _first(attrs: dict, *names: str):
 
 
 def _hex_id(value: str | None) -> str:
-    """OTLP/JSON encodes trace/span ids as hex; MessageToDict produces
-    base64. Normalize both to lowercase hex."""
+    """OTLP/JSON encodes trace/span ids as hex; protobuf's own JSON printer
+    (MessageToJson) produces base64. Normalize both to lowercase hex."""
     if not value:
         return ""
     # Hex trace/span ids are exactly 32/16 chars; their base64 forms are
@@ -122,10 +215,10 @@ _MAX_TOKENS = 10_000_000
 _MAX_ANCESTRY = 64
 
 
-def _is_http_server(span: dict, attrs: dict) -> bool:
-    return span.get("kind") in _SPAN_KIND_SERVER and (
-        _first(attrs, "http.request.method", "http.method") is not None
-        or _first(attrs, "http.response.status_code", "http.status_code") is not None
+def _is_http_server(span: _Span) -> bool:
+    return span.is_server and (
+        _first(span.attrs, "http.request.method", "http.method") is not None
+        or _first(span.attrs, "http.response.status_code", "http.status_code") is not None
     )
 
 
@@ -144,29 +237,26 @@ def _genai_usage(attrs: dict) -> tuple[str, int, int] | None:
         return None
     if not (0 <= tokens_in <= _MAX_TOKENS and 0 <= tokens_out <= _MAX_TOKENS):
         return None
-    return _truncate(model, _MAX_SHORT_TEXT_LEN), tokens_in, tokens_out
+    return str(model)[:_MAX_SHORT_TEXT_LEN], tokens_in, tokens_out
 
 
-def _llm_usage_by_server_span(payload: dict) -> dict[tuple[str, str], dict]:
+def _llm_usage_by_server_span(resources: list[_Resource]) -> dict[tuple[str, str], dict]:
     """GenAI usage summed onto the HTTP server span each LLM call ran under:
-    {(trace, span): {"llm_model", "llm_input_tokens", "llm_output_tokens"}}.
-    Like the SDKs, all tokens are summed and the request is attributed to the
-    model with the most tokens."""
+    {(trace, span): {"llm_model", "llm_input_tokens", "llm_output_tokens",
+    "per_model"}}. Like the SDKs: the model with the most tokens, all tokens
+    summed, and each model's own tokens (for llm_usage_splits)."""
     parents: dict[tuple[str, str], str] = {}
     servers: set[tuple[str, str]] = set()
     calls: list[tuple[tuple[str, str], tuple[str, int, int]]] = []
-    for resource_spans in payload.get("resourceSpans") or []:
-        for scope_spans in resource_spans.get("scopeSpans") or []:
-            for span in scope_spans.get("spans") or []:
-                trace = _hex_id(span.get("traceId"))
-                key = (trace, _hex_id(span.get("spanId")))
-                parents[key] = _hex_id(span.get("parentSpanId"))
-                attrs = _attributes(span.get("attributes"))
-                if _is_http_server(span, attrs):
-                    servers.add(key)
-                usage = _genai_usage(attrs)
-                if usage is not None:
-                    calls.append((key, usage))
+    for resource in resources:
+        for span in resource.spans:
+            key = (span.trace_id, span.span_id)
+            parents[key] = span.parent_id
+            if _is_http_server(span):
+                servers.add(key)
+            usage = _genai_usage(span.attrs)
+            if usage is not None:
+                calls.append((key, usage))
 
     per_server: dict[tuple[str, str], dict[str, list[int]]] = {}
     for key, (model, tokens_in, tokens_out) in calls:
@@ -184,21 +274,31 @@ def _llm_usage_by_server_span(payload: dict) -> dict[tuple[str, str], dict]:
 
     out = {}
     for server, models in per_server.items():
-        top = max(models, key=lambda m: sum(models[m]))
+        top, tokens_in, tokens_out, per_model = summarize_models([(m, t[0], t[1]) for m, t in models.items()])
         out[server] = {
             "llm_model": top,
-            "llm_input_tokens": min(sum(t[0] for t in models.values()), _MAX_TOKENS),
-            "llm_output_tokens": min(sum(t[1] for t in models.values()), _MAX_TOKENS),
+            "llm_input_tokens": min(tokens_in, _MAX_TOKENS),
+            "llm_output_tokens": min(tokens_out, _MAX_TOKENS),
+            "per_model": per_model,
         }
     return out
 
 
 def map_resource_spans(payload: dict, consumer_salt: str | None = None) -> MappingResult:
     """payload: an ExportTraceServiceRequest in OTLP/JSON shape."""
+    return _map(_from_json(payload), consumer_salt)
+
+
+def map_export_request(message, consumer_salt: str | None = None) -> MappingResult:
+    """message: a parsed protobuf ExportTraceServiceRequest."""
+    return _map(_from_proto(message), consumer_salt)
+
+
+def _map(resources: list[_Resource], consumer_salt: str | None) -> MappingResult:
     result = MappingResult()
-    llm_usage = _llm_usage_by_server_span(payload)
-    for resource_spans in payload.get("resourceSpans") or []:
-        resource = _attributes((resource_spans.get("resource") or {}).get("attributes"))
+    llm_usage = _llm_usage_by_server_span(resources)
+    for item in resources:
+        resource = item.attrs
         service_name = _truncate(
             resource.get("service.name") or "unknown_service", _MAX_SERVICE_NAME_LEN
         )
@@ -212,9 +312,8 @@ def map_resource_spans(payload: dict, consumer_salt: str | None = None) -> Mappi
             _MAX_SHORT_TEXT_LEN,
         )
 
-        for scope_spans in resource_spans.get("scopeSpans") or []:
-            for span in scope_spans.get("spans") or []:
-                _map_span(span, service_name, release, environment, host, result, llm_usage, consumer_salt)
+        for span in item.spans:
+            _map_span(span, service_name, release, environment, host, result, llm_usage, consumer_salt)
     return result
 
 
@@ -234,20 +333,20 @@ def _consumer_id(attrs: dict, salt: str | None) -> str | None:
     return consumer_hash(value, salt)
 
 
-def _map_span(span, service_name, release, environment, host, result: MappingResult, llm_usage=None,
+def _map_span(span: _Span, service_name, release, environment, host, result: MappingResult, llm_usage=None,
               consumer_salt: str | None = None) -> None:
-    if span.get("kind") not in _SPAN_KIND_SERVER:
+    if not span.is_server:
         result.skipped += 1
         return
 
-    attrs = _attributes(span.get("attributes"))
+    attrs = span.attrs
     method = _first(attrs, "http.request.method", "http.method")
     status_code = _first(attrs, "http.response.status_code", "http.status_code")
     if method is None and status_code is None:
         result.skipped += 1  # a server span, but not HTTP (gRPC, messaging, ...)
         return
 
-    span_id = f"{_hex_id(span.get('traceId'))}:{_hex_id(span.get('spanId'))}"
+    span_id = f"{span.trace_id}:{span.span_id}"
     if method is None:
         result.reject(f"span {span_id}: missing http.request.method")
         return
@@ -257,8 +356,8 @@ def _map_span(span, service_name, release, environment, host, result: MappingRes
         status_code = None
 
     try:
-        start_ns = int(span.get("startTimeUnixNano") or 0)
-        end_ns = int(span.get("endTimeUnixNano") or 0)
+        start_ns = int(span.start_ns or 0)
+        end_ns = int(span.end_ns or 0)
     except (TypeError, ValueError):
         result.reject(f"span {span_id}: invalid timestamps")
         return
@@ -270,7 +369,7 @@ def _map_span(span, service_name, release, environment, host, result: MappingRes
         result.reject(f"span {span_id}: duration out of range")
         return
 
-    span_status_error = (span.get("status") or {}).get("code") in _STATUS_CODE_ERROR
+    span_status_error = span.status_error
     if status_code is None:
         # No response was sent (connection dropped, unhandled crash before
         # headers). Count it the way the Python SDK does: as a 500.
@@ -282,10 +381,7 @@ def _map_span(span, service_name, release, environment, host, result: MappingRes
     error = status_code >= 500 or span_status_error
     error_type = attrs.get("error.type")
     if error_type is None:
-        for event in span.get("events") or []:
-            if event.get("name") == "exception":
-                error_type = _attributes(event.get("attributes")).get("exception.type")
-                break
+        error_type = span.exception_type
     if error_type is not None and str(error_type).isdigit():
         error_type = None  # semconv sets error.type to the status code for HTTP errors
 
@@ -299,10 +395,15 @@ def _map_span(span, service_name, release, environment, host, result: MappingRes
         if path is not None and str(path).split("?", 1)[0] not in ("/", ""):
             route = UNMATCHED_ROUTE
 
+    event_id = str(uuid.uuid5(_SPAN_NAMESPACE, span_id))
+    event_time = _nanos_to_datetime(end_ns)
+    llm = dict((llm_usage or {}).get((span.trace_id, span.span_id), {}))
+    per_model = llm.pop("per_model", [])
+    result.llm_splits += split_rows(event_id, event_time, service_name, route, per_model)
     result.rows.append(
         event_row(
-            event_id=str(uuid.uuid5(_SPAN_NAMESPACE, span_id)),
-            time=_nanos_to_datetime(end_ns),
+            event_id=event_id,
+            time=event_time,
             service_name=service_name,
             method=str(method).upper()[:_MAX_METHOD_LEN],
             route=route,
@@ -316,7 +417,7 @@ def _map_span(span, service_name, release, environment, host, result: MappingRes
             request_bytes=_byte_count(attrs, "http.request.body.size", "http.request_content_length"),
             response_bytes=_byte_count(attrs, "http.response.body.size", "http.response_content_length"),
             consumer_id=_consumer_id(attrs, consumer_salt),
-            **(llm_usage or {}).get((_hex_id(span.get("traceId")), _hex_id(span.get("spanId"))), {}),
+            **llm,
         )
     )
 

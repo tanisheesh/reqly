@@ -49,7 +49,9 @@ class Principal:
 def _key_matches(provided: str | None, expected: str) -> bool:
     # Constant-time comparison so the key can't be recovered byte-by-byte
     # from response timing.
-    return bool(provided) and hmac.compare_digest(provided.encode(), expected.encode())
+    if not provided:
+        return False
+    return hmac.compare_digest(provided.encode(), expected.encode())
 
 
 def _unauthorized(detail: str) -> HTTPException:
@@ -109,7 +111,7 @@ async def resolve(x_reqly_key: str | None, authorization: str | None) -> Princip
 async def check_service(principal: Principal, service_name: str | None) -> None:
     """403 unless the principal's projects include the service's. A service
     with no project yet (no data) is only visible to all-project principals."""
-    if not service_name or principal.all_projects:
+    if not service_name or principal.project_ids is None:  # all projects
         return
     project_id = await projects.project_of(get_pool(), service_name)
     if project_id is None or project_id not in principal.project_ids:
@@ -118,7 +120,7 @@ async def check_service(principal: Principal, service_name: str | None) -> None:
 
 async def allowed_services(principal: Principal) -> set[str] | None:
     """None: every service."""
-    if principal.all_projects:
+    if principal.project_ids is None:  # all projects
         return None
     return await projects.services_in(get_pool(), principal.project_ids)
 
@@ -192,7 +194,7 @@ async def verify_spec_upload(
 
 async def current_user(authorization: str | None = Header(default=None)) -> dict:
     principal = await _user_principal(authorization)
-    if principal is None:
+    if principal is None or principal.user is None:
         raise _unauthorized("sign in first")
     return principal.user
 

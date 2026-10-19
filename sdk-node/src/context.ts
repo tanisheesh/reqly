@@ -9,11 +9,19 @@ export interface RequestInfo {
   raw: unknown;
 }
 
-export interface LlmSummary {
+export interface LlmModelUsage {
   model: string;
   inputTokens: number;
   outputTokens: number;
 }
+
+export interface LlmSummary extends LlmModelUsage {
+  /** Each model's own tokens, when the request called more than one (most tokens first). */
+  byModel?: LlmModelUsage[];
+}
+
+/** Models listed per request (the collector's cap). */
+export const MAX_MODELS_PER_REQUEST = 16;
 
 /** LLM tokens recorded while one request was served, per model. */
 export class LlmUsage {
@@ -26,21 +34,23 @@ export class LlmUsage {
     this.byModel.set(model, totals);
   }
 
-  /** The model with the most tokens, with every model's tokens summed. */
+  /**
+   * The model with the most tokens, with every model's tokens summed (what
+   * collectors before 0.13 read), plus each model's own tokens when there
+   * were several, so each is priced at its own rate.
+   */
   summary(): LlmSummary | undefined {
-    let model: string | undefined;
-    let best = -1;
-    let input = 0;
-    let output = 0;
-    for (const [name, [i, o]] of this.byModel) {
-      input += i;
-      output += o;
-      if (i + o > best) {
-        best = i + o;
-        model = name;
-      }
-    }
-    return model === undefined ? undefined : { model, inputTokens: input, outputTokens: output };
+    const ranked = [...this.byModel]
+      .map(([model, [inputTokens, outputTokens]]) => ({ model, inputTokens, outputTokens }))
+      .sort((a, b) => b.inputTokens + b.outputTokens - (a.inputTokens + a.outputTokens)); // stable: ties keep call order
+    if (ranked.length === 0) return undefined;
+    const summary: LlmSummary = {
+      model: ranked[0].model,
+      inputTokens: ranked.reduce((sum, m) => sum + m.inputTokens, 0),
+      outputTokens: ranked.reduce((sum, m) => sum + m.outputTokens, 0),
+    };
+    if (ranked.length > 1) summary.byModel = ranked.slice(0, MAX_MODELS_PER_REQUEST);
+    return summary;
   }
 }
 

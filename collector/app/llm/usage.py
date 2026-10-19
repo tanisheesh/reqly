@@ -13,49 +13,46 @@ WINDOWS = {"24h": timedelta(hours=24), "7d": timedelta(days=7), "30d": timedelta
 RAW_WINDOWS = ("24h", "7d")
 
 
+# Each source: (time column, request count, input tokens, output tokens).
+# The splits move tokens between the models of multi-model requests and
+# count no requests (see migrations/011_llm_usage_splits.sql).
+_RAW = (
+    """SELECT time AS t, route, llm_model, 1 AS requests,
+              coalesce(llm_input_tokens, 0) AS input_tokens, coalesce(llm_output_tokens, 0) AS output_tokens
+       FROM request_events WHERE service_name = $1 AND time > $2""",
+    """SELECT time AS t, route, llm_model, 0, input_tokens, output_tokens
+       FROM llm_usage_splits WHERE service_name = $1 AND time > $2""",
+)
+_HOURLY = (
+    """SELECT bucket AS t, route, llm_model, request_count AS requests, input_tokens, output_tokens
+       FROM llm_usage_1hour WHERE service_name = $1 AND bucket > $2""",
+    """SELECT bucket AS t, route, llm_model, 0, input_tokens, output_tokens
+       FROM llm_usage_splits_1hour WHERE service_name = $1 AND bucket > $2""",
+)
+
+
 async def _rows(pool, service: str, window: str, start: datetime):
     """(route, model, requests, input, output) plus per-day cost rows."""
-    if window in RAW_WINDOWS:
-        rows = await pool.fetch(
-            """
-            SELECT route, llm_model, count(*) AS requests,
-                   coalesce(sum(llm_input_tokens), 0) AS input_tokens,
-                   coalesce(sum(llm_output_tokens), 0) AS output_tokens
-            FROM request_events WHERE service_name = $1 AND time > $2
-            GROUP BY route, llm_model
-            """,
-            service, start,
-        )
-        daily = await pool.fetch(
-            """
-            SELECT time_bucket('1 day', time) AS day, llm_model,
-                   sum(llm_input_tokens) AS input_tokens, sum(llm_output_tokens) AS output_tokens
-            FROM request_events
-            WHERE service_name = $1 AND time > $2 AND llm_model IS NOT NULL
-            GROUP BY 1, 2 ORDER BY 1
-            """,
-            service, start,
-        )
-    else:
-        rows = await pool.fetch(
-            """
-            SELECT route, llm_model, sum(request_count) AS requests,
-                   sum(input_tokens) AS input_tokens, sum(output_tokens) AS output_tokens
-            FROM llm_usage_1hour WHERE service_name = $1 AND bucket > $2
-            GROUP BY route, llm_model
-            """,
-            service, start,
-        )
-        daily = await pool.fetch(
-            """
-            SELECT time_bucket('1 day', bucket) AS day, llm_model,
-                   sum(input_tokens) AS input_tokens, sum(output_tokens) AS output_tokens
-            FROM llm_usage_1hour
-            WHERE service_name = $1 AND bucket > $2 AND llm_model IS NOT NULL
-            GROUP BY 1, 2 ORDER BY 1
-            """,
-            service, start,
-        )
+    usage = " UNION ALL ".join(_RAW if window in RAW_WINDOWS else _HOURLY)
+    rows = await pool.fetch(
+        f"""
+        SELECT route, llm_model, sum(requests) AS requests,
+               sum(input_tokens) AS input_tokens, sum(output_tokens) AS output_tokens
+        FROM ({usage}) usage
+        GROUP BY route, llm_model
+        """,
+        service, start,
+    )
+    daily = await pool.fetch(
+        f"""
+        SELECT time_bucket('1 day', t) AS day, llm_model,
+               sum(input_tokens) AS input_tokens, sum(output_tokens) AS output_tokens
+        FROM ({usage}) usage
+        WHERE llm_model IS NOT NULL
+        GROUP BY 1, 2 ORDER BY 1
+        """,
+        service, start,
+    )
     return rows, daily
 
 

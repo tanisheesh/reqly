@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
 from typing import Any
-from importlib.metadata import PackageNotFoundError, version as _pkg_version
 
 
 def _get_sdk_version() -> str:
