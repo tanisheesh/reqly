@@ -84,10 +84,21 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: collector/pyproject.toml
-      - name: Install dependencies
+          cache-dependency-path: collector/requirements.txt
+      - name: Install dependencies (from the lock)
         working-directory: collector
-        run: pip install . pytest
+        run: |
+          pip install --require-hashes -r requirements.txt
+          pip install --no-deps .
+          pip install pytest
+      - name: Lock matches pyproject.toml
+        working-directory: collector
+        # Re-resolving keeps the existing pins, so this only fails when
+        # pyproject.toml changed and requirements.txt wasn't recompiled.
+        run: |
+          pip install uv
+          uv pip compile pyproject.toml --universal --python-version 3.11 --generate-hashes --quiet -o requirements.txt             --custom-compile-command "uv pip compile pyproject.toml --universal --python-version 3.11 --generate-hashes -o requirements.txt"
+          git diff --exit-code requirements.txt
       - name: Run tests
         working-directory: collector
         run: pytest tests -v

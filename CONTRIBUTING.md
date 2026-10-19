@@ -71,6 +71,8 @@ Dashboard on http://localhost:5173, collector API docs on http://localhost:8000/
    cd dashboard && npm ci && npm run build
    ```
 
+   Changed the collector's dependencies in `pyproject.toml`? Recompile its lock, `collector/requirements.txt`, with the `uv pip compile` command at the top of that file; the Docker image installs exactly what it pins, and CI fails when the two disagree.
+
    Changing an SDK's request path? Run the benchmark too (`bench/README.md`). It also runs in CI on SDK changes.
 
 4. **Open a pull request** against `main`. The PR template will guide you.
