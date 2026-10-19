@@ -10,11 +10,11 @@ For local development, see [SETUP.md](SETUP.md). Command-by-command AWS steps (E
 
 | Piece | Runs on | Notes |
 |---|---|---|
-| Collector | Render web service | FastAPI on uvicorn, port 8000. Applies migrations on start-up. Run **one** instance: the scheduler, rate limits and caches are per process |
+| Collector | Render web service | FastAPI on uvicorn, port 8000. Applies migrations on start-up. Run **one** instance: rate limits, the Ask budget and caches are per process (scheduled jobs are claimed in the database, so a second instance doesn't repeat them) |
 | Dashboard | Render | React SPA built with `VITE_COLLECTOR_URL` / `VITE_READ_KEY` |
 | Database | AWS EC2 t3.micro | `timescale/timescaledb-ha:pg16` in Docker (includes the Toolkit), TLS with a self-signed certificate, set up by `infra/ec2-userdata.sh` |
 | Website and docs | Vercel | `landing/build.sh` puts `landing/index.html` at `/` and builds the MkDocs site from `landing/docs/` into `/docs/`. The project's root directory is `landing/`, so nothing else in the repo is served |
-| Packages | PyPI, npm, GHCR | `reqly`, `reqly-node`, `ghcr.io/tanisheesh/reqly-collector`, `reqly-dashboard` (see section 6) |
+| Packages | PyPI, npm, GHCR | `reqly`, `reqly-node`, `ghcr.io/tanisheesh/reqly-collector`, `reqly-dashboard`, the all-in-one `reqly`, and the Helm chart (see section 6) |
 | DNS | GoDaddy | `reqly.tanisheesh.in` → CNAME to Vercel |
 
 ---
@@ -28,14 +28,15 @@ Set these in the host dashboard (never commit them). Every variable, its default
 | Variable | Required | Notes |
 |---|---|---|
 | `DATABASE_URL` | ✅ | `postgresql://reqly:<password>@<host>:5432/reqly?sslmode=require` |
-| `REQLY_INGEST_KEY` | ✅ | Write key for SDKs and admin API calls |
+| `REQLY_INGEST_KEY` | ✅ | Write key for SDKs and admin API calls. The collector won't start without both keys (unless `REQLY_DEMO_MODE=true`) |
 | `REQLY_READ_KEY` | ✅ | Read key compiled into the dashboard. Must differ from the ingest key |
 | `CORS_ORIGINS` | ✅ | The dashboard's origin |
 | `FORWARDED_ALLOW_IPS` | ✅ behind a proxy | `*` on Render, so rate limits see the real client IP |
 | `GROQ_API_KEY` | ❌ | AI reports and Ask Reqly. Without it (or `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` for another OpenAI-compatible API) reports are plain text and Ask is off |
-| `PUBLIC_DASHBOARD` | ❌ | Default `false` (sign-in required); `true` for a public demo |
+| `PUBLIC_DASHBOARD` | ❌ | Default `false` (sign-in required); `true` for a public demo. The live demo sets it explicitly |
 | `REQLY_ADMIN_PASSWORD` | ❌ | Creates the first admin when there are no users (12+ characters) |
-| `ALERT_SLACK_WEBHOOK_URL` / `ALERT_DISCORD_WEBHOOK_URL` / `ALERT_WEBHOOK_URL` | ❌ | Where alerts go |
+| `ALERT_SLACK_WEBHOOK_URL` / `ALERT_DISCORD_WEBHOOK_URL` / `ALERT_TEAMS_WEBHOOK_URL` / `ALERT_PAGERDUTY_ROUTING_KEY` / `ALERT_OPSGENIE_API_KEY` / `ALERT_EMAIL_TO` / `ALERT_WEBHOOK_URL` | ❌ | Where alerts go ([channels](https://reqly.tanisheesh.in/docs/features/alerts/#channels)) |
+| `METRICS_TOKEN` | ❌ | Puts the collector's `/metrics` behind a bearer token (it's open by default) |
 | `INSIGHTS_SCHEDULER_ENABLED` | ❌ | `false` turns off the weekly report |
 
 **Dashboard:** `VITE_COLLECTOR_URL` and `VITE_READ_KEY` at build time, or `REQLY_COLLECTOR_URL` and `REQLY_READ_KEY` at run time with the prebuilt image.
@@ -69,15 +70,26 @@ The chart is in [`deploy/helm/reqly`](../deploy/helm/reqly): collector (1 replic
 
 ### Docker (self-host anywhere)
 
+The simplest: the all-in-one image serves the API and the dashboard on one port, so there's no second service and no CORS ([deploy/all-in-one](../deploy/all-in-one/docker-compose.yml) adds TimescaleDB):
+
+```bash
+docker run -d -p 8000:8000 \
+  -e DATABASE_URL="postgresql://reqly:...@db-host:5432/reqly?sslmode=require" \
+  -e REQLY_INGEST_KEY=... -e REQLY_READ_KEY=... -e REQLY_ADMIN_PASSWORD=... \
+  ghcr.io/tanisheesh/reqly:0.14.1
+```
+
+Or the two separately:
+
 ```bash
 docker run -d -p 8000:8000 \
   -e DATABASE_URL="postgresql://reqly:...@db-host:5432/reqly?sslmode=require" \
   -e REQLY_INGEST_KEY=... -e REQLY_READ_KEY=... -e CORS_ORIGINS=https://reqly-dashboard.example.com \
-  ghcr.io/tanisheesh/reqly-collector:0.10.0
+  ghcr.io/tanisheesh/reqly-collector:0.14.1
 
 docker run -d -p 5173:5173 \
   -e REQLY_COLLECTOR_URL=https://reqly.example.com -e REQLY_READ_KEY=... \
-  ghcr.io/tanisheesh/reqly-dashboard:0.10.0
+  ghcr.io/tanisheesh/reqly-dashboard:0.14.1
 ```
 
 Images are built for linux/amd64 and arm64. Pin a version instead of `latest`.
@@ -116,7 +128,7 @@ Each part has its own tag; pushing the tag runs the workflow.
 |---|---|---|
 | `sdk-vX.Y.Z` | `reqly` to PyPI, plus a GitHub release | `release-sdk.yml` |
 | `node-vX.Y.Z` | `reqly-node` to npm with provenance, plus a GitHub release; mirror `@tanisheesh/reqly-node` on GitHub Packages | `release-sdk-node.yml`, `github-packages.yml` |
-| `collector-vX.Y.Z` | `ghcr.io/tanisheesh/reqly-collector` and `reqly-dashboard` (amd64 + arm64; tagged with the version, the commit SHA and `latest`), then the Helm chart `oci://ghcr.io/tanisheesh/charts/reqly` at the same version | `github-packages.yml` |
+| `collector-vX.Y.Z` | `ghcr.io/tanisheesh/reqly-collector`, `reqly-dashboard` and the all-in-one `reqly` (amd64 + arm64; tagged with the version, the commit SHA and `latest`), then the Helm chart `oci://ghcr.io/tanisheesh/charts/reqly` at the same version | `github-packages.yml` |
 
 **Python SDK:** bump `version` in `sdk/pyproject.toml`, add a `## X.Y.Z — YYYY-MM-DD` section to `sdk/CHANGELOG.md`, merge to `main`, then:
 
@@ -128,7 +140,7 @@ The workflow refuses to publish if the tag doesn't match `pyproject.toml`, the c
 
 **Node SDK:** the same with `sdk-node/package.json`, `sdk-node/CHANGELOG.md` and a `node-vX.Y.Z` tag.
 
-**Images:** bump `collector/pyproject.toml`, merge, tag `collector-vX.Y.Z`. Run `github-packages.yml` by hand to publish the current `main`.
+**Images:** bump `collector/pyproject.toml` and `deploy/helm/reqly/Chart.yaml` (`version` and `appVersion`; CI checks they match), merge, tag `collector-vX.Y.Z`. Run `github-packages.yml` by hand (`publish: images`) to publish the current `main`, e.g. to retry a failed run without moving the tag.
 
 No tokens are stored for any of this. PyPI and npm use trusted publishing (GitHub proves its identity with a short-lived OIDC token), and GHCR uses the workflow's own token.
 
@@ -142,7 +154,8 @@ Add the release to the root [CHANGELOG.md](../CHANGELOG.md) as well.
 
 ## 7. Verify a deploy
 
-- [ ] `GET https://reqly-eventflow-collector.onrender.com/v1/health` returns 200
+- [ ] `GET https://reqly-eventflow-collector.onrender.com/v1/ready` returns `{"status": "ready", "database": "ok"}`
+- [ ] `GET /openapi.json` shows the new collector version, and `GET /v1/auth/config` says `public_dashboard: true` (the demo)
 - [ ] The dashboard loads, lists services and shows charts for the last hour
 - [ ] Making traffic on [EventFlow](https://eventflow-g2h5.onrender.com) shows up on the dashboard within a minute or two
 - [ ] With an LLM configured, Ask Reqly answers a question
@@ -166,9 +179,10 @@ After rolling back, note it in a commit or PR so the next push doesn't silently 
 
 ## 9. Monitoring & logs
 
-- **Logs:** Render → service → Logs (collector, dashboard). EC2: `docker logs` on the TimescaleDB container
+- **Logs:** Render → service → Logs (collector, dashboard); `LOG_FORMAT=json` for a log pipeline. EC2: `docker logs` on the TimescaleDB container
+- **Metrics:** the collector's own Prometheus metrics at `/metrics`: requests and latency per route, events ingested and rejected, database pool, late-data backlog
 - **Errors:** none beyond the logs yet
-- **Uptime:** none yet. Point a checker at `/v1/health`
+- **Uptime:** none yet. Point a checker at `/v1/ready` (it fails when the database doesn't answer)
 - **Reqly on Reqly:** the demo's own traffic shows up in the dashboard, so a quiet dashboard is the first sign something is off
 - **Dependencies:** Dependabot opens weekly update PRs, they are merged automatically once CI passes, and a maintenance report is emailed every Monday (see `.github/workflows/`)
 
@@ -176,7 +190,7 @@ After rolling back, note it in a commit or PR so the next push doesn't silently 
 
 ## Known production limitations
 
-- One collector instance only: the scheduler, rate limits and caches are per process
+- One collector instance only: rate limits, the Ask budget and caches are per process (scheduled jobs run once either way)
 - The most recent ~1 minute of data isn't in the aggregates yet (continuous aggregate `end_offset`)
 - With `PUBLIC_DASHBOARD` on, anyone with the dashboard URL can read every project. Meant for demos only
 - AI features depend on an LLM provider (Groq by default; any OpenAI-compatible API works). Models get retired, so the model is configurable and reports fall back to plain text
