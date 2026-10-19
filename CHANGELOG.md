@@ -6,10 +6,13 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 
 ---
 
-## [Unreleased]
+## [0.14.1] — 2026-10-19
 
-Python SDK 0.7.1 · Node SDK 0.5.1 (collector unchanged)
+Collector 0.14.1 · Helm chart 0.14.1 · Python SDK 0.7.1 · Node SDK 0.5.1
 
+- Two collectors on one database (a rolling deploy, a second replica) no longer both run the
+  scheduled jobs: each run claims its (job, slot) in `scheduled_runs` first (migration 014), so
+  hourly alerts, SLO checks and the weekly AI report (and its LLM call) happen once
 - LLM client instrumentation also counts the `stream()` helpers in Python
   (`client.messages.stream(...)`, `client.chat.completions.stream(...)`, `client.responses.stream(...)`)
 - `trace_slow_ms` / `traceSlowMs` (`REQLY_TRACE_SLOW_MS`) in both SDKs, to match a lower `TRACE_ID_SLOW_MS`
@@ -360,7 +363,8 @@ Python SDK 0.1.5
 
 ---
 
-[Unreleased]: https://github.com/tanisheesh/reqly/compare/collector-v0.14.0...HEAD
+[Unreleased]: https://github.com/tanisheesh/reqly/compare/collector-v0.14.1...HEAD
+[0.14.1]: https://github.com/tanisheesh/reqly/tree/collector-v0.14.1
 [0.14.0]: https://github.com/tanisheesh/reqly/tree/collector-v0.14.0
 [0.13.0]: https://github.com/tanisheesh/reqly/tree/collector-v0.13.0
 [0.12.3]: https://github.com/tanisheesh/reqly/tree/collector-v0.12.3
