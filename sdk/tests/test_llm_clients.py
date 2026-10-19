@@ -115,7 +115,8 @@ _http = __import__("httpx2") if importlib.util.find_spec("httpx2") else httpx
 
 
 def _http_for(client_module):
-    source = open(client_module._base_client.__file__, encoding="utf-8").read()
+    with open(client_module._base_client.__file__, encoding="utf-8") as f:
+        source = f.read()
     return _http if "import httpx2" in source else httpx
 
 
@@ -169,3 +170,124 @@ def test_real_anthropic_client():
     summary = _in_request(lambda: client.messages.create(
         model="claude-haiku-4-5", max_tokens=10, messages=[{"role": "user", "content": "hi"}]))
     assert summary[:3] == ("claude-haiku-4-5", 40, 9)
+
+
+def _sse(http, events):
+    body = "".join(
+        (f"event: {name}\n" if name else "") + f"data: {json.dumps(data) if not isinstance(data, str) else data}\n\n"
+        for name, data in events
+    )
+    return http.MockTransport(lambda request: http.Response(
+        200, headers={"content-type": "text/event-stream"}, content=body.encode()))
+
+
+_ANTHROPIC_STREAM = [
+    ("message_start", {"type": "message_start", "message": {
+        "id": "m1", "type": "message", "role": "assistant", "model": "claude-opus-4-7", "content": [],
+        "stop_reason": None, "stop_sequence": None, "usage": {"input_tokens": 1200, "output_tokens": 1}}}),
+    ("content_block_start", {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}}),
+    ("content_block_delta", {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": "hi"}}),
+    ("content_block_stop", {"type": "content_block_stop", "index": 0}),
+    ("message_delta", {"type": "message_delta", "delta": {"stop_reason": "end_turn", "stop_sequence": None},
+                       "usage": {"output_tokens": 340}}),
+    ("message_stop", {"type": "message_stop"}),
+]
+
+
+@pytest.mark.parametrize("consume", ["iterate", "text_stream", "final_message"])
+def test_real_anthropic_stream_helper(consume):
+    anthropic = pytest.importorskip("anthropic")
+    http = _http_for(anthropic)
+    client = reqly.instrument_anthropic(anthropic.Anthropic(
+        api_key="k", base_url="http://llm.test", http_client=http.Client(transport=_sse(http, _ANTHROPIC_STREAM)),
+    ))
+
+    def call():
+        with client.messages.stream(model="claude-opus-4-7", max_tokens=10,
+                                    messages=[{"role": "user", "content": "hi"}]) as stream:
+            if consume == "iterate":
+                assert any(e.type == "message_stop" for e in stream)
+            elif consume == "text_stream":
+                assert "".join(stream.text_stream) == "hi"
+            else:
+                assert stream.get_final_message().usage.output_tokens == 340
+
+    assert _in_request(call)[:3] == ("claude-opus-4-7", 1200, 340)
+
+
+def test_real_openai_stream_helpers():
+    openai = pytest.importorskip("openai")
+    http = _http_for(openai)
+    chunk = {"id": "c1", "object": "chat.completion.chunk", "created": 0, "model": "gpt-4o"}
+    chat_events = [
+        (None, {**chunk, "choices": [{"index": 0, "delta": {"role": "assistant", "content": "hi"}, "finish_reason": None}]}),
+        (None, {**chunk, "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]}),
+        (None, {**chunk, "choices": [], "usage": {"prompt_tokens": 300, "completion_tokens": 30, "total_tokens": 330}}),
+        (None, "[DONE]"),
+    ]
+    chat = reqly.instrument_openai(openai.OpenAI(
+        api_key="k", base_url="http://llm.test/v1", http_client=http.Client(transport=_sse(http, chat_events)),
+    ))
+
+    def chat_call():
+        with chat.chat.completions.stream(model="gpt-4o", messages=[{"role": "user", "content": "hi"}],
+                                          stream_options={"include_usage": True}) as stream:
+            stream.until_done()
+
+    assert _in_request(chat_call)[:3] == ("gpt-4o", 300, 30)
+
+    response = {"id": "r1", "object": "response", "created_at": 0, "model": "gpt-4.1", "status": "completed",
+                "output": [], "parallel_tool_calls": True, "tool_choice": "auto", "tools": [],
+                "usage": {"input_tokens": 50, "output_tokens": 7, "total_tokens": 57,
+                          "input_tokens_details": {"cached_tokens": 0}, "output_tokens_details": {"reasoning_tokens": 0}}}
+    responses_events = [
+        ("response.created", {"type": "response.created", "sequence_number": 0, "response": {**response, "status": "in_progress", "usage": None}}),
+        ("response.completed", {"type": "response.completed", "sequence_number": 1, "response": response}),
+    ]
+    responses = reqly.instrument_openai(openai.OpenAI(
+        api_key="k", base_url="http://llm.test/v1", http_client=http.Client(transport=_sse(http, responses_events)),
+    ))
+
+    def responses_call():
+        with responses.responses.stream(model="gpt-4.1", input="hi") as stream:
+            assert stream.get_final_response().usage.output_tokens == 7
+
+    assert _in_request(responses_call)[:3] == ("gpt-4.1", 50, 7)
+
+
+def test_real_async_stream_helpers():
+    openai = pytest.importorskip("openai")
+    anthropic = pytest.importorskip("anthropic")
+    oh, ah = _http_for(openai), _http_for(anthropic)
+    chunk = {"id": "c1", "object": "chat.completion.chunk", "created": 0, "model": "gpt-4o"}
+    chat_events = [
+        (None, {**chunk, "choices": [{"index": 0, "delta": {"content": "hi"}, "finish_reason": "stop"}]}),
+        (None, {**chunk, "choices": [], "usage": {"prompt_tokens": 300, "completion_tokens": 30, "total_tokens": 330}}),
+        (None, "[DONE]"),
+    ]
+
+    def async_sse(http, events):
+        transport = _sse(http, events)
+
+        async def handler(request):
+            return transport.handler(request)
+
+        return http.MockTransport(handler)
+
+    chat = reqly.instrument_openai(openai.AsyncOpenAI(
+        api_key="k", base_url="http://llm.test/v1", http_client=oh.AsyncClient(transport=async_sse(oh, chat_events))))
+    claude = reqly.instrument_anthropic(anthropic.AsyncAnthropic(
+        api_key="k", base_url="http://llm.test", http_client=ah.AsyncClient(transport=async_sse(ah, _ANTHROPIC_STREAM))))
+
+    async def calls():
+        token = rc.begin_request()
+        async with chat.chat.completions.stream(model="gpt-4o", messages=[{"role": "user", "content": "hi"}],
+                                                stream_options={"include_usage": True}) as stream:
+            async for _ in stream:
+                pass
+        async with claude.messages.stream(model="claude-opus-4-7", max_tokens=10,
+                                          messages=[{"role": "user", "content": "hi"}]) as stream:
+            await stream.get_final_message()
+        return rc.end_request(token)
+
+    assert asyncio.run(calls())[3] == (("claude-opus-4-7", 1200, 340), ("gpt-4o", 300, 30))

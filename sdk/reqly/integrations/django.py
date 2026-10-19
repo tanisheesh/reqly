@@ -44,7 +44,7 @@ _CONFIG_KEYS = (
     "service_name", "collector_url", "api_key", "sample_rate", "flush_interval_seconds",
     "max_batch_size", "max_queue_size", "ignore_routes", "capture_request_body",
     "release", "environment", "consumer_header", "consumer", "consumer_salt", "hash_consumer",
-    "push_openapi",
+    "push_openapi", "trace_slow_ms",
 )
 
 # <int:pk>, <slug:slug>, <pk>  ->  {pk}

@@ -142,3 +142,23 @@ def test_trace_ids_of_failed_and_slow_requests(fake_collector):
     assert traces.trace_id_from_headers({"x-b3-traceid": "463AC35C9F6413AD"}) == "463ac35c9f6413ad"
     assert traces.trace_id_from_headers({"traceparent": "00-" + "0" * 32 + "-00f067aa0ba902b7-01"}) is None
     client.shutdown()
+
+
+def test_trace_slow_ms_is_configurable(fake_collector, monkeypatch):
+    url, batches = fake_collector
+    app = FastAPI()
+
+    @app.get("/work")
+    def work():
+        time.sleep(0.25)
+        return {}
+
+    monkeypatch.setenv("REQLY_TRACE_SLOW_MS", "100")
+    client = reqly.instrument(app, service_name="s", collector_url=url, flush_interval_seconds=999)
+    assert client.config.trace_slow_ms == 100
+    TestClient(app).get("/work", headers={"traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"})
+    client._buffer.flush()
+    time.sleep(0.05)
+    [event] = [e for b in batches for e in b["events"]]
+    assert event["trace_id"] == "4bf92f3577b34da6a3ce929d0e0e4736"  # 250 ms: slow enough at 100
+    client.shutdown()
