@@ -6,6 +6,17 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 
 ---
 
+## [Unreleased]
+
+Node SDK 0.5.2 (collector unchanged)
+
+- Node: batches are gzipped on libuv's thread pool instead of the event loop, fixing a 3-4 µs per-request
+  regression since 0.4.0 (found by re-running the benchmark, whose CI job had stopped failing on a crash)
+- Docs brought up to date with 0.13-0.14: README, landing page, PRD, architecture, decisions 13-17, setup,
+  deploy, HTTP API reference (alert actions, `/metrics`), SDK guides and benchmarks
+
+---
+
 ## [0.14.1] — 2026-10-19
 
 Collector 0.14.1 · Helm chart 0.14.1 · Python SDK 0.7.1 · Node SDK 0.5.1
