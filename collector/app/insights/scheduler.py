@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import socket
 from datetime import date, datetime, timedelta, timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -17,6 +19,31 @@ from .llm_report import generate_report
 from .report import summarize_drift
 
 logger = logging.getLogger("reqly.collector")
+
+
+_INSTANCE = f"{socket.gethostname()}:{os.getpid()}"
+_KEEP_RUNS = timedelta(days=30)
+
+
+async def claim_run(pool, job: str, slot: datetime) -> bool:
+    """True for exactly one collector per (job, slot): the one whose insert
+    lands (migrations/014_scheduled_runs.sql)."""
+    claimed = await pool.fetchval(
+        """
+        INSERT INTO scheduled_runs (job, slot, claimed_by) VALUES ($1, $2, $3)
+        ON CONFLICT (job, slot) DO NOTHING RETURNING true
+        """,
+        job, slot, _INSTANCE,
+    )
+    if not claimed:
+        logger.info("scheduled job %s for %s: another collector has it", job, slot.isoformat())
+        return False
+    await pool.execute("DELETE FROM scheduled_runs WHERE job = $1 AND slot < $2", job, slot - _KEEP_RUNS)
+    return True
+
+
+def _five_minutes(now: datetime) -> datetime:
+    return now.replace(minute=now.minute - now.minute % 5, second=0, microsecond=0)
 
 
 def _current_week_start(now: datetime | None = None) -> date:
@@ -65,6 +92,9 @@ async def run_insights_for_service(service_name: str) -> dict:
 
 async def run_insights_for_all_services() -> None:
     pool = get_pool()
+    week = datetime.combine(_current_week_start(), datetime.min.time(), tzinfo=timezone.utc)
+    if not await claim_run(pool, "weekly_insights", week):
+        return
     services = await queries.list_services(pool)
     for service_name in services:
         try:
@@ -78,10 +108,13 @@ async def run_hourly_alerts() -> None:
     from ..config import settings
 
     pool = get_pool()
+    now = datetime.now(timezone.utc)
+    if not await claim_run(pool, "hourly_alerts", hourly.last_complete_hour(now)):
+        return
     services = await queries.list_services(pool)
     channels = notifier.channels_from_settings(settings)
     await hourly.run_hourly_check(
-        pool, services, channels, timedelta(hours=settings.alert_renotify_hours),
+        pool, services, channels, timedelta(hours=settings.alert_renotify_hours), now=now,
         llm_cost_min_usd=settings.llm_cost_alert_min_usd,
         client_error_statuses=settings.client_error_alert_statuses,
     )
@@ -91,8 +124,12 @@ async def run_slo_alerts() -> None:
     from ..alerts import notifier, slo_alerts
     from ..config import settings
 
+    pool = get_pool()
+    now = datetime.now(timezone.utc)
+    if not await claim_run(pool, "slo_alerts", _five_minutes(now)):
+        return
     channels = notifier.channels_from_settings(settings)
-    await slo_alerts.run_slo_check(get_pool(), channels, timedelta(hours=settings.alert_renotify_hours))
+    await slo_alerts.run_slo_check(pool, channels, timedelta(hours=settings.alert_renotify_hours), now=now)
 
 
 def start_scheduler(weekly: bool = True, hourly_alerts: bool = True) -> AsyncIOScheduler:

@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from typing import Mapping
 
-SLOW_MS = 500.0  # the collector keeps 1s+ by default (TRACE_ID_SLOW_MS)
+SLOW_MS = 500.0  # default; Config.trace_slow_ms (the collector keeps 1s+: TRACE_ID_SLOW_MS)
 
 _HEX = re.compile(r"^(?:[0-9a-f]{16}|[0-9a-f]{32})$")
 
@@ -34,5 +34,5 @@ def trace_id_from_headers(headers: Mapping[str, str]) -> str | None:
     return _valid(b3) if b3 else None
 
 
-def wants_trace_id(status_code: int, duration_ms: float) -> bool:
-    return status_code >= 400 or duration_ms >= SLOW_MS
+def wants_trace_id(status_code: int, duration_ms: float, slow_ms: float = SLOW_MS) -> bool:
+    return status_code >= 400 or duration_ms >= slow_ms

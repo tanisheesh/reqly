@@ -2,6 +2,18 @@
 
 All notable changes to the `reqly` Python SDK.
 
+## 0.7.1 — 2026-10-19
+
+### Fixed
+- `instrument_openai` / `instrument_anthropic` now also count the `stream()` helpers
+  (`client.messages.stream(...)`, `client.chat.completions.stream(...)`,
+  `client.responses.stream(...)`), sync and async, however the stream is read; OpenAI's chat
+  helper is counted once, not again through the `create()` it calls.
+
+### Added
+- `trace_slow_ms` (`REQLY_TRACE_SLOW_MS`, default 500): requests at least this slow send their
+  trace id, to match a collector whose `TRACE_ID_SLOW_MS` is lower.
+
 ## 0.7.0 — 2026-10-19
 
 ### Added

@@ -2,6 +2,14 @@
 
 All notable changes to `reqly-node`.
 
+## 0.5.1 — 2026-10-19
+
+### Added
+- `traceSlowMs` (`REQLY_TRACE_SLOW_MS`, default 500): requests at least this slow send their
+  trace id, to match a collector whose `TRACE_ID_SLOW_MS` is lower.
+- Tests showing the `stream()` helpers of the real `openai` and `@anthropic-ai/sdk` clients
+  (`finalChatCompletion()`, `finalResponse()`, `finalMessage()`) are counted, once each.
+
 ## 0.5.0 — 2026-10-19
 
 ### Added

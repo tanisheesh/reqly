@@ -95,6 +95,9 @@ class Config:
     consumer: Any = None  # callable(RequestInfo) -> str | None
     consumer_salt: str | None = None
     hash_consumer: bool = True
+    # Requests at least this slow send their trace id (4xx/5xx always do);
+    # match the collector's TRACE_ID_SLOW_MS when lowering it.
+    trace_slow_ms: float = 500.0
     sdk_version: str = field(default_factory=_get_sdk_version)
 
     def __post_init__(self) -> None:
@@ -125,6 +128,7 @@ class Config:
         consumer: Any = None,
         consumer_salt: str | None = None,
         hash_consumer: bool | None = None,
+        trace_slow_ms: float | None = None,
     ) -> "Config":
         import sys as _sys
 
@@ -197,6 +201,9 @@ class Config:
             consumer_header=consumer_header or os.environ.get("REQLY_CONSUMER_HEADER") or None,
             consumer=consumer,
             consumer_salt=consumer_salt or os.environ.get("REQLY_CONSUMER_SALT") or None,
+            trace_slow_ms=(
+                trace_slow_ms if trace_slow_ms is not None else _env_float("REQLY_TRACE_SLOW_MS", 500.0)
+            ),
             hash_consumer=(
                 hash_consumer
                 if hash_consumer is not None

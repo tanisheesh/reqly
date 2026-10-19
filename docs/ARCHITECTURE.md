@@ -66,7 +66,7 @@ A static React SPA that calls the collector from the browser with a session toke
 
 ### Hourly alerts
 
-At :15 past every hour the collector refreshes the last completed hour in `route_errors_1hour` and compares it with the same weekday-hour in the previous 8 weeks using the same detector as the weekly report (`recent_window=1h`). Anomalies get the same release context and hints, then `app/alerts/hourly.py` keeps at most one open alert per (service, route) in the `alerts` table: a new detection opens one and notifies, repeats update it (reminder every `ALERT_RENOTIFY_HOURS`), and two clean hours resolve it with a final notification. Messages go to Slack, Discord and/or a generic JSON webhook, built from the statistics only (no LLM in the alert path). Run the scheduler on a single collector instance.
+At :15 past every hour the collector refreshes the last completed hour in `route_errors_1hour` and compares it with the same weekday-hour in the previous 8 weeks using the same detector as the weekly report (`recent_window=1h`). Anomalies get the same release context and hints, then `app/alerts/hourly.py` keeps at most one open alert per (service, route) in the `alerts` table: a new detection opens one and notifies, repeats update it (reminder every `ALERT_RENOTIFY_HOURS`), and two clean hours resolve it with a final notification. Messages go to Slack, Discord and/or a generic JSON webhook, built from the statistics only (no LLM in the alert path). Each run is first claimed in `scheduled_runs` (job, slot), so a second collector on the same database skips it; rate limits and the Ask budget are still per process, so one collector remains the supported setup.
 
 ### SLOs and error budgets
 

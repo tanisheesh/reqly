@@ -138,3 +138,56 @@ test("the real anthropic client", async (t) => {
   });
   assert.deepEqual([event.llm_model, event.llm_input_tokens, event.llm_output_tokens], ["claude-haiku-4-5", 40, 9]);
 });
+
+const sse = (events) => async () =>
+  new Response(
+    events.map(([name, data]) => `${name ? `event: ${name}\n` : ""}data: ${typeof data === "string" ? data : JSON.stringify(data)}\n\n`).join(""),
+    { status: 200, headers: { "content-type": "text/event-stream" } },
+  );
+
+test("the real clients' stream() helpers are counted once (Node 22+)", async (t) => {
+  let OpenAI, Anthropic;
+  try {
+    ({ default: OpenAI } = await import("openai"));
+    ({ default: Anthropic } = await import("@anthropic-ai/sdk"));
+  } catch {
+    return t.skip("openai / @anthropic-ai/sdk aren't importable on this Node");
+  }
+  const chunk = { id: "c1", object: "chat.completion.chunk", created: 0, model: "gpt-4o" };
+  const chat = instrumentOpenAI(new OpenAI({ apiKey: "k", baseURL: "http://llm.test/v1", fetch: sse([
+    [null, { ...chunk, choices: [{ index: 0, delta: { role: "assistant", content: "hi" }, finish_reason: "stop" }] }],
+    [null, { ...chunk, choices: [], usage: { prompt_tokens: 300, completion_tokens: 30, total_tokens: 330 } }],
+    [null, "[DONE]"],
+  ]) }));
+  const response = { id: "r1", object: "response", created_at: 0, model: "gpt-4.1", status: "completed", output: [],
+    parallel_tool_calls: true, tool_choice: "auto", tools: [],
+    usage: { input_tokens: 50, output_tokens: 7, total_tokens: 57, input_tokens_details: { cached_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } } };
+  const responses = instrumentOpenAI(new OpenAI({ apiKey: "k", baseURL: "http://llm.test/v1", fetch: sse([
+    ["response.created", { type: "response.created", sequence_number: 0, response: { ...response, status: "in_progress", usage: null } }],
+    ["response.completed", { type: "response.completed", sequence_number: 1, response }],
+  ]) }));
+  const claude = instrumentAnthropic(new Anthropic({ apiKey: "k", baseURL: "http://llm.test", fetch: sse([
+    ["message_start", { type: "message_start", message: { id: "m1", type: "message", role: "assistant", model: "claude-opus-4-7",
+      content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 1200, output_tokens: 1 } } }],
+    ["content_block_start", { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } }],
+    ["content_block_delta", { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "hi" } }],
+    ["content_block_stop", { type: "content_block_stop", index: 0 }],
+    ["message_delta", { type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 340 } }],
+    ["message_stop", { type: "message_stop" }],
+  ]) }));
+
+  const event = await oneRequest(async () => {
+    await chat.chat.completions
+      .stream({ model: "gpt-4o", messages: [{ role: "user", content: "hi" }], stream_options: { include_usage: true } })
+      .finalChatCompletion();
+    await responses.responses.stream({ model: "gpt-4.1", input: "hi" }).finalResponse();
+    const message = await claude.messages
+      .stream({ model: "claude-opus-4-7", max_tokens: 10, messages: [{ role: "user", content: "hi" }] })
+      .finalMessage();
+    assert.equal(message.usage.output_tokens, 340);
+  });
+  assert.deepEqual(
+    event.llm_usage.map((m) => [m.model, m.input_tokens, m.output_tokens]),
+    [["claude-opus-4-7", 1200, 340], ["gpt-4o", 300, 30], ["gpt-4.1", 50, 7]],
+  );
+});

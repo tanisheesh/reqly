@@ -29,9 +29,9 @@ collector:
     repository: ghcr.io/tanisheesh/reqly-collector
     tag: ""            # defaults to the chart's appVersion
     pullPolicy: IfNotPresent
-  # Always one replica: the alert scheduler, rate limits and caches live in the
-  # process, so two collectors would run every check twice. Upgrades use the
-  # Recreate strategy for the same reason.
+  # Always one replica: rate limits, the Ask Reqly budget and caches live in
+  # the process (scheduled checks are claimed in the database, so those would
+  # still run once). Upgrades use the Recreate strategy for the same reason.
   config:
     PUBLIC_DASHBOARD: "true"
     REQLY_ADMIN_USERNAME: admin

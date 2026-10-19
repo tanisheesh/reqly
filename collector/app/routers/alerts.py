@@ -144,5 +144,7 @@ async def remove_mute(mute_id: int, principal: Principal = Depends(_on_call)):
     if service is None:
         raise HTTPException(status_code=404, detail="no such mute")
     await check_service(principal, service)
-    await pool.execute("UPDATE alert_mutes SET muted_until = least(muted_until, now()) WHERE id = $1", mute_id)
+    # Deleted, not ended at now(): the check compares with the collector's
+    # clock, which can trail the database's.
+    await pool.execute("DELETE FROM alert_mutes WHERE id = $1", mute_id)
     return {"removed": mute_id}

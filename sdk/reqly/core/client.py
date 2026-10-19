@@ -98,7 +98,7 @@ class ReqlyClient:
             request_info = _once(request_info)
             event = build_event(
                 consumer_id=self._consumer_id(request_info),
-                trace_id=_trace_id(request_info, status_code, duration_ms),
+                trace_id=_trace_id(request_info, status_code, duration_ms, self.config.trace_slow_ms),
                 llm=llm,
                 service_name=self.config.service_name,
                 method=method,
@@ -178,8 +178,8 @@ def _once(factory: Callable[[], Any] | None) -> Callable[[], Any] | None:
     return get
 
 
-def _trace_id(request_info, status_code: int, duration_ms: float) -> str | None:
-    if request_info is None or not wants_trace_id(status_code, duration_ms):
+def _trace_id(request_info, status_code: int, duration_ms: float, slow_ms: float) -> str | None:
+    if request_info is None or not wants_trace_id(status_code, duration_ms, slow_ms):
         return None
     try:
         return trace_id_from_headers(request_info().headers)

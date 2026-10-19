@@ -82,6 +82,7 @@ def instrument(
     consumer=None,
     consumer_salt: str | None = None,
     hash_consumer: bool | None = None,
+    trace_slow_ms: float | None = None,
 ) -> ReqlyClient | None:
     """Instrument a FastAPI, Starlette, Litestar or Flask app with one line.
     (Django: add ``reqly.integrations.django.ReqlyMiddleware`` to MIDDLEWARE.)
@@ -133,6 +134,7 @@ def instrument(
             consumer=consumer,
             consumer_salt=consumer_salt,
             hash_consumer=hash_consumer,
+            trace_slow_ms=trace_slow_ms,
         )
         client = ReqlyClient(config)
         if client.spec_source() is not None:
@@ -171,7 +173,7 @@ _GENERIC_OPTIONS = (
     "service_name", "collector_url", "api_key", "sample_rate", "flush_interval_seconds",
     "max_batch_size", "max_queue_size", "ignore_routes", "capture_request_body",
     "release", "environment", "consumer_header", "consumer", "consumer_salt", "hash_consumer",
-    "push_openapi",
+    "push_openapi", "trace_slow_ms",
 )
 
 

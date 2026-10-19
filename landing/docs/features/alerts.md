@@ -58,7 +58,7 @@ When requests carry a trace id (the SDKs read `traceparent`, `sentry-trace` or `
 • traces: `4bf92f3577b34da6a3ce929d0e0e4736`, `771a43a4192642f0b136d5159a501700`
 ```
 
-Copy one into Tempo, Jaeger or Sentry. With `TRACE_URL_TEMPLATE` set (e.g. `https://grafana.example.com/explore?left=...{trace_id}...`), the dashboard links them. Only 4xx/5xx responses and requests slower than `TRACE_ID_SLOW_MS` (default 1000) keep their trace id.
+Copy one into Tempo, Jaeger or Sentry. With `TRACE_URL_TEMPLATE` set (e.g. `https://grafana.example.com/explore?left=...{trace_id}...`), the dashboard links them. Only 4xx/5xx responses and requests slower than `TRACE_ID_SLOW_MS` (default 1000) keep their trace id. The SDKs send it for requests over 500 ms; lowering `TRACE_ID_SLOW_MS` below that, set the SDKs' `trace_slow_ms` / `traceSlowMs` (`REQLY_TRACE_SLOW_MS`) to match.
 
 ### Root-cause hints
 
@@ -84,8 +84,8 @@ Set any combination. Channels that aren't set are skipped.
 
 Set `ALERTS_ENABLED=false` to turn the hourly check off. [SLO burn-rate alerts](slos.md#burn-rate-alerts) and [LLM cost alerts](#llm-cost-alerts) go to the same channels.
 
-!!! note "Run one collector"
-    The scheduler runs inside the collector process. With two collector instances, every check runs twice.
+!!! note "More than one collector"
+    The scheduler runs inside the collector process. With two collectors on one database (a rolling deploy, a second replica), each run is claimed in the database first, so every check, alert and weekly report still happens once (collector 0.14.1+). Rate limits and the Ask Reqly daily budget are still per process, which is why one collector is the supported setup.
 
 ## Client error alerts
 

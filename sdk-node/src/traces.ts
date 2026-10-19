@@ -4,7 +4,7 @@
  * Only read for failed (4xx/5xx) or slow requests -- the collector keeps no
  * other -- so a fast 200 never pays for it.
  */
-export const TRACE_SLOW_MS = 500; // the collector keeps 1s+ by default (TRACE_ID_SLOW_MS)
+export const TRACE_SLOW_MS = 500; // default; the traceSlowMs option (the collector keeps 1s+: TRACE_ID_SLOW_MS)
 
 const HEX = /^(?:[0-9a-f]{16}|[0-9a-f]{32})$/;
 
@@ -23,6 +23,6 @@ export function traceIdFromHeaders(headers: Record<string, string | undefined>):
   return valid(headers["sentry-trace"]?.split("-")[0]) ?? valid(headers["x-b3-traceid"]);
 }
 
-export function wantsTraceId(statusCode: number, durationMs: number): boolean {
-  return statusCode >= 400 || durationMs >= TRACE_SLOW_MS;
+export function wantsTraceId(statusCode: number, durationMs: number, slowMs = TRACE_SLOW_MS): boolean {
+  return statusCode >= 400 || durationMs >= slowMs;
 }
