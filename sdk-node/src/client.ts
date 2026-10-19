@@ -4,6 +4,7 @@ import { gzipSync } from "node:zlib";
 
 import { ReqlyOptions, ResolvedConfig, resolveConfig } from "./config.js";
 import { LlmSummary, RequestInfo } from "./context.js";
+import { traceIdFromHeaders, wantsTraceId } from "./traces.js";
 
 export const SDK_VERSION = "0.4.0";
 export const UNMATCHED_ROUTE = "__unmatched__";
@@ -50,6 +51,8 @@ interface WireEvent {
   llm_output_tokens: number | null;
   /** Several models in one request; omitted otherwise (ignored by collectors before 0.13). */
   llm_usage?: { model: string; input_tokens: number; output_tokens: number }[];
+  /** Failed or slow requests only; omitted otherwise (ignored by collectors before 0.14). */
+  trace_id?: string;
 }
 
 // Clients with queued events are flushed when the process is about to exit
@@ -68,6 +71,13 @@ function installExitHook(): void {
       if (client.hasQueued()) void client.shutdown();
     }
   });
+}
+
+/** The request info built at most once, however many need it. */
+function once(factory?: () => RequestInfo): (() => RequestInfo) | undefined {
+  if (!factory) return undefined;
+  let info: RequestInfo | undefined;
+  return () => (info ??= factory());
 }
 
 function retryable(status: number): boolean {
@@ -137,6 +147,8 @@ export class ReqlyClient {
       if (this.config.ignoreRoutes.has(route)) return;
       if (this.config.sampleRate < 1 && Math.random() >= this.config.sampleRate) return;
       const error = request.errorType !== undefined || request.statusCode >= 500;
+      const requestInfo = once(request.requestInfo);
+      const traceId = this.traceId(requestInfo, request.statusCode, request.durationMs);
       this.queue.push({
         event_id: randomUUID(),
         timestamp: new Date().toISOString(),
@@ -149,7 +161,7 @@ export class ReqlyClient {
         host: HOST,
         request_bytes: request.requestBytes ?? null,
         response_bytes: request.responseBytes ?? null,
-        consumer_id: this.consumerId(request.requestInfo),
+        consumer_id: this.consumerId(requestInfo),
         llm_model: request.llm?.model ?? null,
         llm_input_tokens: request.llm?.inputTokens ?? null,
         llm_output_tokens: request.llm?.outputTokens ?? null,
@@ -162,6 +174,7 @@ export class ReqlyClient {
               })),
             }
           : {}),
+        ...(traceId ? { trace_id: traceId } : {}),
       });
       this.stats.recorded += 1;
       if (this.queue.length > this.config.maxQueueSize) {
@@ -173,6 +186,15 @@ export class ReqlyClient {
     } catch (err) {
       this.disabled = true;
       console.warn("reqly: internal error, disabling instrumentation:", err);
+    }
+  }
+
+  private traceId(requestInfo: (() => RequestInfo) | undefined, statusCode: number, durationMs: number): string | undefined {
+    if (!requestInfo || !wantsTraceId(statusCode, durationMs)) return undefined;
+    try {
+      return traceIdFromHeaders(requestInfo().headers);
+    } catch {
+      return undefined; // costs the trace id, not the event
     }
   }
 
