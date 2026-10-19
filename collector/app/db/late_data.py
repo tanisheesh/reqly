@@ -68,7 +68,11 @@ AGGREGATES: tuple[tuple[str, timedelta], ...] = (
     ("api_latency_1min", timedelta(minutes=1)),
     ("consumer_usage_1hour", timedelta(hours=1)),
     ("llm_usage_1hour", timedelta(hours=1)),
+    ("llm_usage_splits_1hour", timedelta(hours=1)),
 )
+# Built from their own table, which their migration created empty: nothing
+# to seed, and usually still empty (most requests call one model or none).
+_NOT_SEEDED = frozenset({"llm_usage_splits_1hour"})
 
 
 def _floor_to_hour(ts: datetime) -> datetime:
@@ -228,7 +232,7 @@ async def seed_empty_aggregates(pool: asyncpg.Pool, late: LateDataTracker = trac
     retention window. Returns True if a refresh was queued."""
     async with pool.acquire() as conn:
         for view, _ in await existing_aggregates(conn):
-            if await conn.fetchval(f"SELECT EXISTS (SELECT 1 FROM {view})"):
+            if view in _NOT_SEEDED or await conn.fetchval(f"SELECT EXISTS (SELECT 1 FROM {view})"):
                 continue
             oldest = await conn.fetchval("SELECT min(time) FROM request_events")
             if oldest is None:

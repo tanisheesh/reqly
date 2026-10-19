@@ -197,8 +197,13 @@ def test_genai_span_tokens_land_on_the_request_that_made_the_call():
     call2 = _child("3333333333333333", SERVER_ID, {
         "gen_ai.request.model": "gpt-4o", "gen_ai.usage.prompt_tokens": 100,  # legacy names
         "gen_ai.usage.completion_tokens": 20})
-    [event] = _events(map_resource_spans(_tree(server, handler, call1, call2)))
+    result = map_resource_spans(_tree(server, handler, call1, call2))
+    [event] = _events(result)
     assert event["route"] == "/chat"
+    # and split so gpt-4o's tokens are priced as gpt-4o
+    splits = {s[4]: (s[5], s[6]) for s in result.llm_splits}
+    assert splits == {"gpt-4o-mini-2024-07-18": (-100, -20), "gpt-4o": (100, 20)}
+    assert {s[1] for s in result.llm_splits} == {event["event_id"]}
     # tokens summed, attributed to the model with the most tokens (like the SDKs)
     assert (event["llm_model"], event["llm_input_tokens"], event["llm_output_tokens"]) == \
         ("gpt-4o-mini-2024-07-18", 1300, 260)

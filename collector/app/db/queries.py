@@ -70,6 +70,20 @@ async def insert_events(pool: asyncpg.Pool, rows: list[tuple]) -> None:
     await pool.execute(_INSERT_EVENTS_SQL, *columns)
 
 
+_INSERT_LLM_SPLITS_SQL = """
+INSERT INTO llm_usage_splits (time, event_id, service_name, route, llm_model, input_tokens, output_tokens)
+SELECT * FROM unnest($1::timestamptz[], $2::uuid[], $3::text[], $4::text[], $5::text[], $6::bigint[], $7::bigint[])
+ON CONFLICT (time, event_id, llm_model) DO NOTHING
+"""
+
+
+async def insert_llm_splits(pool: asyncpg.Pool, rows: list[tuple]) -> None:
+    """Rows from app.llm.splits.split_rows(), for the events just inserted."""
+    if not rows:
+        return
+    await pool.execute(_INSERT_LLM_SPLITS_SQL, *[list(column) for column in zip(*rows)])
+
+
 _UPSERT_DEPLOYMENT_SQL = """
 INSERT INTO deployments (service_name, environment, release, first_seen_at, last_seen_at)
 VALUES ($1, $2, $3, $4, $5)

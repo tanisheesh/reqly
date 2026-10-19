@@ -29,6 +29,11 @@ def client(monkeypatch):
     monkeypatch.setattr(ingest_module, "writable_service", any_service)
     monkeypatch.setattr(ingest_module, "insert_events", fake_insert_events)
 
+    async def fake_insert_llm_splits(pool, rows):
+        test_client.split_rows.extend(rows)
+
+    monkeypatch.setattr(ingest_module, "insert_llm_splits", fake_insert_llm_splits)
+
     async def fake_record_deployments(pool, rows):
         test_client.deployment_rows.extend(rows)
 
@@ -37,6 +42,7 @@ def client(monkeypatch):
     test_client = TestClient(app)
     test_client.captured_rows = captured_rows
     test_client.deployment_rows = []
+    test_client.split_rows = []
     return test_client
 
 
@@ -108,6 +114,42 @@ def test_ingest_rejects_bad_or_unknown_encodings(client):
     assert r.status_code == 400 and r.json()["detail"] == "invalid gzip body"
     r = client.post("/v1/ingest", headers={**headers, "Content-Encoding": "br"}, content=body)
     assert r.status_code == 415
+
+
+def test_llm_usage_sets_the_totals_and_splits_the_tokens(client):
+    from app.db.queries import EVENT_COLUMNS
+
+    multi = _valid_event(
+        llm_model="ignored", llm_input_tokens=1, llm_output_tokens=1,  # recomputed from llm_usage
+        llm_usage=[
+            {"model": "gpt-4o-mini", "input_tokens": 400, "output_tokens": 40},
+            {"model": "gpt-4o", "input_tokens": 1000, "output_tokens": 300},
+            {"model": "gpt-4o-mini", "input_tokens": 100},  # same model twice: merged
+        ],
+    )
+    single = _valid_event(llm_usage=[{"model": "claude-haiku", "input_tokens": 9, "output_tokens": 1}])
+    response = client.post(
+        "/v1/ingest", headers={"X-Reqly-Key": "demo-key"}, json={"service_name": "svc", "events": [multi, single]},
+    )
+    assert response.json() == {"accepted": 2, "rejected": 0}
+    rows = [dict(zip(EVENT_COLUMNS, r)) for r in client.captured_rows]
+    assert [(r["llm_model"], r["llm_input_tokens"], r["llm_output_tokens"]) for r in rows] == [
+        ("gpt-4o", 1500, 340), ("claude-haiku", 9, 1),
+    ]
+    assert [(s[1], s[4], s[5], s[6]) for s in client.split_rows] == [
+        (multi["event_id"], "gpt-4o", -500, -40),
+        (multi["event_id"], "gpt-4o-mini", 500, 40),
+    ]
+
+
+def test_llm_usage_is_validated_per_event(client):
+    too_many = _valid_event(llm_usage=[{"model": f"m{i}", "input_tokens": 1} for i in range(17)])
+    negative = _valid_event(llm_usage=[{"model": "m", "input_tokens": -1}])
+    response = client.post(
+        "/v1/ingest", headers={"X-Reqly-Key": "demo-key"},
+        json={"service_name": "svc", "events": [too_many, negative, _valid_event()]},
+    )
+    assert (response.json()["accepted"], response.json()["rejected"]) == (1, 2)
 
 
 def test_ingest_rejects_oversized_route(client):

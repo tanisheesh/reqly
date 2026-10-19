@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ..db.queries import event_row
+from ..llm.splits import split_rows, summarize_models
 
 # Namespace for event ids derived from (traceId, spanId): exporters retry
 # failed exports, and a deterministic id lets the existing ON CONFLICT dedup
@@ -55,6 +56,8 @@ class MappingResult:
     skipped: int = 0  # not HTTP server spans -- ignored by design, not an error
     rejected: int = 0  # HTTP server spans that failed validation
     reasons: list[str] = field(default_factory=list)
+    # llm_usage_splits rows for requests whose spans called several models
+    llm_splits: list[tuple] = field(default_factory=list)
 
     def reject(self, reason: str) -> None:
         self.rejected += 1
@@ -239,9 +242,9 @@ def _genai_usage(attrs: dict) -> tuple[str, int, int] | None:
 
 def _llm_usage_by_server_span(resources: list[_Resource]) -> dict[tuple[str, str], dict]:
     """GenAI usage summed onto the HTTP server span each LLM call ran under:
-    {(trace, span): {"llm_model", "llm_input_tokens", "llm_output_tokens"}}.
-    Like the SDKs, all tokens are summed and the request is attributed to the
-    model with the most tokens."""
+    {(trace, span): {"llm_model", "llm_input_tokens", "llm_output_tokens",
+    "per_model"}}. Like the SDKs: the model with the most tokens, all tokens
+    summed, and each model's own tokens (for llm_usage_splits)."""
     parents: dict[tuple[str, str], str] = {}
     servers: set[tuple[str, str]] = set()
     calls: list[tuple[tuple[str, str], tuple[str, int, int]]] = []
@@ -271,11 +274,12 @@ def _llm_usage_by_server_span(resources: list[_Resource]) -> dict[tuple[str, str
 
     out = {}
     for server, models in per_server.items():
-        top = max(models, key=lambda m: sum(models[m]))
+        top, tokens_in, tokens_out, per_model = summarize_models([(m, t[0], t[1]) for m, t in models.items()])
         out[server] = {
             "llm_model": top,
-            "llm_input_tokens": min(sum(t[0] for t in models.values()), _MAX_TOKENS),
-            "llm_output_tokens": min(sum(t[1] for t in models.values()), _MAX_TOKENS),
+            "llm_input_tokens": min(tokens_in, _MAX_TOKENS),
+            "llm_output_tokens": min(tokens_out, _MAX_TOKENS),
+            "per_model": per_model,
         }
     return out
 
@@ -391,10 +395,15 @@ def _map_span(span: _Span, service_name, release, environment, host, result: Map
         if path is not None and str(path).split("?", 1)[0] not in ("/", ""):
             route = UNMATCHED_ROUTE
 
+    event_id = str(uuid.uuid5(_SPAN_NAMESPACE, span_id))
+    event_time = _nanos_to_datetime(end_ns)
+    llm = dict((llm_usage or {}).get((span.trace_id, span.span_id), {}))
+    per_model = llm.pop("per_model", [])
+    result.llm_splits += split_rows(event_id, event_time, service_name, route, per_model)
     result.rows.append(
         event_row(
-            event_id=str(uuid.uuid5(_SPAN_NAMESPACE, span_id)),
-            time=_nanos_to_datetime(end_ns),
+            event_id=event_id,
+            time=event_time,
             service_name=service_name,
             method=str(method).upper()[:_MAX_METHOD_LEN],
             route=route,
@@ -408,7 +417,7 @@ def _map_span(span: _Span, service_name, release, environment, host, result: Map
             request_bytes=_byte_count(attrs, "http.request.body.size", "http.request_content_length"),
             response_bytes=_byte_count(attrs, "http.response.body.size", "http.response_content_length"),
             consumer_id=_consumer_id(attrs, consumer_salt),
-            **(llm_usage or {}).get((span.trace_id, span.span_id), {}),
+            **llm,
         )
     )
 

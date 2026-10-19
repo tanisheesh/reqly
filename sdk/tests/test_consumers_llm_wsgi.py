@@ -130,9 +130,9 @@ def test_llm_usage_from_async_and_sync_endpoints(fake_collector):
     assert events["/plain"]["llm_model"] is None and events["/plain"]["llm_input_tokens"] is None
     # one model: no per-model list; several: each with its own tokens
     assert "llm_usage" not in events["/chat"] and "llm_usage" not in events["/plain"]
-    agent = events["/agent"]
-    assert (agent["llm_model"], agent["llm_input_tokens"], agent["llm_output_tokens"]) == ("gpt-4o", 1400, 340)
-    assert agent["llm_usage"] == [
+    multi = events["/agent"]
+    assert (multi["llm_model"], multi["llm_input_tokens"], multi["llm_output_tokens"]) == ("gpt-4o", 1400, 340)
+    assert multi["llm_usage"] == [
         {"model": "gpt-4o", "input_tokens": 1000, "output_tokens": 300},
         {"model": "gpt-4o-mini", "input_tokens": 400, "output_tokens": 40},
     ]

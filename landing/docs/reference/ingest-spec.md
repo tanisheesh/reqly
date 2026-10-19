@@ -3,7 +3,7 @@ title: Ingest spec
 description: The /v1/ingest contract every Reqly SDK implements.
 ---
 
-# Ingest spec (v2)
+# Ingest spec (v3)
 
 The contract every Reqly SDK implements. Write SDKs for other languages against
 this document, not against the Python SDK's code.
@@ -18,8 +18,15 @@ traces to `POST /otlp/v1/traces` instead. See [OpenTelemetry](../instrument/open
 ```
 POST /v1/ingest
 Content-Type: application/json
+Content-Encoding: gzip            (optional, collector 0.13+)
 X-Reqly-Key: <ingest key or a project key with the ingest scope>
 ```
+
+The body may be gzip-compressed. Compressed bodies are capped at 16 MB and
+32 MB once decompressed; an unknown `Content-Encoding` is answered with `415`.
+A collector before 0.13 can't read gzip and answers `422`, so an SDK that
+compresses resends that batch as plain JSON and stops compressing (see
+[SDK behaviour](#sdk-behaviour-requirements)).
 
 | Response | Meaning | SDK should |
 |---|---|---|
@@ -95,6 +102,7 @@ Unknown top-level fields are ignored, so newer SDKs can talk to older collectors
 | `llm_model` | string | no | ≤ 255 chars | **v2.** Model used while serving this request, if any. |
 | `llm_input_tokens` | int | no | 0–10,000,000 | **v2.** |
 | `llm_output_tokens` | int | no | 0–10,000,000 | **v2.** |
+| `llm_usage` | array | no | ≤ 16 items | **v3.** One `{"model", "input_tokens", "output_tokens"}` per model when the request called several, so each is priced at its own rate. When present it wins: the collector sets `llm_model` to the model with the most tokens and the `llm_*_tokens` to the totals. Keep sending those three too, for collectors before 0.13. |
 
 Any other fields on an event are ignored.
 
@@ -121,11 +129,17 @@ meet all of them.
    `RENDER_GIT_COMMIT`, `VERCEL_GIT_COMMIT_SHA`, …).
 8. **Fork safety** where the runtime forks workers after import (e.g. Python's
    gunicorn `--preload`): restart the background worker in the child.
+9. **Compression** (optional). Gzip bodies above about 1 KB. If a gzipped batch is
+   answered `400`, `415` or `422`, resend it as plain JSON; when that succeeds, stop
+   compressing for the life of the process.
 
 ---
 
 ## Changelog
 
+- **v3** (collector 0.13.0): gzip request bodies (`Content-Encoding: gzip`) and the event's
+  `llm_usage` (per-model tokens of a multi-model request). Both optional; v2 payloads are
+  unchanged and still accepted.
 - **collector 0.12.1:** a `backfill` batch needs the collector's `REQLY_INGEST_KEY`, and rebuilds
   only the hours it contains (it used to rebuild every hour from its oldest event to now).
 - **collector 0.8.1:** events older than 13 days (unless the batch sets `backfill`) or more than

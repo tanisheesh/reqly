@@ -131,6 +131,12 @@ def _python_app_traffic(collector_url: str) -> None:
         reqly.record_llm_usage("gpt-4o-mini", input_tokens=1000, output_tokens=200)
         return {"ok": True}
 
+    @app.post("/agent")
+    def agent():  # two models in one request: each priced at its own rate
+        reqly.record_llm_usage("gpt-4o", input_tokens=1000, output_tokens=300)
+        reqly.record_llm_usage("gpt-4o-mini", input_tokens=400, output_tokens=40)
+        return {"ok": True}
+
     client = reqly.instrument(
         app, service_name=PY_SERVICE, collector_url=collector_url, api_key=INGEST_KEY,
         release=RELEASE, environment="ci", consumer_header="x-api-key", consumer_salt="e2e-salt",
@@ -144,8 +150,9 @@ def _python_app_traffic(collector_url: str) -> None:
         http.get("/boom")
     for _ in range(2):
         http.post("/chat")
+    http.post("/agent")
     client.shutdown()
-    assert client.stats()["shipped_events"] == 20, client.stats()
+    assert client.stats()["shipped_events"] == 21, client.stats()
 
 
 def _node_traffic(collector_url: str) -> None:
@@ -183,7 +190,7 @@ def test_events_from_both_sdks_reach_the_dashboard_api(collector):
     assert RELEASE in [r["release"] for r in _read(collector, f"/v1/services/{PY_SERVICE}/releases")["releases"]]
     assert _read(collector, f"/v1/services/{PY_SERVICE}/environments")["environments"] == ["ci"]
     env_summary = _read(collector, "/v1/metrics/summary", service_name=PY_SERVICE, window="1h", environment="ci")
-    assert sum(r["request_count"] for r in env_summary["top_routes"]) == 20
+    assert sum(r["request_count"] for r in env_summary["top_routes"]) == 21
 
     consumers = _read(collector, f"/v1/services/{PY_SERVICE}/consumers", window="24h")
     assert (consumers["consumers"], consumers["requests_with_consumer"]) == (3, 15)  # key-0..2
@@ -191,8 +198,12 @@ def test_events_from_both_sdks_reach_the_dashboard_api(collector):
     assert all(len(c["consumer_id"]) == 16 and not c["consumer_id"].startswith("key-") for c in consumers["top"])
 
     llm = _read(collector, f"/v1/services/{PY_SERVICE}/llm-usage", window="24h")
-    assert (llm["totals"]["input_tokens"], llm["totals"]["output_tokens"]) == (2000, 400)
+    assert (llm["totals"]["input_tokens"], llm["totals"]["output_tokens"]) == (3400, 740)
     assert llm["totals"]["cost_usd"] > 0
+    agent = next(r for r in llm["routes"] if r["route"] == "/agent")
+    assert {m["model"]: (m["input_tokens"], m["output_tokens"]) for m in agent["models"]} == {
+        "gpt-4o": (1000, 300), "gpt-4o-mini": (400, 40),
+    }
 
     node = _read(collector, "/v1/metrics/summary", service_name=NODE_SERVICE, window="1h")
     node_routes = {r["route"]: r for r in node["top_routes"]}
@@ -202,4 +213,4 @@ def test_events_from_both_sdks_reach_the_dashboard_api(collector):
     metrics = httpx.get(f"{collector}/metrics", timeout=10).text
     accepted = [line for line in metrics.splitlines()
                 if line.startswith('reqly_ingest_events_total{outcome="accepted",source="sdk"}')]
-    assert accepted and float(accepted[0].split()[-1]) >= 45
+    assert accepted and float(accepted[0].split()[-1]) >= 46

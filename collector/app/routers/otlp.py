@@ -26,7 +26,7 @@ from ..consumers.cap import consumer_cap
 from ..db.late_data import event_time_problem
 from ..db.late_data import tracker as late_data_tracker
 from ..db.pool import get_pool
-from ..db.queries import EVENT_COLUMNS, insert_events, record_deployments, row_time
+from ..db.queries import EVENT_COLUMNS, insert_events, insert_llm_splits, record_deployments, row_time
 from ..gzip_body import decompress
 from ..observability import INGEST_EVENTS
 from ..otlp.mapping import map_export_request, map_resource_spans
@@ -36,6 +36,7 @@ router = APIRouter()
 
 _SERVICE_INDEX = EVENT_COLUMNS.index("service_name")
 _CONSUMER_INDEX = EVENT_COLUMNS.index("consumer_id")
+_EVENT_ID_INDEX = EVENT_COLUMNS.index("event_id")
 
 # Compressed request bodies are capped before reading, decompressed ones
 # while inflating (gzip_body), so a small gzip bomb can't exhaust memory.
@@ -142,6 +143,8 @@ async def export_traces(request: Request, principal: Principal = Depends(verify_
         pool = get_pool()
         result.rows = await _cap_consumers(pool, result.rows)
         await insert_events(pool, result.rows)
+        kept = {row[_EVENT_ID_INDEX] for row in result.rows}
+        await insert_llm_splits(pool, [split for split in result.llm_splits if split[1] in kept])
         await record_deployments(pool, result.rows)
         late_data_tracker.note(min(row_time(r) for r in result.rows))
 
