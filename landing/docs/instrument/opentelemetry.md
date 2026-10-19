@@ -92,7 +92,8 @@ Reqly is API-level monitoring, not a tracing backend. From each export it keeps 
 | error | status ≥ 500, or span status ERROR |
 | error type | `error.type`, else the `exception.type` of the span's first exception event |
 | body sizes | `http.request.body.size` / `http.response.body.size` |
-| LLM model and tokens | GenAI spans under the request (see below) |
+| LLM model and tokens | GenAI spans under the request, per model (see below) |
+| trace id | the span's trace id, kept for 4xx/5xx and slow requests (`TRACE_ID_SLOW_MS`), so [alerts](../features/alerts.md#traces) can point at the trace |
 | [API consumer](../features/consumers.md) | `reqly.consumer_id`, else `enduser.id`, HMAC-hashed by the collector with `REQLY_CONSUMER_SALT`. Without that salt the attribute is ignored, so a raw user id or email is never stored |
 
 !!! warning "The route matters"
@@ -100,7 +101,7 @@ Reqly is API-level monitoring, not a tracing backend. From each export it keeps 
 
 ### LLM calls
 
-If your app's LLM calls are instrumented with the OpenTelemetry **GenAI conventions** (OpenLLMetry, OpenInference, or the official `opentelemetry-instrumentation-openai` and similar), Reqly reads `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens` (or the older `prompt_tokens` / `completion_tokens`) and the model (`gen_ai.response.model`, else `gen_ai.request.model`) from those spans. It adds them to the HTTP request they ran under, so [LLM cost per route](../features/llm-cost.md) and [LLM cost alerts](../features/alerts.md#llm-cost-alerts) work without a Reqly SDK.
+If your app's LLM calls are instrumented with the OpenTelemetry **GenAI conventions** (OpenLLMetry, OpenInference, or the official `opentelemetry-instrumentation-openai` and similar), Reqly reads `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens` (or the older `prompt_tokens` / `completion_tokens`) and the model (`gen_ai.response.model`, else `gen_ai.request.model`) from those spans. It adds them to the HTTP request they ran under, each model priced at its own rate when a request called several, so [LLM cost per route](../features/llm-cost.md) and [LLM cost alerts](../features/alerts.md#llm-cost-alerts) work without a Reqly SDK.
 
 A call is matched to its request by walking up its parent spans within the same export. An exporter normally sends a request and its child spans together; a call whose request isn't in the same export is not counted.
 

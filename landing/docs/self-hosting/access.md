@@ -21,7 +21,7 @@ A valid key used for something its scopes don't allow gets **403**; an unknown k
 
 ## Turn on sign-in
 
-For a shared collector, turn the public dashboard off and create the first admin:
+Outside demo mode (collector 0.14+) the dashboard already needs a sign-in: `PUBLIC_DASHBOARD` defaults to `false`. Docker Compose runs in demo mode, where it defaults to `true`; for a shared collector, turn it off and create the first admin:
 
 ```bash
 PUBLIC_DASHBOARD=false

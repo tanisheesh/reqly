@@ -22,8 +22,10 @@ endpoint that touches a database takes milliseconds. Numbers are from a Windows 
 [benchmark workflow](https://github.com/tanisheesh/reqly/blob/main/.github/workflows/bench.yml) reruns them on GitHub's Linux runners
 on every SDK change (results in each run's summary).
 
-Re-checked for reqly 0.5.5 and reqly-node 0.3.2 by running them back to back with the releases
-these numbers were first measured on (0.5.2 and 0.1.2): the same within noise.
+Re-checked for reqly 0.7.1 and reqly-node 0.5.2 by running them back to back with 0.5.6 and
+0.3.2 on the same machine (Python 3.14, Node 26): the same within noise. The first try of that
+check caught a 3-4 µs regression in reqly-node 0.4.0-0.5.1, which compressed batches on the
+event loop; 0.5.2 compresses them on libuv's thread pool.
 
 ## How it is measured
 

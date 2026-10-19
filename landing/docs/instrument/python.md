@@ -164,6 +164,7 @@ With `sample_rate` below 1.0, request counts in the dashboard are the sampled vo
 - **Non-blocking:** shipping happens on a background thread with strict HTTP timeouts, so a slow or unreachable collector never blocks a request.
 - **Bounded cardinality:** route templates only. Unmatched paths (404s, scanners) collapse into one `__unmatched__` bucket.
 - **Bounded memory:** a fixed-size queue. Under backpressure the oldest events are dropped and counted.
+- **Compressed:** batches above 1 KB are gzipped. A collector before 0.13 that can't read gzip gets the batch again as plain JSON, and the SDK stops compressing.
 - **Safe retries:** batches are retried with exponential backoff on `408`, `429` and `5xx`. Other `4xx` responses are dropped. Every event carries an `event_id` the collector deduplicates on, so a retry never double-counts.
 - **Bounded exit:** queued events are sent when the process exits, with one attempt per batch and at most 5 seconds in total, so a collector outage never holds up a deploy or a worker restart. What couldn't be sent is counted as dropped.
 - **Abandoned requests:** a request cancelled before the app answered (the client disconnected, or the server is shutting down) is recorded as `499` (client closed request), not as a `500`.
@@ -180,4 +181,4 @@ With `sample_rate` below 1.0, request counts in the dashboard are the sampled vo
 | Flask | 2.3+ |
 | Django | 4.2+, sync and async views; DRF and Django Ninja |
 | Other WSGI / ASGI | any, with `instrument_wsgi()` / `instrument_asgi()` and a `route_resolver` |
-| Collector | any version. `release`, `environment` and body sizes need 0.3.0+; `push_openapi` needs 0.7.0+; consumer and LLM views need 0.8.0+ |
+| Collector | any version. `release`, `environment` and body sizes need 0.3.0+; `push_openapi` 0.7.0+; consumer and LLM views 0.8.0+; gzip and per-model LLM cost 0.13.0+ (older collectors get plain JSON and one model per request); trace ids 0.14.0+ |
