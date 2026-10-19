@@ -11,7 +11,6 @@ Point an exporter at it with:
 from __future__ import annotations
 
 import json
-import zlib
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -29,6 +28,7 @@ from ..db.late_data import event_time_problem
 from ..db.late_data import tracker as late_data_tracker
 from ..db.pool import get_pool
 from ..db.queries import EVENT_COLUMNS, insert_events, record_deployments, row_time
+from ..gzip_body import decompress
 from ..otlp.mapping import map_resource_spans
 from ..rate_limit import INGEST_IP_LIMIT, ingest_key, ingest_limit, limiter
 
@@ -38,29 +38,12 @@ _SERVICE_INDEX = EVENT_COLUMNS.index("service_name")
 _CONSUMER_INDEX = EVENT_COLUMNS.index("consumer_id")
 
 # Compressed request bodies are capped before reading, decompressed ones
-# while inflating, so a small gzip bomb can't exhaust memory.
+# while inflating (gzip_body), so a small gzip bomb can't exhaust memory.
 _MAX_BODY_BYTES = 8 * 1024 * 1024
-_MAX_DECOMPRESSED_BYTES = 32 * 1024 * 1024
 _MAX_EVENTS_PER_REQUEST = 10_000
 
 _PROTOBUF = "application/x-protobuf"
 _JSON = "application/json"
-
-
-def _decompress(body: bytes, encoding: str) -> bytes:
-    encoding = encoding.strip().lower()
-    if encoding in ("", "identity"):
-        return body
-    if encoding != "gzip":
-        raise HTTPException(status_code=415, detail=f"unsupported Content-Encoding: {encoding}")
-    inflater = zlib.decompressobj(16 + zlib.MAX_WBITS)  # gzip framing
-    try:
-        data = inflater.decompress(body, _MAX_DECOMPRESSED_BYTES)
-    except zlib.error:
-        raise HTTPException(status_code=400, detail="invalid gzip body")
-    if inflater.unconsumed_tail:
-        raise HTTPException(status_code=413, detail="decompressed body too large")
-    return data
 
 
 def _respond(content_type: str, rejected: int, message: str) -> Response:
@@ -115,7 +98,7 @@ async def export_traces(request: Request, principal: Principal = Depends(verify_
     body = await request.body()
     if len(body) > _MAX_BODY_BYTES:
         raise HTTPException(status_code=413, detail="request body too large")
-    body = _decompress(body, request.headers.get("content-encoding") or "")
+    body = decompress(body, request.headers.get("content-encoding") or "")
 
     if content_type == _PROTOBUF:
         message = ExportTraceServiceRequest()

@@ -13,9 +13,11 @@ from ..db.late_data import event_time_problem
 from ..db.late_data import tracker as late_data_tracker
 from ..db.pool import get_pool
 from ..db.queries import event_row, insert_events, record_deployments, row_time
+from ..gzip_body import GzipRoute
 from ..rate_limit import INGEST_IP_LIMIT, ingest_key, ingest_limit, limiter
 
-router = APIRouter()
+# The SDKs gzip larger batches (Content-Encoding: gzip).
+router = APIRouter(route_class=GzipRoute)
 
 _MAX_BATCH_SIZE = 1000
 _MAX_DURATION_MS = 300_000  # 5 minutes -- anything longer is clearly corrupt

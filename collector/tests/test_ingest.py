@@ -1,3 +1,5 @@
+import gzip
+import json
 import uuid
 from datetime import datetime, timezone
 
@@ -86,6 +88,26 @@ def test_ingest_partial_acceptance_drops_only_bad_events(client):
     assert (body["accepted"], body["rejected"]) == (1, 1)
     assert body["reasons"] == ["duration_ms: Value error, duration_ms out of plausible range"]
     assert len(client.captured_rows) == 1
+
+
+def test_ingest_accepts_a_gzip_body(client):
+    batch = {"service_name": "svc", "events": [_valid_event() for _ in range(3)]}
+    response = client.post(
+        "/v1/ingest",
+        headers={"X-Reqly-Key": "demo-key", "Content-Type": "application/json", "Content-Encoding": "gzip"},
+        content=gzip.compress(json.dumps(batch).encode()),
+    )
+    assert response.status_code == 200, response.text
+    assert response.json() == {"accepted": 3, "rejected": 0}
+
+
+def test_ingest_rejects_bad_or_unknown_encodings(client):
+    headers = {"X-Reqly-Key": "demo-key", "Content-Type": "application/json"}
+    body = json.dumps({"service_name": "svc", "events": [_valid_event()]}).encode()
+    r = client.post("/v1/ingest", headers={**headers, "Content-Encoding": "gzip"}, content=body)
+    assert r.status_code == 400 and r.json()["detail"] == "invalid gzip body"
+    r = client.post("/v1/ingest", headers={**headers, "Content-Encoding": "br"}, content=body)
+    assert r.status_code == 415
 
 
 def test_ingest_rejects_oversized_route(client):
