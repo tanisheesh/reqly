@@ -2,8 +2,8 @@ name: GitHub Packages
 
 # Publishes to GitHub Packages, which is what the repository's "Packages"
 # sidebar lists:
-# - container images ghcr.io/tanisheesh/reqly-collector and reqly-dashboard
-#   (linux/amd64 + linux/arm64, each built on a native runner), tagged with
+# - container images ghcr.io/tanisheesh/reqly-collector, reqly-dashboard and
+#   reqly (all-in-one: the collector serving the dashboard) (linux/amd64 + linux/arm64, each built on a native runner), tagged with
 #   the collector version, the short commit SHA and `latest`;
 # - the Helm chart as an OCI artifact, oci://ghcr.io/tanisheesh/charts/reqly,
 #   versioned like the collector (after the images, which it points at);
@@ -97,7 +97,8 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: digests-${{ matrix.image }}-${{ matrix.arch }}
+          # arch first: "digests-*-reqly" must not also match reqly-collector's
+          name: digests-${{ matrix.arch }}-${{ matrix.image }}
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -107,6 +108,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false  # one image failing shouldn't cancel the others
       matrix:
         include:
           - image: reqly-collector
@@ -127,7 +129,7 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           path: /tmp/digests
-          pattern: digests-${{ matrix.image }}-*
+          pattern: digests-*-${{ matrix.image }}
           merge-multiple: true
 
       - uses: docker/setup-buildx-action@v4
