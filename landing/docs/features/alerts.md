@@ -77,6 +77,20 @@ Set `ALERTS_ENABLED=false` to turn the hourly check off. [SLO burn-rate alerts](
 !!! note "Run one collector"
     The scheduler runs inside the collector process. With two collector instances, every check runs twice.
 
+## Client error alerts
+
+5xx responses are the only errors in error rates and [availability SLOs](slos.md): a 4xx is the API correctly refusing a bad request. But a sudden wave of **401, 403, 422 or 429** on one route usually means a contract broke: auth after a deploy, a frontend sending a field the backend stopped accepting, a rate limit set too low.
+
+Every hour, each of those codes' share of a route's requests is compared with the same weekday-hour of the previous 8 weeks, with the same exact Poisson test as the error alerts (z ≥ 4). It also has to be at least 20 responses, 5 points above its usual share and twice it. The alert names the status code, and the release that was running if it was new:
+
+```
+🟡 Client error spike — shop /orders (Thursday 09:00-10:00 UTC, z=38.2)
+• 401 on 40.0% of requests vs 1.0% usual (400 of 1,000)
+• running release v7, first seen 2026-10-15T08:40:00+00:00
+```
+
+`CLIENT_ERROR_ALERT_STATUSES` picks the codes (default `401,403,422,429`; empty turns these alerts off). They go to the same channels, and can be [muted](#acknowledge-silence-mute) on their own with `kind: client_errors`.
+
 ## LLM cost alerts
 
 Right after the error check, the same hourly job looks at what each route spent on LLM calls (from [recorded token usage](llm-cost.md)) and compares it with the same weekday-hour over the previous 8 weeks. Cost isn't count data, so it uses the median of those hours and a robust spread (MAD) instead of the Poisson test.

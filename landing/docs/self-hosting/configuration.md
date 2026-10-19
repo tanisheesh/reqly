@@ -59,6 +59,7 @@ The weekly report and Ask Reqly use any OpenAI-compatible chat completions API: 
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_STARTTLS` | empty / `587` / empty / empty / `true` | SMTP server for email alerts |
 | `RESEND_API_KEY` | empty | Send email alerts through Resend's API instead of SMTP |
 | `ALERT_RENOTIFY_HOURS` | `6` | Reminder interval while an alert keeps firing |
+| `CLIENT_ERROR_ALERT_STATUSES` | `401,403,422,429` | 4xx codes whose sudden spikes on a route open an [alert](../features/alerts.md#client-error-alerts). Empty turns them off |
 | `LLM_COST_ALERT_MIN_USD` | `1.0` | The smallest extra LLM spend per route-hour, in USD, worth an [alert](../features/alerts.md#llm-cost-alerts). `0` turns LLM cost alerts off. The local Compose stack uses `0.4` |
 | `DASHBOARD_URL` | `http://localhost:5173` | Linked from Slack alerts |
 | `INSIGHTS_SCHEDULER_ENABLED` | `true` | `false` turns off the weekly insights report |
