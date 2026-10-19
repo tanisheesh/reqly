@@ -61,7 +61,7 @@ reqly.instrument(app, service_name="checkout-api")   # FastAPI, Flask, Django, S
 | Collector | FastAPI · asyncpg · APScheduler · Pydantic v2 · argon2 |
 | Database | TimescaleDB (pg16, Toolkit) · hypertables · continuous aggregates · UddSketch |
 | Dashboard | React 19 · Vite · TypeScript · Tailwind CSS 4 · Recharts · TanStack Query |
-| AI | Groq API · gpt-oss-120b (tool calling) · statistics-first anomaly detection |
+| AI | Any OpenAI-compatible API (Groq by default; OpenAI, OpenRouter, Ollama) · gpt-oss-120b (tool calling) · statistics-first anomaly detection |
 | Infra | Docker Compose · Helm chart · EC2 (TimescaleDB) · Render · GHCR images · PyPI / npm trusted publishing |
 
 
