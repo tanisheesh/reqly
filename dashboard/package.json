@@ -9,9 +9,9 @@
     "preview": "vite preview --host"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.104.2",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
+    "@tanstack/react-query": "^5.104.3",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "recharts": "^3.10.1"
   },
   "devDependencies": {
