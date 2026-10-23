@@ -20,7 +20,9 @@ from .logs import configure_logging
 from .observability import MetricsMiddleware
 from .observability import router as observability_router
 from .rate_limit import limiter
-from .routers import alerts, ask, auth, deployments, ingest, insights, metrics, openapi, otlp, projects, slos, usage
+from .routers import (
+    alerts, ask, auth, deployments, ingest, insights, metrics, openapi, otlp, projects, proxy_logs, slos, usage,
+)
 from .users.accounts import bootstrap_admin
 
 configure_logging(settings.log_format)
@@ -89,6 +91,7 @@ app.add_middleware(MetricsMiddleware)
 app.include_router(auth.router)
 app.include_router(ingest.router)
 app.include_router(deployments.router)
+app.include_router(proxy_logs.router)
 app.include_router(otlp.router)
 app.include_router(metrics.router)
 app.include_router(insights.router)
