@@ -176,4 +176,4 @@ process.on("SIGTERM", async () => {
 - **Node.js 20+**: every integration.
 - **Collector**: consumer and LLM views need 0.8.0+, `pushOpenapi` 0.7.0+, gzip and per-model LLM cost 0.13.0+ (older ones get plain JSON), trace ids 0.14.0+.
 - **Bun**: Hono on `Bun.serve` and `reqlyHttp` on Bun's node:http are tested in CI.
-- **Cloudflare Workers, Deno Deploy and other edge runtimes**: not supported yet. A Worker can't keep a background flush timer between requests, so use [OpenTelemetry](opentelemetry.md) there.
+- **Cloudflare Workers, Vercel, Next.js route handlers, Deno Deploy and other serverless or edge runtimes**: use [`reqly-node/edge`](edge.md), which sends each request's event with `waitUntil` instead of a background timer.

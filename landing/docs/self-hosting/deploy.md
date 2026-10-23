@@ -18,6 +18,9 @@ The [live demo](https://reqly-eventflow-dashboard.onrender.com) runs the databas
 !!! tip "On Kubernetes?"
     The [Helm chart](kubernetes.md) installs all three with one command.
 
+!!! tip "One click"
+    Render, Coolify and Railway: see [One-click deploy](one-click.md).
+
 ## All-in-one: two containers
 
 `ghcr.io/tanisheesh/reqly` is the collector serving the dashboard on the same port (collector 0.14+). With it a deployment is just that image and TimescaleDB: no separate dashboard, no `CORS_ORIGINS`, and no collector URL to build into the dashboard.

@@ -72,6 +72,7 @@ The weekly report and Ask Reqly use any OpenAI-compatible chat completions API: 
 | Variable | Default | Notes |
 |---|---|---|
 | `DATABASE_URL` | set by Compose | `postgresql://reqly:<password>@<host>:5432/reqly`. Add `?sslmode=require` for a remote database |
+| `PGHOST` / `PGPORT` / `PGUSER` / `PGPASSWORD` / `PGDATABASE` / `PGSSLMODE` | empty / `5432` / `reqly` / empty / `reqly` / empty | Used to build the database URL when `DATABASE_URL` isn't set, as platform templates hand them out |
 | `POSTGRES_PASSWORD` | `localdev` | Local Compose only |
 | `DB_POOL_MIN_SIZE` / `DB_POOL_MAX_SIZE` | `2` / `10` | The collector's database connection pool. Raise the maximum for heavy ingest or many dashboard users; keep it under the database's `max_connections` |
 

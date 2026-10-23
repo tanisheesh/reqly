@@ -97,6 +97,8 @@ nav:
       - Python: instrument/python.md
       - Node.js: instrument/node.md
       - OpenTelemetry: instrument/opentelemetry.md
+      - Serverless & edge: instrument/edge.md
+      - Proxy access logs: instrument/proxy-logs.md
   - Features:
       - Metrics & releases: features/metrics.md
       - Alerts & weekly report: features/alerts.md
@@ -109,10 +111,12 @@ nav:
       - Configuration: self-hosting/configuration.md
       - Projects, keys & sign-in: self-hosting/access.md
       - Deploy to production: self-hosting/deploy.md
+      - One-click deploy: self-hosting/one-click.md
       - Kubernetes (Helm): self-hosting/kubernetes.md
   - Reference:
       - HTTP API: reference/http-api.md
       - Ingest spec: reference/ingest-spec.md
+      - CLI & GitHub Action: reference/cli.md
       - SDK overhead: reference/benchmarks.md
       - Changelog: https://github.com/tanisheesh/reqly/blob/main/CHANGELOG.md
   - Website: https://reqly.tanisheesh.in/
