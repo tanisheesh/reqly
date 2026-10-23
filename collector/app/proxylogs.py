@@ -128,9 +128,10 @@ def parse_line(entry: dict[str, Any], received: datetime) -> LogRequest:
         path = entry.get("path") or entry.get("uri") or entry.get("request_uri")
         status = _int(entry.get("status") or entry.get("response_code") or entry.get("status_code"))
         duration = _float(entry.get("duration_ms"))
-        if duration is None and _float(entry.get("request_time")) is not None:
-            duration = _float(entry.get("request_time")) * 1000  # Nginx: seconds
-        if duration is None and _float(entry.get("duration")) is not None:
+        request_time = _float(entry.get("request_time"))
+        if duration is None and request_time is not None:
+            duration = request_time * 1000  # Nginx: seconds
+        if duration is None:
             duration = _float(entry.get("duration"))  # Envoy %DURATION%: milliseconds
         time = _time(entry.get("time") or entry.get("timestamp") or entry.get("time_iso8601") or entry.get("start_time"))
         host = entry.get("host") or entry.get("hostname") or entry.get("authority")

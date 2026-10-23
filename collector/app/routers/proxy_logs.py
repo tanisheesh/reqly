@@ -55,7 +55,9 @@ async def ingest_logs(
     spec = await get_spec(pool, service_name)
     operations = spec_operations(spec["spec"], spec["base_path"] or "") if spec else []
     now = datetime.now(timezone.utc)
-    rows, rejected, reasons = [], 0, []
+    rows: list[tuple] = []
+    rejected = 0
+    reasons: list[str] = []
 
     def reject(reason: str) -> None:
         nonlocal rejected

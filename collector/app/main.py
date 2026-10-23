@@ -21,7 +21,19 @@ from .observability import MetricsMiddleware
 from .observability import router as observability_router
 from .rate_limit import limiter
 from .routers import (
-    alerts, ask, auth, deployments, ingest, insights, metrics, openapi, otlp, projects, proxy_logs, slos, usage,
+    alerts,
+    ask,
+    auth,
+    deployments,
+    ingest,
+    insights,
+    metrics,
+    openapi,
+    otlp,
+    projects,
+    proxy_logs,
+    slos,
+    usage,
 )
 from .users.accounts import bootstrap_admin
 
@@ -71,7 +83,7 @@ async def lifespan(app: FastAPI):
         await close_pool()
 
 
-app = FastAPI(title="Reqly Collector", version="0.14.2", lifespan=lifespan)
+app = FastAPI(title="Reqly Collector", version="0.15.0", lifespan=lifespan)
 
 app.state.limiter = limiter
 
