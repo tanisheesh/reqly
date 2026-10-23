@@ -94,6 +94,15 @@ SET first_seen_at = LEAST(deployments.first_seen_at, EXCLUDED.first_seen_at),
 """
 
 
+async def upsert_deployment(pool: asyncpg.Pool, service: str, environment: str, release: str, at: datetime) -> dict:
+    """One explicit deploy marker (POST /v1/deployments)."""
+    row = await pool.fetchrow(
+        _UPSERT_DEPLOYMENT_SQL + " RETURNING service_name, environment, release, first_seen_at, last_seen_at",
+        service, environment, release, at, at,
+    )
+    return dict(row)
+
+
 async def record_deployments(pool: asyncpg.Pool, rows: list[tuple]) -> None:
     """Upserts one deployments row per (service, environment, release) in
     the batch, widening its first/last-seen range. Rows without a release
