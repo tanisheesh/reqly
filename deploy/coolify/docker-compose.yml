@@ -1,0 +1,42 @@
+# Reqly on Coolify: New resource → Docker Compose → this file (or the
+# repository with this path). Coolify fills in the SERVICE_* variables: a
+# domain for the app and generated passwords and keys, shown in the
+# resource's Environment Variables. Sign in as "admin" with the
+# SERVICE_PASSWORD_ADMIN value.
+services:
+  reqly:
+    image: ghcr.io/tanisheesh/reqly:latest
+    environment:
+      - SERVICE_FQDN_REQLY_8000
+      - DATABASE_URL=postgresql://reqly:${SERVICE_PASSWORD_POSTGRES}@timescaledb:5432/reqly
+      - REQLY_INGEST_KEY=${SERVICE_PASSWORD_64_INGEST}
+      - REQLY_READ_KEY=${SERVICE_PASSWORD_64_READ}
+      - REQLY_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      - FORWARDED_ALLOW_IPS=*
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - ALERT_SLACK_WEBHOOK_URL=${ALERT_SLACK_WEBHOOK_URL:-}
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/ready')"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  timescaledb:
+    image: timescale/timescaledb-ha:pg16
+    environment:
+      - POSTGRES_USER=reqly
+      - POSTGRES_DB=reqly
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    volumes:
+      - reqly-pgdata:/home/postgres/pgdata
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reqly -d reqly"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  reqly-pgdata:
