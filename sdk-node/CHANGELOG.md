@@ -2,6 +2,15 @@
 
 All notable changes to `reqly-node`.
 
+## 0.6.0 — 2026-10-23
+
+### Added
+- `reqly-node/edge`: `reqlyFetch(handler, options)` for Cloudflare Workers, Vercel, Next.js route
+  handlers, Deno, Netlify and Bun. Web APIs only (WebCrypto HMAC for consumer ids, the same as the
+  Node SDK's; `CompressionStream` for gzip); each request's event is sent after the response with
+  `ctx.waitUntil`, Vercel's request context, or a `waitUntil` option (e.g. Next's `after`). Next.js
+  and Remix route segments (`[id]`, `[...slug]`, `$id`) become `{name}`.
+
 ## 0.5.2 — 2026-10-19
 
 ### Fixed
