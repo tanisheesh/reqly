@@ -7,7 +7,7 @@ import { ReqlyOptions, ResolvedConfig, resolveConfig } from "./config.js";
 import { LlmSummary, RequestInfo } from "./context.js";
 import { traceIdFromHeaders, wantsTraceId } from "./traces.js";
 
-export const SDK_VERSION = "0.5.2";
+export const SDK_VERSION = "0.6.0";
 export const UNMATCHED_ROUTE = "__unmatched__";
 
 const HOST = hostname();

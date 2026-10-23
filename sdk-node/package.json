@@ -1,6 +1,6 @@
 {
   "name": "reqly-node",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "Reqly SDK for Node.js: per-route latency, errors, consumers and LLM cost for Express, Fastify, Hono, Koa, NestJS and plain node:http, sent to a self-hosted Reqly collector.",
   "license": "MIT",
   "author": "Tanish Poddar",
@@ -20,7 +20,12 @@
     "nestjs",
     "latency",
     "monitoring",
-    "reqly"
+    "reqly",
+    "serverless",
+    "edge",
+    "cloudflare-workers",
+    "nextjs",
+    "vercel"
   ],
   "engines": {
     "node": ">=20"
@@ -38,6 +43,16 @@
       "require": {
         "types": "./dist/cjs/index.d.ts",
         "default": "./dist/cjs/index.js"
+      }
+    },
+    "./edge": {
+      "import": {
+        "types": "./dist/esm/edge.d.ts",
+        "default": "./dist/esm/edge.js"
+      },
+      "require": {
+        "types": "./dist/cjs/edge.d.ts",
+        "default": "./dist/cjs/edge.js"
       }
     }
   },
