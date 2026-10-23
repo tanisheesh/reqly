@@ -18,6 +18,9 @@ import { COLLECTOR_URL, TimeWindow } from "../api/client";
 import { SessionUser } from "../api/auth";
 import { SettingsPage } from "./SettingsPage";
 
+// Once, at load: the footer's copyright year.
+const YEAR = new Date().getFullYear();
+
 function ReqlyIcon({ size = 18 }: { size?: number }) {
   return (
     <svg
@@ -161,8 +164,6 @@ export function Dashboard({
   const { data: summary, isLoading } = useMetricsSummary(
     serviceName, route, timeWindow, environment && environments.includes(environment) ? environment : null,
   );
-
-  const year = new Date().getFullYear();
 
   const latestP95 = summary?.latency.at(-1)?.p95_ms?.toFixed(0) ?? null;
   const lastErrPoint = summary?.error_rate.at(-1);
@@ -355,7 +356,7 @@ export function Dashboard({
             </a>
           </div>
           <p className="text-xs text-slate-700">
-            Copyright {year}&nbsp;&nbsp;|&nbsp;&nbsp;Made with{" "}
+            Copyright {YEAR}&nbsp;&nbsp;|&nbsp;&nbsp;Made with{" "}
             <span className="text-red-500/80">♥</span> by{" "}
             <a
               href="https://tanisheesh.in/"

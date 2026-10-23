@@ -171,6 +171,9 @@ jobs:
       - name: Install dependencies
         working-directory: dashboard
         run: npm ci
+      - name: Lint (oxlint: ESLint rules incl. react-hooks; typescript-eslint doesn't support TypeScript 7 yet)
+        working-directory: dashboard
+        run: npm run lint
       - name: Unit tests
         working-directory: dashboard
         run: npm test
