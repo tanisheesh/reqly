@@ -100,7 +100,7 @@ docker run -d \
 ```
 
 Prebuilt images (linux/amd64 and arm64) are published to GitHub Packages; pin a version
-(`:0.14.2`) instead of `latest` in production. `ghcr.io/tanisheesh/reqly` is the all-in-one image: the collector serving the dashboard on the same port, so you can skip the dashboard step below.
+(`:0.15.0`) instead of `latest` in production. `ghcr.io/tanisheesh/reqly` is the all-in-one image: the collector serving the dashboard on the same port, so you can skip the dashboard step below.
 
 **Option B — Separate server / Render / Fly.io**
 

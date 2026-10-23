@@ -804,7 +804,7 @@
         </div>
         <div class="stat-item">
           <div class="stat-val">Any stack</div>
-          <div class="stat-desc">Python, Node.js, or OpenTelemetry from Go, Java, .NET…</div>
+          <div class="stat-desc">Python, Node.js, edge runtimes, OpenTelemetry from Go, Java, .NET… or just your proxy's logs</div>
         </div>
         <div class="stat-item">
           <div class="stat-val">1 command</div>
@@ -1129,7 +1129,7 @@ app.<span class="fn">use</span>(<span class="fn">reqlyExpress</span>({ serviceNa
         <table class="stack-table">
           <thead><tr><th>Layer</th><th>Technology &amp; reason</th></tr></thead>
           <tbody>
-            <tr><td>SDKs</td><td>Python 3.9+ — pure ASGI/WSGI middleware, httpx, background thread · Node.js 20+ — TypeScript, zero dependencies, ESM + CJS · OTLP/HTTP for everything else</td></tr>
+            <tr><td>SDKs</td><td>Python 3.9+ — pure ASGI/WSGI middleware, httpx, background thread, a CLI · Node.js 20+ — TypeScript, zero dependencies, ESM + CJS, and a web-APIs-only edge build for Workers and Vercel · OTLP/HTTP or proxy access logs for everything else</td></tr>
             <tr><td>Collector</td><td>FastAPI · asyncpg · APScheduler · Pydantic v2 · argon2 — async throughout, no ORM; native ingest (gzip, one bulk insert per batch) plus an OTLP receiver; Prometheus metrics and JSON logs for itself</td></tr>
             <tr><td>Database</td><td>TimescaleDB (pg16, Toolkit) — hypertables, continuous aggregates, UddSketch percentiles</td></tr>
             <tr><td>Dashboard</td><td>React 19 · Vite · TypeScript · Tailwind CSS 4 · Recharts · TanStack Query</td></tr>

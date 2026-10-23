@@ -14,7 +14,7 @@ Teams running a handful of HTTP APIs have two bad options for knowing whether th
 
 ## 2. Goals
 
-1. One-line instrumentation for Python (FastAPI, Flask, Django, Starlette, Litestar, any WSGI/ASGI app) and Node.js (Express, Fastify, Hono, Koa, NestJS); any other language through OpenTelemetry (OTLP/HTTP) with exporter settings only.
+1. One-line instrumentation for Python (FastAPI, Flask, Django, Starlette, Litestar, any WSGI/ASGI app), Node.js (Express, Fastify, Hono, Koa, NestJS) and serverless / edge runtimes (Cloudflare Workers, Vercel, Next.js, Deno, Bun); any other language through OpenTelemetry (OTLP/HTTP), or no app change at all through the reverse proxy's access logs.
 2. Correct latency percentiles at every level (route, service, 1h to 7d) and error rates that are current to the minute.
 3. Explanations, not just charts: every alert carries the release that was running, root-cause leads (host, environment, error type, status code) and the API consumers it hit.
 4. Hourly anomaly and client-error (4xx) alerts against a weekday × hour baseline, deduplicated and auto-resolved, delivered to Slack, Discord, Microsoft Teams, PagerDuty, Opsgenie, email or a webhook, and acknowledged, silenced or muted from the dashboard; a weekly AI-written report.
@@ -145,8 +145,7 @@ Teams running a handful of HTTP APIs have two bad options for knowing whether th
 ## 10. v2 Candidates
 
 - **Reqly MCP server** — the Ask Reqly tools for Claude Code, Cursor and other MCP clients.
-- **Serverless / edge mode** for `reqly-node` (`waitUntil`, Next.js App Router, Cloudflare Workers).
-- **Go SDK**, a **CLI + GitHub Action** (deploy markers, spec upload from CI) and a **reverse-proxy log ingestor**.
+- **Go SDK**.
 - **OIDC sign-in**, and shared rate limits for multi-instance collectors.
 
 ---

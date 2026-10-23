@@ -40,6 +40,8 @@ import reqly
 reqly.instrument(app, service_name="checkout-api")   # FastAPI, Flask, Django, Starlette, Litestar
 ```
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/tanisheesh/reqly) · or [Coolify, Railway, Docker, Helm](https://reqly.tanisheesh.in/docs/self-hosting/one-click/)
+
 > **Live demo →** [reqly-eventflow-dashboard.onrender.com](https://reqly-eventflow-dashboard.onrender.com) — metrics from the
 > [EventFlow](https://eventflow-g2h5.onrender.com) demo app (log in there as `admin@eventhub.com` / `Admin@123` to make some traffic).
 
@@ -50,7 +52,7 @@ reqly.instrument(app, service_name="checkout-api")   # FastAPI, Flask, Django, S
 - **It explains what broke** — hourly alerts against a weekday × hour baseline, for errors, latency and sudden 401/403/422/429 waves, with the release that was running, root-cause leads (*"92% of errors came from pod-7"*), the clients that were hit and traces to open; to Slack, Discord, Teams, PagerDuty, Opsgenie, email or webhooks, acknowledged or muted from the dashboard; a weekly AI report narrates the findings
 - **Ask Reqly** — *"why did /orders start failing?"* answered from the collector's own data through read-only query tools, with every query shown and any number not found in the results flagged
 - **API-level depth** — SLOs with burn-rate alerts, OpenAPI drift (undocumented, unused and deprecated-but-used endpoints), API consumers, and LLM token cost per route and model (counted straight from your OpenAI or Anthropic client) with alerts when it spikes
-- **Any stack, small footprint** — Python SDK, Node.js SDK (Express, Fastify, Hono, Koa, NestJS) or OTLP from any language; the SDKs add ~6–33 µs per request ([benchmark](bench/README.md)) and never crash your app; projects, per-team API keys and sign-in for shared collectors; safe by default, with Prometheus metrics for the collector itself
+- **Any stack, small footprint** — Python SDK, Node.js SDK (Express, Fastify, Hono, Koa, NestJS; Cloudflare Workers, Vercel and Next.js with `reqly-node/edge`), OTLP from any language, or your reverse proxy's access logs (Caddy, Traefik, Nginx, Envoy); deploy markers from CI with the `reqly` CLI or the GitHub Action; the SDKs add ~6–33 µs per request ([benchmark](bench/README.md)) and never crash your app; projects, per-team API keys and sign-in for shared collectors; safe by default, with Prometheus metrics for the collector itself
 
 
 ## Stack
@@ -62,7 +64,7 @@ reqly.instrument(app, service_name="checkout-api")   # FastAPI, Flask, Django, S
 | Database | TimescaleDB (pg16, Toolkit) · hypertables · continuous aggregates · UddSketch |
 | Dashboard | React 19 · Vite · TypeScript · Tailwind CSS 4 · Recharts · TanStack Query |
 | AI | Any OpenAI-compatible API (Groq by default; OpenAI, OpenRouter, Ollama) · gpt-oss-120b (tool calling) · statistics-first anomaly detection |
-| Infra | Docker Compose · Helm chart · all-in-one image · EC2 (TimescaleDB) · Render · GHCR images · PyPI / npm trusted publishing · CI with ruff, mypy, vitest and an end-to-end test |
+| Infra | Docker Compose · Helm chart · all-in-one image · Render / Coolify / Railway templates · EC2 (TimescaleDB) · Render · GHCR images · PyPI / npm trusted publishing · CI with ruff, mypy, vitest and an end-to-end test |
 
 
 ## Engineering Decisions

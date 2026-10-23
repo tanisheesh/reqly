@@ -57,6 +57,15 @@ vendor account.
 | 👥 **API consumers** | Who calls your API and who an incident hit, with ids hashed in the SDK |
 | 💸 **LLM cost per route** | Tokens and cost per route and model, counted straight from your OpenAI or Anthropic client, and an alert when it spikes |
 
+## From CI: deploy markers and spec uploads
+
+```bash
+reqly deploy --service checkout-api --environment production   # release from GITHUB_SHA, ...
+reqly openapi push --service checkout-api openapi.yaml
+```
+
+Or the GitHub Action `tanisheesh/reqly@v1`. See [CLI & GitHub Action](https://reqly.tanisheesh.in/docs/reference/cli/).
+
 ## Your framework
 
 | Framework | What to write |
