@@ -2,6 +2,14 @@
 
 All notable changes to the `reqly` Python SDK.
 
+## 0.8.0 — 2026-10-23
+
+### Added
+- The `reqly` command: `reqly deploy` records a deploy marker (release from `--release`,
+  `REQLY_RELEASE` or the CI variables), `reqly openapi push` uploads a spec, `reqly ping` checks the
+  collector and the key. Needs collector 0.15+ for deploy markers.
+- The PyPI page shows the current README (LLM client instrumentation, trace ids, the CLI).
+
 ## 0.7.1 — 2026-10-19
 
 ### Fixed

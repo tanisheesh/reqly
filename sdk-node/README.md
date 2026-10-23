@@ -88,6 +88,20 @@ http.createServer(reqlyHttp(handler, {
 Routes are recorded as **templates** (`/api/users/:id`, router prefixes included), never raw
 paths; requests no route matched become `__unmatched__`, so 404 scanners can't flood your data.
 
+## Serverless and edge
+
+```js
+import { reqlyFetch } from "reqly-node/edge";
+
+// Cloudflare Workers
+export default { fetch: reqlyFetch(handler, (env) => ({ serviceName: "api", apiKey: env.REQLY_API_KEY })) };
+// Next.js route handler
+export const GET = reqlyFetch(getOrder, { serviceName: "web", route: "/api/orders/[id]" });
+```
+
+Web APIs only, no `node:` modules; each request's event is sent with `waitUntil`. See
+[Serverless & edge](https://reqly.tanisheesh.in/docs/instrument/edge/).
+
 ## Who is calling, and what it costs
 
 ```js

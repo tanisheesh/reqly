@@ -5,6 +5,7 @@ import { createServer } from "node:http";
 
 import { Hono } from "hono";
 
+import { reqlyFetch } from "../dist/esm/edge.js";
 import { recordLlmUsage, reqlyHono, reqlyHttp } from "../dist/esm/index.js";
 import { fakeCollector, options } from "./helpers.mjs";
 
@@ -54,5 +55,15 @@ await handler.client.flush();
 assert.deepEqual(summary(), [["GET", "/ping", 200, false]]);
 await handler.client.shutdown();
 
+// reqly-node/edge: a fetch handler on Bun.serve
+collector.batches.length = 0;
+const edge = reqlyFetch(() => new Response("edge"), { serviceName: "bun-edge", collectorUrl: collector.url, route: "/items/[id]" });
+const pending = [];
+const edgeServer = Bun.serve({ port: 0, fetch: (request) => edge(request, undefined, { waitUntil: (p) => pending.push(p) }) });
+await fetch(`http://localhost:${edgeServer.port}/items/3`);
+edgeServer.stop(true);
+await Promise.all(pending);
+assert.deepEqual(summary(), [["GET", "/items/{id}", 200, false]]);
+
 await collector.close();
-console.log(`bun ${Bun.version}: hono + node:http OK`);
+console.log(`bun ${Bun.version}: hono + node:http + edge OK`);

@@ -48,3 +48,15 @@ def test_the_collector_refuses_to_start_without_keys(monkeypatch):
     with pytest.raises(RuntimeError, match="REQLY_INGEST_KEY must be set"):
         with TestClient(main.app):
             pass
+
+
+def test_database_url_from_the_libpq_variables(monkeypatch):
+    for name in ("DATABASE_URL", "PGHOST", "PGPORT", "PGUSER", "PGPASSWORD", "PGDATABASE", "PGSSLMODE"):
+        monkeypatch.delenv(name, raising=False)
+    assert Settings.from_env().database_url == "postgresql://reqly:localdev@localhost:5432/reqly"
+    monkeypatch.setenv("PGHOST", "reqly-db")
+    monkeypatch.setenv("PGPASSWORD", "p@ss/word")
+    monkeypatch.setenv("PGSSLMODE", "require")
+    assert Settings.from_env().database_url == "postgresql://reqly:p%40ss%2Fword@reqly-db:5432/reqly?sslmode=require"
+    monkeypatch.setenv("DATABASE_URL", "postgresql://x@y/z")
+    assert Settings.from_env().database_url == "postgresql://x@y/z"  # DATABASE_URL wins

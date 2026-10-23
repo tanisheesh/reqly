@@ -31,7 +31,7 @@ HTTP_DURATION = Histogram(
 )
 INGEST_EVENTS = Counter(
     "reqly_ingest_events_total",
-    "Events received, by source (sdk: /v1/ingest, otlp: /otlp/v1/traces) and outcome.",
+    "Events received, by source (sdk: /v1/ingest, otlp: /otlp/v1/traces, proxy: /v1/ingest/logs) and outcome.",
     ["source", "outcome"],
 )
 

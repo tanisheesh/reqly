@@ -9,7 +9,7 @@ Companion to [PRD.md](PRD.md): the PRD says what Reqly does, this says how.
 | Layer | Tech |
 |---|---|
 | Python SDK | Python 3.9+ · pure ASGI middleware (FastAPI, Starlette, Litestar) · Flask hooks · Django middleware · generic WSGI/ASGI wrappers · httpx · one background flush thread |
-| Node.js SDK | TypeScript, Node 20+, no runtime dependencies · Express / Fastify / Hono / Koa middleware, NestJS helper · `AsyncLocalStorage` · `fetch` |
+| Node.js SDK | TypeScript, Node 20+, no runtime dependencies · Express / Fastify / Hono / Koa middleware, NestJS helper · `AsyncLocalStorage` · `fetch`; `reqly-node/edge` uses web APIs only (WebCrypto, `CompressionStream`) for Workers / Vercel / Next.js |
 | Collector | FastAPI · Uvicorn · asyncpg · APScheduler 3 · slowapi · Pydantic v2 · argon2-cffi · opentelemetry-proto · httpx · openai (any OpenAI-compatible API) · prometheus-client; dependencies hash-pinned in `requirements.txt` |
 | Database | TimescaleDB on PostgreSQL 16 (`timescale/timescaledb-ha`, with the Toolkit) · hypertables · continuous aggregates · UddSketch · retention policies |
 | Dashboard | React 19 · Vite · TypeScript · Tailwind CSS 4 · Recharts · TanStack Query |
@@ -28,7 +28,7 @@ reqly/
   sdk/                   Python SDK (PyPI: reqly)
   sdk-node/              Node.js SDK (npm: reqly-node)
   collector/app/         FastAPI collector
-    routers/             ingest, otlp, metrics, alerts (+ on-call actions), slos, insights, ask, openapi, usage, projects, auth
+    routers/             ingest, otlp, proxy_logs, deployments, metrics, alerts (+ on-call actions), slos, insights, ask, openapi, usage, projects, auth
     db/                  pool + migrations runner, queries, late-data refresher
     insights/ alerts/    detection, release context, hints, weekly report, scheduler; hourly, client-error, LLM cost
                          and SLO alerts, on-call actions, notifier (Slack, Discord, Teams, PagerDuty, Opsgenie, email, webhook)
@@ -38,6 +38,8 @@ reqly/
   collector/migrations/  001-014 SQL, applied on start-up (tracked in schema_migrations)
   dashboard/             React SPA (vitest unit tests)
   e2e/                   both SDKs -> a collector process -> TimescaleDB -> the API, in CI
+  action.yml .github/action/   the GitHub Action (deploy markers, spec upload), curl only
+  render.yaml railway.json deploy/coolify/   one-click templates
   deploy/                Helm chart, all-in-one image (Dockerfile + compose)
   load_generator/        demo traffic with deliberate incidents (bad deploy, bad pod, Monday spike)
   bench/                 SDK overhead benchmarks
@@ -53,7 +55,7 @@ Middleware records each request when the response finishes: method, the framewor
 
 One FastAPI service:
 
-- **Ingest:** `POST /v1/ingest` (SDK batches, plain or gzipped, one bulk `unnest()` insert, per-event validation only when the batch fails as a whole) and `POST /otlp/v1/traces` (OTLP/HTTP; HTTP server spans become events, and GenAI spans under them add the request's LLM model and tokens). Both refuse events older than 13 days (unless the batch is a backfill) or in the future, and enforce which project a service belongs to.
+- **Ingest:** `POST /v1/ingest/logs` (reverse proxy access logs: Caddy / Traefik / Nginx / Envoy JSON lines; raw paths become route templates from the service's OpenAPI spec, else by collapsing id-like segments) and `POST /v1/deployments` (deploy markers from the CLI or the GitHub Action), besides `POST /v1/ingest` (SDK batches, plain or gzipped, one bulk `unnest()` insert, per-event validation only when the batch fails as a whole) and `POST /otlp/v1/traces` (OTLP/HTTP; HTTP server spans become events, and GenAI spans under them add the request's LLM model and tokens). Both refuse events older than 13 days (unless the batch is a backfill) or in the future, and enforce which project a service belongs to.
 - **Reads:** metrics summary, services, routes, releases, alerts, SLOs, consumers, LLM usage, OpenAPI drift, latest report — reading from the continuous aggregates, raw events only where freshness or detail requires it.
 - **Configuration:** SLOs, OpenAPI specs, projects, API keys, members (admin).
 - **AI:** Ask Reqly and on-demand weekly reports.

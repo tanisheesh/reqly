@@ -34,6 +34,25 @@ def _status_codes(raw: str) -> tuple[int, ...]:
     return tuple(codes)
 
 
+def _database_url() -> str:
+    """DATABASE_URL, else one built from the libpq variables (PGHOST, PGPORT,
+    PGUSER, PGPASSWORD, PGDATABASE) that platform templates hand out, else
+    the local default."""
+    url = os.environ.get("DATABASE_URL")
+    if url:
+        return url
+    host = os.environ.get("PGHOST")
+    if not host:
+        return "postgresql://reqly:localdev@localhost:5432/reqly"
+    from urllib.parse import quote
+
+    user = quote(os.environ.get("PGUSER", "reqly"), safe="")
+    password = os.environ.get("PGPASSWORD")
+    auth = f"{user}:{quote(password, safe='')}" if password else user
+    query = f"?sslmode={os.environ['PGSSLMODE']}" if os.environ.get("PGSSLMODE") else ""
+    return f"postgresql://{auth}@{host}:{os.environ.get('PGPORT', '5432')}/{quote(os.environ.get('PGDATABASE', 'reqly'), safe='')}{query}"
+
+
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 OPENAI_BASE_URL = "https://api.openai.com/v1"
 _DEFAULT_LLM_MODEL = "openai/gpt-oss-120b"
@@ -147,10 +166,7 @@ class Settings:
         llm_base_url, llm_api_key, llm_model = _llm_from_env()
 
         return cls(
-            database_url=os.environ.get(
-                "DATABASE_URL",
-                "postgresql://reqly:localdev@localhost:5432/reqly",
-            ),
+            database_url=_database_url(),
             ingest_key=ingest_key,
             read_key=read_key,
             llm_base_url=llm_base_url,

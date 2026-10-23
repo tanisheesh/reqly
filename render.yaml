@@ -1,0 +1,62 @@
+# Render Blueprint: Reqly in two services, the all-in-one image (collector +
+# dashboard) and TimescaleDB on a disk.
+#   https://render.com/deploy?repo=https://github.com/tanisheesh/reqly
+# Render generates the keys and passwords; read them in each service's
+# Environment tab. Sign in as "admin" with REQLY_ADMIN_PASSWORD.
+# Both run on paid instances: a private service with a disk isn't free.
+services:
+  - type: pserv
+    name: reqly-db
+    runtime: image
+    image:
+      url: docker.io/timescale/timescaledb-ha:pg16
+    plan: starter
+    disk:
+      name: pgdata
+      mountPath: /home/postgres/pgdata
+      sizeGB: 10
+    envVars:
+      - key: POSTGRES_USER
+        value: reqly
+      - key: POSTGRES_DB
+        value: reqly
+      - key: POSTGRES_PASSWORD
+        generateValue: true
+      - key: PGDATA
+        value: /home/postgres/pgdata/data
+
+  - type: web
+    name: reqly
+    runtime: image
+    image:
+      url: ghcr.io/tanisheesh/reqly:latest
+    plan: starter
+    healthCheckPath: /v1/ready
+    envVars:
+      - key: PGHOST
+        fromService:
+          type: pserv
+          name: reqly-db
+          property: host
+      - key: PGUSER
+        value: reqly
+      - key: PGDATABASE
+        value: reqly
+      - key: PGPASSWORD
+        fromService:
+          type: pserv
+          name: reqly-db
+          envVarKey: POSTGRES_PASSWORD
+      - key: REQLY_INGEST_KEY
+        generateValue: true
+      - key: REQLY_READ_KEY
+        generateValue: true
+      - key: REQLY_ADMIN_PASSWORD
+        generateValue: true
+      - key: FORWARDED_ALLOW_IPS
+        value: "*"
+      # Optional: an LLM for the weekly report and Ask Reqly, alert channels.
+      - key: GROQ_API_KEY
+        sync: false
+      - key: ALERT_SLACK_WEBHOOK_URL
+        sync: false

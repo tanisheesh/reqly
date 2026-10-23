@@ -30,6 +30,8 @@ Endpoints about one service check it against the caller's projects; list endpoin
 |---|---|---|---|
 | `POST` | `/v1/ingest` | Ingest | Batch of request events, ≤ 1,000 per call, plain or gzipped JSON, validated one by one. [Spec](ingest-spec.md) |
 | `POST` | `/otlp/v1/traces` | Ingest | OTLP/HTTP traces, protobuf or JSON, gzip. [OpenTelemetry](../instrument/opentelemetry.md) |
+| `POST` | `/v1/ingest/logs?service_name=&release=&environment=` | Ingest | Reverse proxy access log lines (Caddy, Traefik, Nginx, Envoy), NDJSON or a JSON array, ≤ 5,000 per call. [Proxy access logs](../instrument/proxy-logs.md) |
+| `POST` | `/v1/deployments` | Ingest | Deploy marker: `{"service_name", "release", "environment"?, "deployed_at"?}`. [CLI & GitHub Action](cli.md) |
 
 ## Metrics
 

@@ -28,6 +28,7 @@ async def list_alerts(
         """
         SELECT a.id, a.kind, a.service_name, a.route, a.opened_at, a.first_hour, a.last_hour, a.resolved_at,
                a.details, a.acknowledged_at, a.acknowledged_by, a.silenced_until,
+               coalesce(a.silenced_until > now(), false) AS silenced,
                EXISTS (
                    SELECT 1 FROM alert_mutes m
                    WHERE m.service_name = a.service_name AND m.muted_until > now()

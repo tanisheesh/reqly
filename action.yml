@@ -1,0 +1,53 @@
+name: Reqly deploy
+description: Record a deploy marker in Reqly and upload the service's OpenAPI spec from CI.
+author: Tanish Poddar
+branding:
+  icon: activity
+  color: blue
+
+inputs:
+  collector-url:
+    description: The Reqly collector's URL, e.g. https://reqly.example.com
+    required: true
+  api-key:
+    description: An ingest key, or a project key with the ingest scope. Pass it from a secret.
+    required: true
+  service:
+    description: The service name, as the SDK reports it
+    required: true
+  release:
+    description: The release being deployed
+    required: false
+    default: ${{ github.sha }}
+  environment:
+    description: The deployment environment, e.g. production
+    required: false
+    default: ""
+  openapi-spec:
+    description: Path to the service's OpenAPI spec (JSON or YAML) to upload; empty skips the upload
+    required: false
+    default: ""
+  base-path:
+    description: Prefix for the spec's paths, e.g. /api
+    required: false
+    default: ""
+  deploy-marker:
+    description: Record a deploy marker ("false" to only upload the spec)
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Reqly
+      shell: bash
+      env:
+        REQLY_COLLECTOR_URL: ${{ inputs.collector-url }}
+        REQLY_API_KEY: ${{ inputs.api-key }}
+        REQLY_SERVICE: ${{ inputs.service }}
+        REQLY_RELEASE: ${{ inputs.release }}
+        REQLY_ENVIRONMENT: ${{ inputs.environment }}
+        REQLY_OPENAPI_SPEC: ${{ inputs.openapi-spec }}
+        REQLY_BASE_PATH: ${{ inputs.base-path }}
+        REQLY_DEPLOY_MARKER: ${{ inputs.deploy-marker }}
+      run: bash "$GITHUB_ACTION_PATH/.github/action/reqly.sh"

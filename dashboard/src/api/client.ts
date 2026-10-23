@@ -196,6 +196,7 @@ export interface Alert {
   acknowledged_at?: string | null;
   acknowledged_by?: string | null;
   silenced_until?: string | null;
+  silenced?: boolean; // silenced_until is still ahead (worked out by the collector)
   muted?: boolean;
 }
 

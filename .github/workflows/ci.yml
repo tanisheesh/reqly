@@ -171,6 +171,10 @@ jobs:
       - name: Install dependencies
         working-directory: dashboard
         run: npm ci
+      # oxlint: ESLint rules incl. react-hooks (typescript-eslint doesn't support TypeScript 7 yet)
+      - name: Lint
+        working-directory: dashboard
+        run: npm run lint
       - name: Unit tests
         working-directory: dashboard
         run: npm test
@@ -221,3 +225,57 @@ jobs:
         run: pytest e2e -v
         env:
           DATABASE_URL: "postgresql://reqly:reqly@localhost:5432/reqly"
+
+  action:
+    name: GitHub Action (deploy marker + spec upload)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: timescale/timescaledb-ha:pg16
+        env:
+          POSTGRES_DB: reqly
+          POSTGRES_USER: reqly
+          POSTGRES_PASSWORD: reqly
+        options: >-
+          --health-cmd "pg_isready -U reqly -d reqly"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: "postgresql://reqly:reqly@localhost:5432/reqly"
+      REQLY_INGEST_KEY: "action-ingest"
+      REQLY_READ_KEY: "action-read"
+      PUBLIC_DASHBOARD: "true"
+      INSIGHTS_SCHEDULER_ENABLED: "false"
+      ALERTS_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: collector/requirements.txt
+      - name: Start a collector
+        working-directory: collector
+        run: |
+          pip install --require-hashes -r requirements.txt
+          nohup python -m uvicorn app.main:app --port 8000 > ../collector.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf localhost:8000/v1/ready && exit 0; sleep 2; done
+          cat ../collector.log; exit 1
+      - name: Spec to upload
+        run: |
+          printf 'openapi: 3.0.0\ninfo: {title: ci, version: "1"}\npaths:\n  /orders:\n    get: {}\n' > ci-openapi.yaml
+      - uses: ./
+        with:
+          collector-url: http://localhost:8000
+          api-key: action-ingest
+          service: action-ci
+          environment: ci
+          openapi-spec: ci-openapi.yaml
+      - name: The marker and the spec arrived
+        run: |
+          curl -sf -H "X-Reqly-Key: action-read" localhost:8000/v1/services/action-ci/releases | tee releases.json
+          grep -q "\"release\":\"$GITHUB_SHA\"" releases.json
+          curl -sf -H "X-Reqly-Key: action-read" localhost:8000/v1/services/action-ci/openapi/drift | grep -q '"/orders"'

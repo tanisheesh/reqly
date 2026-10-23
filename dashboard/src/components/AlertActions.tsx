@@ -22,7 +22,7 @@ export function AlertActions({ alert }: { alert: Alert }) {
     },
     onError: (e: Error) => setError(e.message),
   });
-  const silenced = alert.silenced_until && new Date(alert.silenced_until) > new Date();
+  const silenced = alert.silenced === true;
   // The read key can't act on alerts; only signed-in users (or admin keys) can.
   const canAct = currentSession() !== null;
 

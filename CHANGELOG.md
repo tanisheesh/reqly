@@ -6,6 +6,33 @@ Per-package details: [Python SDK](sdk/CHANGELOG.md) · [Node SDK](sdk-node/CHANG
 
 ---
 
+## [0.15.0] — 2026-10-23
+
+Collector 0.15.0 · Helm chart 0.15.0 · Python SDK 0.8.0 · Node SDK 0.6.0
+
+### ✨ Added
+- **Serverless and edge:** `reqly-node/edge` with `reqlyFetch(handler, options)` for Cloudflare Workers,
+  Vercel, Next.js route handlers, Deno, Netlify and Bun. Web APIs only (no `node:` modules, so Workers
+  need no `nodejs_compat`); each request's event goes out after the response through `waitUntil`.
+  Tested on workerd (Miniflare) and Bun
+- **Reverse proxy access logs:** `POST /v1/ingest/logs` takes Caddy and Traefik JSON access logs as
+  they are, and Nginx / Envoy / anything else as JSON lines. Raw paths become route templates from the
+  service's OpenAPI spec, else by collapsing id-like segments; lines are deduplicated on re-send
+- **Deploy markers:** `POST /v1/deployments`, the `reqly` CLI (`reqly deploy`, `reqly openapi push`,
+  `reqly ping`, in the Python SDK) and the GitHub Action `tanisheesh/reqly@v1`
+- **One-click deploy:** a Render Blueprint (`render.yaml`, Deploy to Render button), a Coolify
+  compose file and a Railway config
+- The collector builds its database URL from `PGHOST` / `PGPORT` / `PGUSER` / `PGPASSWORD` /
+  `PGDATABASE` when `DATABASE_URL` isn't set
+- Dashboard: oxlint (correctness and react-hooks rules) in CI, in place of eslint until
+  typescript-eslint supports TypeScript 7
+
+### 🐛 Fixed
+- `GET /v1/alerts` says whether an alert is `silenced` (worked out by the collector), so the
+  dashboard no longer compares times during render
+
+---
+
 ## [0.14.2] — 2026-10-19
 
 Collector 0.14.2 · Helm chart 0.14.2 · Node SDK 0.5.2
@@ -379,7 +406,8 @@ Python SDK 0.1.5
 
 ---
 
-[Unreleased]: https://github.com/tanisheesh/reqly/compare/collector-v0.14.2...HEAD
+[Unreleased]: https://github.com/tanisheesh/reqly/compare/collector-v0.15.0...HEAD
+[0.15.0]: https://github.com/tanisheesh/reqly/tree/collector-v0.15.0
 [0.14.2]: https://github.com/tanisheesh/reqly/tree/collector-v0.14.2
 [0.14.1]: https://github.com/tanisheesh/reqly/tree/collector-v0.14.1
 [0.14.0]: https://github.com/tanisheesh/reqly/tree/collector-v0.14.0

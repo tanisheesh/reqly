@@ -76,6 +76,7 @@ def test_on_call_actions():
 
             listed = {a["id"]: a for a in client.get(f"/v1/alerts?service_name={service}", headers=READ).json()["alerts"]}
             assert listed[orders]["acknowledged_by"] == "ingest-key" and listed[users]["muted"] is True
+            assert listed[orders]["silenced"] is False
             mutes = client.get(f"/v1/alert-mutes?service_name={service}", headers=READ).json()["mutes"]
             assert len(mutes) == 2
 

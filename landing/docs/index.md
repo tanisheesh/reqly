@@ -35,6 +35,22 @@ Reqly watches every request your APIs serve and explains problems instead of jus
 
     [:octicons-arrow-right-24: Node SDK](instrument/node.md)
 
+-   :material-cloud-outline: **Serverless & edge**
+
+    ---
+
+    Cloudflare Workers, Vercel, Next.js, Deno and Bun with `reqly-node/edge`.
+
+    [:octicons-arrow-right-24: Serverless & edge](instrument/edge.md)
+
+-   :material-server-network: **No app changes**
+
+    ---
+
+    Send Caddy, Traefik, Nginx or Envoy access logs instead.
+
+    [:octicons-arrow-right-24: Proxy access logs](instrument/proxy-logs.md)
+
 -   :material-transit-connection-variant: **Any language**
 
     ---

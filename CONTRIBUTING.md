@@ -39,6 +39,8 @@ Dashboard on http://localhost:5173, collector API docs on http://localhost:8000/
 | `infra/` | EC2 bootstrap for the database, AWS deploy guide | shell |
 | `deploy/helm/reqly/` | Helm chart (`helm lint` runs in CI) | Helm |
 | `deploy/all-in-one/` | The all-in-one image (collector serving the dashboard) and its compose file | Docker |
+| `deploy/coolify/`, `render.yaml`, `railway.json` | One-click templates | YAML, JSON |
+| `action.yml`, `.github/action/` | The GitHub Action (`uses: tanisheesh/reqly@v1`) | YAML, bash |
 | `e2e/` | End-to-end test: both SDKs → a collector process → TimescaleDB → the API | Python, Node |
 | `examples/` | Example apps (OpenTelemetry → Reqly) | various |
 
@@ -70,8 +72,8 @@ Dashboard on http://localhost:5173, collector API docs on http://localhost:8000/
    docker compose up timescaledb -d
    cd collector && pip install -e ".[dev]" && pytest
 
-   # Dashboard: unit tests, type-check and build
-   cd dashboard && npm ci && npm test && npm run build
+   # Dashboard: lint, unit tests, type-check and build
+   cd dashboard && npm ci && npm run lint && npm test && npm run build
 
    # Lint and type-check (Python)
    pip install ruff mypy
