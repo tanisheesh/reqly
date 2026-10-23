@@ -36,6 +36,9 @@ dependencies = [
     "httpx>=0.27,<1.0",
 ]
 
+[project.scripts]
+reqly = "reqly.cli:main"
+
 [project.urls]
 Homepage = "https://reqly.tanisheesh.in"
 Repository = "https://github.com/tanisheesh/reqly"
