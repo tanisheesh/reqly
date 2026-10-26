@@ -68,7 +68,7 @@
     "prepublishOnly": "npm test"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.135.0",
+    "@anthropic-ai/sdk": "^1.1.0",
     "@fastify/swagger": "^9.9.2",
     "@koa/router": "^15.7.0",
     "@nestjs/common": "^12.1.2",
