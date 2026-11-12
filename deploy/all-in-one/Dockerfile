@@ -4,13 +4,14 @@
 
 FROM node:22-alpine AS dashboard
 WORKDIR /app
-COPY dashboard/package.json dashboard/package-lock.json ./
-RUN npm ci
+RUN corepack enable
+COPY dashboard/package.json dashboard/pnpm-lock.yaml* dashboard/pnpm-workspace.yaml* ./
+RUN pnpm install --frozen-lockfile
 COPY dashboard/ ./
 # The collector writes /config.js at run time (this origin, and the read key
 # when the dashboard is public), so nothing is baked into the bundle.
 ENV VITE_COLLECTOR_URL="" VITE_READ_KEY=""
-RUN npm run build
+RUN pnpm run build
 
 FROM python:3.12-slim
 WORKDIR /srv

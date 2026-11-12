@@ -64,8 +64,8 @@
   "sideEffects": false,
   "scripts": {
     "build": "node scripts/clean.mjs && tsc -p tsconfig.json && tsc -p tsconfig.cjs.json && node scripts/cjs-package.mjs",
-    "test": "npm run build && node --test test/*.test.mjs",
-    "prepublishOnly": "npm test"
+    "test": "pnpm run build && node --test test/*.test.mjs",
+    "prepublishOnly": "pnpm test"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^1.1.0",

@@ -1,7 +1,8 @@
 FROM node:22-alpine AS build
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+RUN corepack enable
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
+RUN pnpm install --frozen-lockfile
 COPY . .
 # Build-time defaults. A published image is configured at run time instead,
 # with REQLY_COLLECTOR_URL / REQLY_READ_KEY (see docker/entrypoint.mjs).
@@ -9,7 +10,7 @@ ARG VITE_COLLECTOR_URL=http://localhost:8000
 ARG VITE_READ_KEY=demo-read-key
 ENV VITE_COLLECTOR_URL=$VITE_COLLECTOR_URL
 ENV VITE_READ_KEY=$VITE_READ_KEY
-RUN npm run build
+RUN pnpm run build
 
 FROM node:22-alpine
 WORKDIR /app
