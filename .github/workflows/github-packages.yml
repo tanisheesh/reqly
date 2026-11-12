@@ -202,8 +202,9 @@ jobs:
           registry-url: "https://npm.pkg.github.com"
           scope: "@${{ github.repository_owner }}"
 
-      - run: npm ci
-      - run: npm test
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
 
       - name: Publish @${{ github.repository_owner }}/reqly-node
         env:
